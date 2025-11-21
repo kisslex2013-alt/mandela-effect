@@ -1,0 +1,104 @@
+---
+alwaysApply: false
+---
+
+# Feature Name
+
+## Описание
+
+[Что делает эта фича]
+
+## Использование
+
+### Базовый пример
+
+```tsx
+import { FeatureName } from '@/components/FeatureName'
+
+function Page() {
+  return <FeatureName />
+}
+```
+
+### Props (если есть)
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `prop1` | `string` | - | Описание |
+
+## API Endpoints
+
+### GET /api/features
+
+Получает список всех features
+
+**Response:**
+
+```json
+{
+  "features": [
+    {
+      "id": "1",
+      "title": "Feature title",
+      "description": "Description",
+      "createdAt": "2024-01-01T00:00:00Z",
+      "updatedAt": "2024-01-01T00:00:00Z",
+      "userId": "user-1"
+    }
+  ]
+}
+```
+
+### POST /api/features
+
+Создает новую feature
+
+**Request:**
+
+```json
+{
+  "title": "Feature title",
+  "description": "Description"
+}
+```
+
+**Response:**
+
+```json
+{
+  "feature": { /* feature object */ }
+}
+```
+
+## State Management
+
+Используется Zustand store: `useFeatureStore`
+
+**Селекторы:**
+
+```tsx
+const features = useFeatureStore((state) => state.features)
+const isLoading = useFeatureStore((state) => state.isLoading)
+```
+
+**Actions:**
+
+```tsx
+const { fetchFeatures, createFeature } = useFeatureStore()
+```
+
+## Тестирование
+
+```bash
+npm run test components/FeatureName
+```
+
+## Known Issues
+
+- [ ] Issue 1
+- [ ] Issue 2
+
+## Roadmap
+
+- [ ] Будущая фича 1
+- [ ] Будущая фича 2

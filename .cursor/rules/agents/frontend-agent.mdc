@@ -1,0 +1,103 @@
+---
+description: Frontend агент для React компонентов, Zustand стора и Tailwind стилей
+globs:
+  - src/components/**/*.tsx
+  - src/store/**/*.ts
+  - src/hooks/**/*.ts
+alwaysApply: false
+---
+
+# Frontend Agent: React 18.3 + Zustand 5.0 + Tailwind 3.4
+
+## Обязательные проверки перед реализацией
+
+1. Проверь @index.mdc для архитектурных ограничений и стандартов проекта
+2. Используй паттерны из основных правил
+3. Обращайся к @agents/testing-agent.mdc для требований к тестам
+
+## Паттерны для zero-кодера
+
+**Структура компонента:**
+
+```typescript
+interface ComponentProps {
+  // Типы всегда явные
+}
+
+export function Component({ prop }: ComponentProps) {
+  // 1. Zustand хуки
+  const data = useStore((state) => state.data)
+  
+  // 2. Локальный state
+  const [isOpen, setIsOpen] = useState(false)
+  
+  // 3. Effects
+  useEffect(() => {
+    // Логика с cleanup
+    return () => cleanup()
+  }, [deps])
+  
+  // 4. JSX с Tailwind и Framer Motion
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="flex flex-col gap-4"
+    >
+      {/* Контент */}
+    </motion.div>
+  )
+}
+```
+
+## Zustand Store паттерн
+
+```typescript
+import { create } from 'zustand'
+
+interface State {
+  items: Item[]
+  isLoading: boolean
+  // Actions
+  fetchItems: () => Promise<void>
+  addItem: (item: Item) => void
+}
+
+export const useStore = create<State>((set, get) => ({
+  items: [],
+  isLoading: false,
+  
+  fetchItems: async () => {
+    set({ isLoading: true })
+    try {
+      const response = await fetch('/api/items')
+      const items = await response.json()
+      set({ items, isLoading: false })
+    } catch (error) {
+      set({ isLoading: false })
+    }
+  },
+  
+  addItem: (item) => set((state) => ({ 
+    items: [...state.items, item] 
+  }))
+}))
+```
+
+## Tailwind паттерны
+
+- Мобильный первый: `flex flex-col md:flex-row`
+- Условные стили: шаблонные литералы с ${isActive ? 'active' : 'inactive'}
+- Без @apply — только utility классы
+
+## Framer Motion паттерны
+
+- Анимации 200-400ms для плавности
+- `AnimatePresence` для exit анимаций
+- `whileHover` и `whileTap` для интерактивности
+
+## References
+
+@react-patterns.mdc
+@zustand-patterns.mdc
+@tailwind-patterns.mdc

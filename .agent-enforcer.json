@@ -1,0 +1,35 @@
+{
+  "rules": {
+    "js_ts": {
+      "no-console": "warning",
+      "no-debugger": "error",
+      "no-unused-vars": "warning",
+      "no-undef": "error",
+      "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "warning"
+    },
+    "python": {},
+    "general": {
+      "file-too-long": "warning",
+      "too-many-lines": "warning"
+    }
+  },
+  "ignore": [
+    "node_modules",
+    "dist",
+    "build",
+    ".git",
+    "backups",
+    "*.backup",
+    "*.log",
+    "coverage",
+    ".vscode",
+    ".idea"
+  ],
+  "fileExtensions": {
+    "js_ts": [".js", ".jsx", ".ts", ".tsx"],
+    "python": [".py"]
+  },
+  "maxFileLength": 500,
+  "maxLinesPerFunction": 100
+}

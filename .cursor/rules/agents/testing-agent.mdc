@@ -1,0 +1,383 @@
+---
+description: Testing агент для unit, integration и E2E тестов с Vitest и Testing Library
+globs:
+  - "**/*.test.ts"
+  - "**/*.test.tsx"
+  - "**/*.spec.ts"
+  - "**/*.spec.tsx"
+  - src/__tests__/**/*
+alwaysApply: false
+---
+
+# Testing Agent: Vitest + React Testing Library
+
+## Обязательные проверки перед реализацией
+
+1. Проверь @index.mdc для структуры проекта и стандартов тестирования
+2. Используй паттерны из основных правил
+3. Каждый компонент/функция должны иметь тесты
+
+## Паттерны для zero-кодера
+
+**Структура теста компонента:**
+
+```typescript
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { describe, it, expect, vi } from 'vitest'
+import { UserProfile } from './UserProfile'
+
+describe('UserProfile', () => {
+  // 1. Arrange - подготовка данных
+  const mockUser = {
+    id: '1',
+    name: 'John Doe',
+    email: 'john@example.com'
+  }
+  
+  // 2. Тест успешного рендера
+  it('отображает данные пользователя', () => {
+    render(<UserProfile user={mockUser} />)
+    
+    expect(screen.getByText('John Doe')).toBeInTheDocument()
+    expect(screen.getByText('john@example.com')).toBeInTheDocument()
+  })
+  
+  // 3. Тест интерактивности
+  it('вызывает onEdit при клике на кнопку', async () => {
+    const mockOnEdit = vi.fn()
+    
+    render(<UserProfile user={mockUser} onEdit={mockOnEdit} />)
+    
+    const editButton = screen.getByRole('button', { name: /edit/i })
+    fireEvent.click(editButton)
+    
+    expect(mockOnEdit).toHaveBeenCalledWith(mockUser)
+  })
+  
+  // 4. Тест loading состояния
+  it('показывает loader во время загрузки', () => {
+    render(<UserProfile user={null} isLoading={true} />)
+    
+    expect(screen.getByText('Loading...')).toBeInTheDocument()
+  })
+  
+  // 5. Тест error состояния
+  it('показывает ошибку при неудаче', () => {
+    render(<UserProfile user={null} error="Failed to load" />)
+    
+    expect(screen.getByText(/failed to load/i)).toBeInTheDocument()
+  })
+})
+```
+
+## Тестирование Zustand stores
+
+```typescript
+import { describe, it, expect, beforeEach } from 'vitest'
+import { useUserStore } from './userStore'
+
+describe('userStore', () => {
+  beforeEach(() => {
+    // Очистка store перед каждым тестом
+    useUserStore.setState({ users: [], isLoading: false })
+  })
+  
+  it('добавляет пользователя в список', () => {
+    const store = useUserStore.getState()
+    const newUser = { id: '1', name: 'John' }
+    
+    store.addUser(newUser)
+    
+    const users = useUserStore.getState().users
+    expect(users).toContainEqual(newUser)
+  })
+  
+  it('загружает пользователей асинхронно', async () => {
+    const store = useUserStore.getState()
+    
+    // Mock fetch
+    global.fetch = vi.fn(() =>
+      Promise.resolve({
+        json: () => Promise.resolve([{ id: '1', name: 'John' }])
+      })
+    ) as any
+    
+    await store.fetchUsers()
+    
+    const users = useUserStore.getState().users
+    expect(users).toHaveLength(1)
+    expect(useUserStore.getState().isLoading).toBe(false)
+  })
+})
+```
+
+## Тестирование API routes
+
+```typescript
+import { describe, it, expect, vi } from 'vitest'
+import { POST } from './route'
+import { NextRequest } from 'next/server'
+
+describe('POST /api/users', () => {
+  it('создает нового пользователя', async () => {
+    const mockData = {
+      email: 'test@example.com',
+      password: 'password123',
+      name: 'Test User'
+    }
+    
+    const request = new NextRequest('http://localhost:3000/api/users', {
+      method: 'POST',
+      body: JSON.stringify(mockData)
+    })
+    
+    const response = await POST(request)
+    const data = await response.json()
+    
+    expect(response.status).toBe(200)
+    expect(data).toHaveProperty('id')
+    expect(data.email).toBe(mockData.email)
+    // Пароль НЕ должен возвращаться
+    expect(data).not.toHaveProperty('password')
+  })
+  
+  it('возвращает 400 при невалидных данных', async () => {
+    const invalidData = {
+      email: 'not-an-email',
+      password: '123' // слишком короткий
+    }
+    
+    const request = new NextRequest('http://localhost:3000/api/users', {
+      method: 'POST',
+      body: JSON.stringify(invalidData)
+    })
+    
+    const response = await POST(request)
+    
+    expect(response.status).toBe(400)
+  })
+  
+  it('возвращает 401 при отсутствии авторизации', async () => {
+    const request = new NextRequest('http://localhost:3000/api/users', {
+      method: 'POST'
+    })
+    // Не передаем auth token
+    
+    const response = await POST(request)
+    
+    expect(response.status).toBe(401)
+  })
+})
+```
+
+## Тестирование hooks
+
+```typescript
+import { renderHook, act, waitFor } from '@testing-library/react'
+import { describe, it, expect } from 'vitest'
+import { useUser } from './useUser'
+
+describe('useUser', () => {
+  it('загружает данные пользователя', async () => {
+    const { result } = renderHook(() => useUser('user-1'))
+    
+    // Начальное состояние
+    expect(result.current.isLoading).toBe(true)
+    expect(result.current.user).toBeNull()
+    
+    // Ждем завершения загрузки
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
+    
+    expect(result.current.user).toBeDefined()
+    expect(result.current.user?.id).toBe('user-1')
+  })
+  
+  it('обновляет пользователя', async () => {
+    const { result } = renderHook(() => useUser('user-1'))
+    
+    await waitFor(() => {
+      expect(result.current.user).toBeDefined()
+    })
+    
+    const updatedData = { name: 'New Name' }
+    
+    act(() => {
+      result.current.updateUser(updatedData)
+    })
+    
+    expect(result.current.user?.name).toBe('New Name')
+  })
+})
+```
+
+## Integration тесты
+
+```typescript
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { describe, it, expect, beforeEach } from 'vitest'
+import { App } from './App'
+
+describe('App Integration Tests', () => {
+  beforeEach(() => {
+    // Очистка всех stores
+    useUserStore.getState().reset()
+    useAuthStore.getState().reset()
+  })
+  
+  it('полный flow: логин → загрузка данных → отображение', async () => {
+    render(<App />)
+    
+    // 1. Форма логина видна
+    expect(screen.getByLabelText(/email/i)).toBeInTheDocument()
+    
+    // 2. Вводим данные
+    fireEvent.change(screen.getByLabelText(/email/i), {
+      target: { value: 'test@example.com' }
+    })
+    fireEvent.change(screen.getByLabelText(/password/i), {
+      target: { value: 'password123' }
+    })
+    
+    // 3. Отправляем форму
+    fireEvent.click(screen.getByRole('button', { name: /login/i }))
+    
+    // 4. Ждем редиректа на dashboard
+    await waitFor(() => {
+      expect(screen.getByText(/dashboard/i)).toBeInTheDocument()
+    })
+    
+    // 5. Проверяем что данные загрузились
+    await waitFor(() => {
+      expect(screen.getByText(/welcome/i)).toBeInTheDocument()
+    })
+  })
+})
+```
+
+## Mocking внешних зависимостей
+
+```typescript
+import { vi } from 'vitest'
+
+// Mock fetch
+global.fetch = vi.fn()
+
+function mockFetch(data: any) {
+  return vi.fn(() =>
+    Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve(data)
+    })
+  ) as any
+}
+
+// Использование
+beforeEach(() => {
+  global.fetch = mockFetch([{ id: '1', name: 'Test' }])
+})
+
+// Mock модуля
+vi.mock('./api/client', () => ({
+  fetchUser: vi.fn(() => Promise.resolve({ id: '1', name: 'John' }))
+}))
+
+// Mock Zustand store
+vi.mock('./store', () => ({
+  useStore: vi.fn(() => ({
+    users: [],
+    addUser: vi.fn()
+  }))
+}))
+```
+
+## Snapshot тесты
+
+```typescript
+import { render } from '@testing-library/react'
+import { describe, it, expect } from 'vitest'
+import { Button } from './Button'
+
+describe('Button snapshots', () => {
+  it('рендерит primary вариант', () => {
+    const { container } = render(<Button variant="primary">Click me</Button>)
+    expect(container.firstChild).toMatchSnapshot()
+  })
+  
+  it('рендерит disabled состояние', () => {
+    const { container } = render(<Button disabled>Click me</Button>)
+    expect(container.firstChild).toMatchSnapshot()
+  })
+})
+```
+
+## Coverage требования
+
+```typescript
+// vitest.config.ts
+export default defineConfig({
+  test: {
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html'],
+      exclude: [
+        'node_modules/**',
+        'dist/**',
+        '**/*.config.ts',
+        '**/*.d.ts'
+      ],
+      // Минимальные требования
+      lines: 80,
+      functions: 80,
+      branches: 75,
+      statements: 80
+    }
+  }
+})
+```
+
+## Что тестировать (приоритеты)
+
+**Высокий приоритет:**
+
+- Критическая бизнес-логика (payment, auth)
+- Public API компонентов
+- Обработка ошибок
+- Edge cases (null, undefined, пустые массивы)
+
+**Средний приоритет:**
+
+- UI interactions (клики, формы)
+- State management (Zustand stores)
+- Conditional rendering
+
+**Низкий приоритет:**
+
+- Styling (используй snapshot тесты)
+- Простые utility функции
+- Constants и types
+
+## Анти-паттерны в тестах
+
+1. ❌ Тестирование implementation details вместо поведения
+2. ❌ Множество expect в одном тесте (разбивай на отдельные)
+3. ❌ Отсутствие cleanup после тестов
+4. ❌ Хардкод данных вместо fixtures
+5. ❌ Игнорирование async операций (забыл await)
+6. ❌ Тесты зависящие от порядка выполнения
+7. ❌ Слишком много моков (переусложнение)
+8. ❌ Тестирование сторонних библиотек
+
+## Test-Driven Development workflow
+
+1. Напиши failing тест (red)
+2. Напиши минимум кода чтобы тест прошел (green)
+3. Отрефактори код (refactor)
+4. Повтори
+
+## References
+
+@vitest-config.mdc
+@testing-library-patterns.mdc
+@mocking-guide.mdc

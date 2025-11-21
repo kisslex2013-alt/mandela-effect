@@ -1,0 +1,84 @@
+---
+description: Стандарты проекта для команды - загружается для всех задач
+alwaysApply: true
+---
+
+# Project Standards: React 18.3 + Zustand 5.0 + Tailwind 3.4
+
+## Архитектура проекта
+
+- **Frontend**: React 18.3 с TypeScript (строгий режим)
+- **State Management**: Zustand 5.0
+- **Styling**: Tailwind CSS 3.4
+- **Testing**: Vitest 4.0 + React Testing Library
+- **Build Tool**: Vite 7.1
+- **Charts**: Recharts 3.3
+- **Animations**: Framer Motion 12.23
+
+## Структура проекта
+
+```
+src/
+├── components/     # React компоненты
+│   ├── ui/         # Базовые UI компоненты
+│   ├── modals/     # Модальные окна
+│   ├── layout/     # Компоненты макета
+│   └── FeatureName/
+│       ├── index.tsx
+│       ├── FeatureName.tsx
+│       └── FeatureName.test.tsx
+├── store/          # Zustand stores
+│   └── useFeatureStore.ts
+├── hooks/          # Custom React hooks
+│   └── useFeature.ts
+├── utils/          # Утилиты и хелперы
+│   └── featureHelpers.ts
+├── types/          # TypeScript типы и интерфейсы
+│   └── feature.ts
+└── constants/      # Константы
+    └── featureConstants.ts
+```
+
+## Стандарты кода
+
+### TypeScript
+- Всегда явные типы, запрет на `any`
+- Используй интерфейсы для props компонентов
+- Строгий режим включен (`strict: true`)
+- Типы экспортируй из `types/` директории
+
+### React
+- Только функциональные компоненты
+- Hooks для state и side effects
+- Мемоизация через `useMemo`/`useCallback` где нужно
+- Компоненты в PascalCase, файлы в PascalCase.tsx
+
+### Zustand
+- Один store на домен/фичу
+- Селекторы для оптимизации ре-рендеров
+- Async actions через async/await
+- Типизация state через интерфейсы
+
+### Tailwind CSS
+- Utility-first подход
+- Компоненты через `className`
+- Кастомные классы только если нужно переиспользование
+- Responsive через префиксы (`sm:`, `md:`, `lg:`)
+
+## Маршрутизация агентов
+
+Когда пользователь запрашивает:
+
+- **Backend/API** → `@agents/backend-agent.mdc`
+- **UI/компоненты** → `@agents/frontend-agent.mdc`
+- **Тесты** → `@agents/testing-agent.mdc`
+- **Workflows** → `@workflows/feature-development.mdc`
+- **Code Review** → `@workflows/code-review.mdc`
+
+## Принципы для zero-кодера
+
+- Давай пошаговые объяснения
+- Генерируй полный рабочий код без пропусков
+- Используй комментарии на русском для сложной логики
+- Проверяй TypeScript типы явно
+- Показывай промежуточные результаты после каждого этапа

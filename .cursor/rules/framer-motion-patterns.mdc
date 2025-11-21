@@ -1,0 +1,123 @@
+---
+description: Специфичные правила для Framer Motion - GPU-accelerated анимации
+globs: ["**/*motion*", "**/*animation*", "**/*animate*"]
+---
+
+# Framer Motion Patterns: Правила для анимаций
+
+## Только transform properties
+
+Анимируй только transform properties (x, y, scale, rotate), **НИКОГДА width/height** — они вызывают layout reflow вместо GPU compositing.
+
+```javascript
+// ❌ НЕПРАВИЛЬНО - вызывает layout reflow
+<motion.div animate={{ width: 200, height: 100 }}>
+
+// ✅ ПРАВИЛЬНО - GPU compositing
+<motion.div animate={{ x: 100, scale: 1.2 }}>
+```
+
+**Правило:** "Use transform properties only. Example: animate={{x: 100, scale: 1.2}} NOT animate={{width: 200}}."
+
+## willChange CSS property обязателен
+
+**willChange CSS property обязателен** для performance. Без этого браузер не оптимизирует анимацию, вызывая dropped frames.
+
+```javascript
+// ✅ ПРАВИЛЬНО
+<motion.div
+  animate={{ x: 100 }}
+  style={{ willChange: 'transform' }}
+>
+
+// ✅ ПРАВИЛЬНО для opacity
+<motion.div
+  animate={{ opacity: 0.5 }}
+  style={{ willChange: 'opacity' }}
+>
+```
+
+**Правило:** "Always add style={{willChange: 'transform'}} when animating transform. Add willChange: 'opacity' when animating opacity."
+
+## AnimatePresence для exit animations
+
+AnimatePresence для exit animations — частая забывчивость слабых моделей:
+
+```javascript
+// ❌ НЕПРАВИЛЬНО - exit анимация не работает
+{isVisible && (
+  <motion.div
+    initial={{ opacity: 0 }}
+    animate={{ opacity: 1 }}
+    exit={{ opacity: 0 }}
+  >
+    Content
+  </motion.div>
+)}
+
+// ✅ ПРАВИЛЬНО - с AnimatePresence
+<AnimatePresence>
+  {isVisible && (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      Content
+    </motion.div>
+  )}
+</AnimatePresence>
+```
+
+**Правило:** "Wrap components with exit animations in AnimatePresence."
+
+## Структура анимации
+
+```javascript
+function AnimatedComponent({ isVisible }) {
+  return (
+    <AnimatePresence mode="wait">
+      {isVisible && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          transition={{ duration: 0.3, ease: 'easeOut' }}
+          style={{ willChange: 'transform, opacity' }}
+        >
+          Content
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+}
+```
+
+## Производительность
+
+- Используй только transform properties (x, y, scale, rotate, opacity)
+- Всегда добавляй `willChange` для анимируемых свойств
+- Используй `AnimatePresence` для exit animations
+- Избегай анимации width/height, top/left, margin/padding
+- Используй `layout` prop для автоматической анимации layout изменений
+
+## Variants для сложных анимаций
+
+Используй variants для организации сложных анимаций:
+
+```javascript
+const variants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: -20 }
+}
+
+<motion.div
+  variants={variants}
+  initial="hidden"
+  animate="visible"
+  exit="exit"
+>
+  Content
+</motion.div>
+```

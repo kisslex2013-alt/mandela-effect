@@ -1,0 +1,310 @@
+---
+description: Backend агент для API routes, серверной логики и интеграций с БД
+globs:
+  - src/api/**/*
+  - src/server/**/*
+  - src/lib/db/**/*
+  - src/services/**/*
+alwaysApply: false
+---
+
+# Backend Agent: API Routes + Server Logic
+
+## Обязательные проверки перед реализацией
+
+1. Проверь @index.mdc для архитектурных ограничений и стандартов проекта
+2. Используй паттерны из основных правил
+3. Обращайся к @agents/testing-agent.mdc для требований к API тестам
+
+## Паттерны для zero-кодера
+
+**Структура API route (Express/Next.js):**
+
+```typescript
+// Next.js API Route пример
+import { NextRequest, NextResponse } from 'next/server'
+
+interface RequestBody {
+  // Типы всегда явные
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    // 1. Валидация входных данных
+    const body: RequestBody = await request.json()
+    
+    // 2. Проверка авторизации
+    const user = await verifyAuth(request)
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+    
+    // 3. Бизнес-логика
+    const result = await processData(body)
+    
+    // 4. Успешный ответ
+    return NextResponse.json(result, { status: 200 })
+    
+  } catch (error) {
+    // 5. Обработка ошибок
+    console.error('API Error:', error)
+    return NextResponse.json(
+      { error: 'Internal Server Error' },
+      { status: 500 }
+    )
+  }
+}
+```
+
+## Работа с базой данных
+
+**Prisma паттерн (если используется):**
+
+```typescript
+import { prisma } from '@/lib/db'
+
+export async function getUser(id: string) {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        // Не возвращай пароли!
+      }
+    })
+    
+    return user
+  } catch (error) {
+    console.error('DB Error:', error)
+    throw new Error('Failed to fetch user')
+  }
+}
+
+export async function createUser(data: CreateUserInput) {
+  // Валидация перед записью
+  if (!data.email || !data.password) {
+    throw new Error('Missing required fields')
+  }
+  
+  // Хэширование пароля
+  const hashedPassword = await hashPassword(data.password)
+  
+  return await prisma.user.create({
+    data: {
+      ...data,
+      password: hashedPassword
+    }
+  })
+}
+```
+
+## Валидация данных
+
+**Используй Zod для type-safe валидации:**
+
+```typescript
+import { z } from 'zod'
+
+const UserSchema = z.object({
+  email: z.string().email('Неверный формат email'),
+  password: z.string().min(8, 'Минимум 8 символов'),
+  name: z.string().min(2, 'Минимум 2 символа')
+})
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json()
+    
+    // Валидация с понятными ошибками
+    const validated = UserSchema.parse(body)
+    
+    // Работаем с провалидированными данными
+    const result = await createUser(validated)
+    
+    return NextResponse.json(result)
+    
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: error.errors },
+        { status: 400 }
+      )
+    }
+    // Другие ошибки
+    return NextResponse.json(
+      { error: 'Internal error' },
+      { status: 500 }
+    )
+  }
+}
+```
+
+## Аутентификация и авторизация
+
+```typescript
+import { cookies } from 'next/headers'
+import { verify } from 'jsonwebtoken'
+
+export async function verifyAuth(request: NextRequest) {
+  try {
+    // Получаем token из cookie или header
+    const token = cookies().get('auth-token')?.value ||
+                  request.headers.get('authorization')?.replace('Bearer ', '')
+    
+    if (!token) return null
+    
+    // Проверяем token
+    const payload = verify(token, process.env.JWT_SECRET!)
+    
+    return payload as { userId: string }
+    
+  } catch (error) {
+    console.error('Auth error:', error)
+    return null
+  }
+}
+
+// Middleware для защищенных routes
+export function withAuth(handler: Function) {
+  return async (request: NextRequest) => {
+    const user = await verifyAuth(request)
+    
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+    
+    // Передаем user в handler
+    return handler(request, user)
+  }
+}
+```
+
+## Работа с внешними API
+
+```typescript
+export async function fetchExternalData(endpoint: string) {
+  try {
+    const response = await fetch(`${process.env.API_BASE_URL}${endpoint}`, {
+      headers: {
+        'Authorization': `Bearer ${process.env.API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      // Timeout для избежания зависания
+      signal: AbortSignal.timeout(5000)
+    })
+    
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`)
+    }
+    
+    return await response.json()
+    
+  } catch (error) {
+    console.error('External API error:', error)
+    throw error
+  }
+}
+```
+
+## Error handling паттерны
+
+```typescript
+// Кастомные ошибки для разных случаев
+export class ValidationError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'ValidationError'
+  }
+}
+
+export class AuthError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'AuthError'
+  }
+}
+
+// Централизованный error handler
+export function handleAPIError(error: unknown) {
+  if (error instanceof ValidationError) {
+    return NextResponse.json(
+      { error: error.message },
+      { status: 400 }
+    )
+  }
+  
+  if (error instanceof AuthError) {
+    return NextResponse.json(
+      { error: error.message },
+      { status: 401 }
+    )
+  }
+  
+  // Generic error
+  console.error('Unhandled error:', error)
+  return NextResponse.json(
+    { error: 'Internal server error' },
+    { status: 500 }
+  )
+}
+```
+
+## Rate limiting и безопасность
+
+```typescript
+import { ratelimit } from '@/lib/redis'
+
+export async function checkRateLimit(identifier: string) {
+  const { success, remaining } = await ratelimit.limit(identifier)
+  
+  if (!success) {
+    throw new Error('Rate limit exceeded')
+  }
+  
+  return remaining
+}
+
+// Использование в API route
+export async function POST(request: NextRequest) {
+  const ip = request.ip || 'anonymous'
+  
+  try {
+    await checkRateLimit(ip)
+    
+    // Обработка запроса
+    
+  } catch (error) {
+    if (error.message === 'Rate limit exceeded') {
+      return NextResponse.json(
+        { error: 'Too many requests' },
+        { status: 429 }
+      )
+    }
+  }
+}
+```
+
+## Анти-паттерны для backend
+
+1. ❌ Возврат паролей в API ответах
+2. ❌ SQL инъекции через прямые запросы без параметризации
+3. ❌ Отсутствие валидации входных данных
+4. ❌ Хранение секретов в коде (используй .env)
+5. ❌ Отсутствие обработки ошибок в async функциях
+6. ❌ Игнорирование CORS настроек
+7. ❌ Отсутствие логирования критических операций
+8. ❌ Синхронные операции блокирующие event loop
+
+## References
+
+@api-security.mdc
+@database-patterns.mdc
+@error-handling.mdc

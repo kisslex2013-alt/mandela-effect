@@ -1,0 +1,36 @@
+[
+  {
+    "id": 1763703482596,
+    "category": "films",
+    "categoryEmoji": "🎬",
+    "categoryName": "Фильмы/ТВ",
+    "title": "тестовое название",
+    "question": "тестовый вопрос 20 сим",
+    "variantA": "вариант а",
+    "variantB": "вариант б",
+    "currentState": "тестовое описание",
+    "sourceLink": "http://localhost:3000",
+    "submitterEmail": "k1sslex@yandex.ru",
+    "status": "pending",
+    "dateSubmitted": "2025-11-21T05:38:02.596Z",
+    "votesA": 0,
+    "votesB": 0
+  },
+  {
+    "id": 1763703668816,
+    "category": "brands",
+    "categoryEmoji": "🏢",
+    "categoryName": "Бренды",
+    "title": "тесновое название 2",
+    "question": "тестовый вопрос 20 сим",
+    "variantA": "Вариант А",
+    "variantB": "Вариант Б",
+    "currentState": "тестовое описание",
+    "sourceLink": "http://localhost:3000",
+    "submitterEmail": "sdfasd@adas.ci",
+    "status": "pending",
+    "dateSubmitted": "2025-11-21T05:41:08.816Z",
+    "votesA": 0,
+    "votesB": 0
+  }
+]

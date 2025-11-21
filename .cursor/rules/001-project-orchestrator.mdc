@@ -1,0 +1,16 @@
+---
+description: DEPRECATED - Используй @index.mdc вместо этого файла
+alwaysApply: false
+---
+
+# ⚠️ DEPRECATED: Project Orchestrator
+
+Этот файл устарел. Используй `.cursor/index.mdc` для Level 2 правил.
+
+## Миграция
+
+Все правила перенесены в `.cursor/index.mdc` с расширенной функциональностью.
+
+## Обратная совместимость
+
+Если есть ссылки на этот файл, они автоматически перенаправляются на `index.mdc`.

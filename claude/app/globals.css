@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Плавный скролл */
+html {
+  scroll-behavior: smooth;
+}
+

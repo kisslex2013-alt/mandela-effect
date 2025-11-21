@@ -1,0 +1,170 @@
+---
+description: Правила для Zustand stores - атомарные селекторы и организация
+globs: ["**/store/**/*.{js,ts}", "**/stores/**/*.{js,ts}"]
+---
+
+# Zustand Stores: Правила организации
+
+## Критическое правило: Атомарные селекторы
+
+**НИКОГДА** не экспортируй стор напрямую. Всегда создавай кастомные хуки с атомарными селекторами.
+
+```javascript
+// ❌ НЕПРАВИЛЬНО - вызывает ре-рендер при изменении любого поля
+const { bears, fish } = useBearStore()
+
+// ✅ ПРАВИЛЬНО - атомарные селекторы
+export const useBears = () => useBearStore(state => state.bears)
+export const useFish = () => useBearStore(state => state.fish)
+
+// Использование
+const bears = useBears()
+const fish = useFish()
+```
+
+**Правило:** "Export ONLY custom hooks (atomic selectors), NOT the store."
+
+## Разделение actions от state
+
+Организация стора должна отделять actions от state через namespace:
+
+```javascript
+// ✅ ПРАВИЛЬНО
+const useDashboardStore = create((set) => ({
+  // State
+  theme: 'dark',
+  refreshInterval: 5000,
+  chartType: 'line',
+  
+  // Actions namespace
+  actions: {
+    setTheme: (theme) => set({ theme }),
+    setRefreshInterval: (interval) => set({ refreshInterval: interval }),
+    setChartType: (type) => set({ chartType: type })
+  }
+}))
+
+// Экспорт атомарных селекторов
+export const useTheme = () => useDashboardStore(state => state.theme)
+export const useRefreshInterval = () => useDashboardStore(state => state.refreshInterval)
+export const useChartType = () => useDashboardStore(state => state.chartType)
+export const useDashboardActions = () => useDashboardStore(state => state.actions)
+```
+
+## Множественные маленькие сторы
+
+Создавай **множественные маленькие сторы по доменам** вместо одного гигантского:
+
+```javascript
+// ✅ ПРАВИЛЬНО - разделение по доменам
+// stores/uiStore.js
+export const useUIStore = create(...) // тема, сайдбар
+
+// stores/chartsStore.js
+export const useChartsStore = create(...) // настройки графиков
+
+// stores/audioStore.js
+export const useAudioStore = create(...) // Tone.js состояние
+```
+
+## Shallow comparison для объектов
+
+Если нужно выбрать несколько полей как объект, обязательно используй `shallow` из `zustand/shallow`:
+
+```javascript
+import { shallow } from 'zustand/shallow'
+
+// ❌ НЕПРАВИЛЬНО - каждый рендер создает новый объект
+const { theme, chartType } = useDashboardStore(state => ({
+  theme: state.theme,
+  chartType: state.chartType
+}))
+
+// ✅ ПРАВИЛЬНО - shallow comparison
+const { theme, chartType } = useDashboardStore(
+  state => ({
+    theme: state.theme,
+    chartType: state.chartType
+  }),
+  shallow
+)
+```
+
+## Async actions
+
+Используй async/await для асинхронных действий:
+
+```javascript
+const useFeatureStore = create((set, get) => ({
+  features: [],
+  isLoading: false,
+  error: null,
+  
+  actions: {
+    fetchFeatures: async () => {
+      set({ isLoading: true, error: null })
+      try {
+        const response = await fetch('/api/features')
+        const data = await response.json()
+        set({ features: data, isLoading: false })
+      } catch (error) {
+        set({ error: error.message, isLoading: false })
+      }
+    }
+  }
+}))
+```
+
+## Devtools middleware
+
+Используй devtools middleware для отладки:
+
+```javascript
+import { devtools } from 'zustand/middleware'
+
+const useStore = create(
+  devtools(
+    (set) => ({
+      // state
+    }),
+    { name: 'StoreName' }
+  )
+)
+```
+
+## Persist middleware
+
+Используй persist middleware для сохранения состояния:
+
+```javascript
+import { persist } from 'zustand/middleware'
+
+const useStore = create(
+  persist(
+    (set) => ({
+      // state
+    }),
+    { name: 'store-name' }
+  )
+)
+```
+
+## Типизация (если используется TypeScript)
+
+```typescript
+interface StoreState {
+  count: number
+  actions: {
+    increment: () => void
+    decrement: () => void
+  }
+}
+
+const useStore = create<StoreState>((set) => ({
+  count: 0,
+  actions: {
+    increment: () => set((state) => ({ count: state.count + 1 })),
+    decrement: () => set((state) => ({ count: state.count - 1 }))
+  }
+}))
+```

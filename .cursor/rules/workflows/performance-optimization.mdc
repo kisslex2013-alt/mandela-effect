@@ -1,0 +1,67 @@
+# Check Performance
+
+## Используй React DevTools Profiler
+
+Проверь что:
+
+1. Компоненты не ре-рендерятся без причины
+2. Дорогие операции в useMemo/useCallback
+3. Списки используют правильные keys
+
+### Пример оптимизации
+
+```typescript
+const MemoizedItem = memo(FeatureItem, (prev, next) => {
+  return prev.feature.id === next.feature.id &&
+         prev.feature.updatedAt === next.feature.updatedAt
+})
+```
+
+## Чеклист завершения фичи
+
+### ✅ Backend готов
+
+```text
+□ API endpoints реализованы и протестированы
+□ Валидация данных с Zod
+□ Error handling полный
+□ Авторизация проверяется
+□ Rate limiting настроен (если нужно)
+□ Логирование критических операций
+□ Unit тесты написаны и проходят
+```
+
+### ✅ Frontend готов
+
+```text
+□ Компоненты реализованы
+□ State management через Zustand
+□ Loading/Error/Empty states
+□ Форма валидируется
+□ Responsive дизайн (mobile + desktop)
+□ Accessibility (a11y) проверен
+□ Анимации добавлены (Framer Motion)
+□ Component тесты написаны
+```
+
+### ✅ Качество
+
+```text
+□ TypeScript без ошибок
+□ ESLint без warnings
+□ Code review пройден
+□ Performance оптимизирован
+□ Bundle size приемлем
+□ Нет security проблем
+□ Документация написана
+```
+
+### ✅ Deployment готовность
+
+```text
+□ ENV переменные документированы
+□ Database миграции готовы (если нужно)
+□ Feature flags настроены (если используются)
+□ Monitoring/logging настроен
+□ Rollback план есть
+```

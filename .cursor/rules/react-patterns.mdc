@@ -1,0 +1,195 @@
+---
+description: React-специфичные правила и паттерны
+globs: ["**/*.jsx", "**/*.tsx"]
+---
+
+# React Patterns: Правила для React компонентов
+
+## Rules of Hooks (критично для слабых моделей)
+
+Хуки должны вызываться **только на верхнем уровне функций**, никогда внутри условий, циклов или после early returns.
+
+```javascript
+// ❌ НЕПРАВИЛЬНО
+function Component({ condition }) {
+  if (condition) {
+    return null
+  }
+  const [state, setState] = useState(0) // ОШИБКА!
+}
+
+// ✅ ПРАВИЛЬНО
+function Component({ condition }) {
+  const [state, setState] = useState(0) // Всегда на верхнем уровне
+  
+  if (condition) {
+    return null
+  }
+}
+```
+
+**Повторяй в промптах:** "Hooks at the top level, before any conditional logic, never inside if statements or loops."
+
+## Dependency Arrays обязательны
+
+Массивы зависимостей в `useEffect`, `useCallback` и `useMemo` **обязательны в React 18**.
+
+```javascript
+// ❌ НЕПРАВИЛЬНО
+useEffect(() => {
+  fetchData()
+}) // Нет массива зависимостей!
+
+// ✅ ПРАВИЛЬНО
+useEffect(() => {
+  fetchData()
+}, []) // Пустой массив для однократного выполнения
+
+// ✅ ПРАВИЛЬНО с зависимостями
+useEffect(() => {
+  fetchData(userId)
+}, [userId]) // Зависимость указана
+```
+
+**Правило:** "Always specify dependency arrays. Use ESLint react-hooks/exhaustive-deps rule."
+
+## Очистка в useEffect
+
+Критична очистка в `useEffect` для событийных слушателей и подписок:
+
+```javascript
+useEffect(() => {
+  const handleResize = () => {
+    // обработка
+  }
+  
+  window.addEventListener('resize', handleResize)
+  
+  // ✅ ОБЯЗАТЕЛЬНО: очистка
+  return () => {
+    window.removeEventListener('resize', handleResize)
+  }
+}, [])
+
+// Для подписок
+useEffect(() => {
+  const unsubscribe = subscribe()
+  
+  return () => {
+    unsubscribe()
+  }
+}, [])
+```
+
+## Key props в списках
+
+**НИКОГДА** не используй индекс массива как key. Используй только уникальные стабильные ID.
+
+```javascript
+// ❌ НЕПРАВИЛЬНО
+{items.map((item, index) => (
+  <Item key={index} item={item} />
+))}
+
+// ✅ ПРАВИЛЬНО
+{items.map((item) => (
+  <Item key={item.id} item={item} />
+))}
+```
+
+**Правило:** "NEVER use array index as key. Use unique stable IDs only."
+
+## Структура компонента
+
+```javascript
+// ✅ ПРАВИЛЬНАЯ СТРУКТУРА
+function Component({ prop1, prop2 }) {
+  // 1. Hooks (всегда на верхнем уровне)
+  const [state, setState] = useState(null)
+  const data = useStore(state => state.data)
+  
+  // 2. Computed values
+  const computed = useMemo(() => {
+    return expensiveCalculation(data)
+  }, [data])
+  
+  // 3. Event handlers
+  const handleClick = useCallback(() => {
+    // обработка
+  }, [])
+  
+  // 4. Effects
+  useEffect(() => {
+    // side effects
+  }, [])
+  
+  // 5. Early returns
+  if (loading) {
+    return <Spinner />
+  }
+  
+  if (error) {
+    return <Error message={error} />
+  }
+  
+  // 6. Render
+  return (
+    <div>
+      {/* JSX */}
+    </div>
+  )
+}
+```
+
+## Мемоизация
+
+Используй `useMemo` для дорогих вычислений и `useCallback` для функций, передаваемых в дочерние компоненты:
+
+```javascript
+// ✅ useMemo для дорогих вычислений
+const formattedData = useMemo(() => {
+  return rawData.map(item => ({
+    ...item,
+    formatted: formatDate(item.date)
+  }))
+}, [rawData])
+
+// ✅ useCallback для функций
+const handleSubmit = useCallback((data) => {
+  onSubmit(data)
+}, [onSubmit])
+```
+
+## Loading и Error states
+
+Всегда обрабатывай loading и error состояния:
+
+```javascript
+function Component() {
+  const { data, isLoading, error } = useData()
+  
+  if (isLoading) {
+    return <Spinner />
+  }
+  
+  if (error) {
+    return <Error message={error.message} />
+  }
+  
+  if (!data || data.length === 0) {
+    return <EmptyState />
+  }
+  
+  return (
+    <div>
+      {/* Основной контент */}
+    </div>
+  )
+}
+```
+
+## Максимальная длина компонента
+
+- Компонент: максимум 100 строк
+- JSX: максимум 50 строк (выноси в подкомпоненты)
+- Функция: максимум 50 строк (разбивай на подфункции)
