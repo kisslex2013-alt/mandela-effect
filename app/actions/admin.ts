@@ -1,6 +1,7 @@
 'use server';
 
 import prisma from '@/lib/prisma';
+import { Prisma } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
 
@@ -125,7 +126,7 @@ export async function createEffect(
         history: data.history || null,
         historySource: data.historySource || null,
         yearDiscovered: data.yearDiscovered || null,
-        interpretations: data.interpretations || null,
+        interpretations: data.interpretations ? data.interpretations : Prisma.JsonNull,
         votesFor: 0,
         votesAgainst: 0,
         views: 0,
@@ -304,7 +305,7 @@ export async function approveSubmission(
         history: data.history || null,
         historySource: data.historySource || null,
         yearDiscovered: data.yearDiscovered || null,
-        interpretations: data.interpretations || null,
+        interpretations: data.interpretations ? data.interpretations : Prisma.JsonNull,
         votesFor: 0,
         votesAgainst: 0,
         views: 0,
