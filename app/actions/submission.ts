@@ -1,6 +1,7 @@
 'use server';
 
 import prisma from '@/lib/prisma';
+import { Prisma } from '@prisma/client';
 
 // ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
 
@@ -362,7 +363,7 @@ export async function submitEffect(data: SubmitEffectData): Promise<SubmitResult
         currentState: currentState || null,
         sourceLink: sourceLink || null,
         submitterEmail: email || null,
-        interpretations: interpretationsData,
+        interpretations: interpretationsData ? interpretationsData : Prisma.JsonNull,
         status: 'PENDING',
       },
     });
