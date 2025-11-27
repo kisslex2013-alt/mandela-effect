@@ -1,0 +1,69 @@
+/* ВАРИАНТ А - ЗАМЕНИ ВЕСЬ БЛОК С hasVoted */
+
+{!hasVoted ? (
+  <motion.button
+    onClick={() => handleVote('A')}
+    disabled={isVoting}
+    whileHover={{ scale: 1.05 }}
+    whileTap={{ scale: 0.95 }}
+    className="w-full mt-6 px-6 py-3 bg-dark rounded-lg text-light font-semibold hover:bg-gradient-to-r hover:from-primary hover:to-secondary transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+  >
+    {isVoting && (
+      <svg className="animate-spin h-5 w-5 text-light" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+      </svg>
+    )}
+    {isVoting ? 'Отправка...' : 'Выбрать'}
+  </motion.button>
+) : (
+  <motion.div 
+    initial={{ opacity: 0, y: 10 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.5 }}
+    className="mt-4 space-y-3"
+  >
+    {/* Прогресс-бар */}
+    <div className="relative h-3 rounded-full bg-dark/50 overflow-hidden">
+      <motion.div
+        className="h-full bg-gradient-to-r from-primary to-primary/80"
+        initial={{ width: 0 }}
+        animate={{ width: `${effect.percentA}%` }}
+        transition={{ duration: 0.8, delay: 0.3 }}
+      />
+    </div>
+    
+    {/* Статистика */}
+    <div className="flex items-center justify-between text-sm">
+      <span className="text-primary font-bold text-base">
+        {effect.percentA.toFixed(1)}%
+      </span>
+      <span className="text-light/60">
+        {effect.votesA.toLocaleString('ru-RU')} голосов
+      </span>
+    </div>
+    
+    {/* Статус выбора */}
+    {selectedVariant === 'A' && (
+      <div className="space-y-2 pt-2 border-t border-light/10">
+        <div className="text-primary font-bold flex items-center gap-2">
+          <span className="text-xl">✓</span>
+          Ты выбрал этот вариант
+        </div>
+        {effect.votesA > effect.votesB ? (
+          <div className="text-xs px-3 py-1.5 bg-blue-500/20 border border-blue-500/50 text-blue-300 rounded-lg inline-flex items-center gap-1.5">
+            <span>👥</span> В большинстве
+          </div>
+        ) : effect.votesA < effect.votesB ? (
+          <div className="text-xs px-3 py-1.5 bg-purple-500/20 border border-purple-500/50 text-purple-300 rounded-lg inline-flex items-center gap-1.5">
+            <span>✨</span> В меньшинстве
+          </div>
+        ) : (
+          <div className="text-xs px-3 py-1.5 bg-gray-500/20 border border-gray-500/50 text-gray-300 rounded-lg inline-flex items-center gap-1.5">
+            <span>⚖️</span> Голоса разделились
+          </div>
+        )}
+      </div>
+    )}
+  </motion.div>
+)}

@@ -6,27 +6,45 @@
     "dev": "next dev --webpack",
     "build": "next build --webpack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "analyze": "cross-env ANALYZE=true next build --webpack",
+    "db:seed": "npx prisma db seed",
+    "db:reset-demo": "cross-env SEED_MODE=demo npx prisma db push --force-reset && cross-env SEED_MODE=demo npx prisma db seed",
+    "db:reset-prod": "cross-env SEED_MODE=production npx prisma db push --force-reset && cross-env SEED_MODE=production npx prisma db seed"
+  },
+  "prisma": {
+    "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "@prisma/client": "^5.22.0",
     "@types/canvas-confetti": "^1.9.0",
     "canvas-confetti": "^1.9.4",
     "date-fns": "^4.1.0",
     "embla-carousel-react": "^8.6.0",
+    "emoji-picker-react": "^4.16.1",
+    "framer-motion": "^12.23.24",
     "next": "16.0.3",
+    "openai": "^6.9.1",
+    "prisma": "^5.22.0",
     "react": "19.2.0",
     "react-dom": "19.2.0",
-    "react-hot-toast": "^2.6.0"
+    "react-hot-toast": "^2.6.0",
+    "recharts": "^3.4.1",
+    "zod": "^4.1.13"
   },
   "devDependencies": {
+    "@next/bundle-analyzer": "^16.0.3",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "autoprefixer": "^10.4.20",
+    "cross-env": "^10.1.0",
     "eslint": "^9",
     "eslint-config-next": "16.0.3",
     "postcss": "^8.4.49",
     "tailwindcss": "3.4.17",
+    "ts-node": "^10.9.2",
     "typescript": "^5"
   }
 }
