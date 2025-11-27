@@ -1,51 +1,79 @@
 import { MetadataRoute } from 'next';
-import effectsData from '@/data/effects.json';
+import prisma from '@/lib/prisma';
 
-export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = 'https://yourdomain.com'; // Замени на свой домен
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://mandela-effect.vercel.app';
+  
+  // Получаем все эффекты из базы данных
+  const effects = await prisma.effect.findMany({
+    select: {
+      id: true,
+      updatedAt: true,
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+  });
   
   // Статические страницы
-  const staticPages = [
+  const staticPages: MetadataRoute.Sitemap = [
     {
       url: baseUrl,
       lastModified: new Date(),
-      changeFrequency: 'daily' as const,
+      changeFrequency: 'daily',
       priority: 1,
     },
     {
       url: `${baseUrl}/catalog`,
       lastModified: new Date(),
-      changeFrequency: 'daily' as const,
+      changeFrequency: 'daily',
       priority: 0.9,
+    },
+    {
+      url: `${baseUrl}/about`,
+      lastModified: new Date(),
+      changeFrequency: 'monthly',
+      priority: 0.7,
+    },
+    {
+      url: `${baseUrl}/how-it-works`,
+      lastModified: new Date(),
+      changeFrequency: 'monthly',
+      priority: 0.7,
     },
     {
       url: `${baseUrl}/my-memory`,
       lastModified: new Date(),
-      changeFrequency: 'weekly' as const,
+      changeFrequency: 'weekly',
       priority: 0.7,
     },
     {
       url: `${baseUrl}/stats`,
       lastModified: new Date(),
-      changeFrequency: 'weekly' as const,
+      changeFrequency: 'weekly',
       priority: 0.7,
+    },
+    {
+      url: `${baseUrl}/quiz`,
+      lastModified: new Date(),
+      changeFrequency: 'weekly',
+      priority: 0.8,
     },
     {
       url: `${baseUrl}/submit`,
       lastModified: new Date(),
-      changeFrequency: 'monthly' as const,
+      changeFrequency: 'monthly',
       priority: 0.6,
     },
   ];
   
   // Страницы эффектов
-  const effectPages = effectsData.map((effect) => ({
+  const effectPages: MetadataRoute.Sitemap = effects.map((effect) => ({
     url: `${baseUrl}/effect/${effect.id}`,
-    lastModified: new Date(effect.dateAdded),
-    changeFrequency: 'weekly' as const,
+    lastModified: effect.updatedAt,
+    changeFrequency: 'weekly',
     priority: 0.8,
   }));
   
   return [...staticPages, ...effectPages];
 }
-
