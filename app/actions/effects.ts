@@ -144,6 +144,11 @@ export async function getEffects(params: GetEffectsParams = {}): Promise<EffectR
   }
 
   try {
+    // Проверяем подключение к БД
+    const dbUrl = process.env.DATABASE_URL;
+    const isPooler = dbUrl?.includes('pooler') || dbUrl?.includes(':6543');
+    console.log(`[getEffects] DATABASE_URL использует ${isPooler ? 'Pooler' : 'Direct Connection'}`);
+    
     const effects = await prisma.effect.findMany({
       where,
       orderBy,
@@ -151,19 +156,31 @@ export async function getEffects(params: GetEffectsParams = {}): Promise<EffectR
       skip: offset,
     });
 
-    console.log(`[getEffects] Получено эффектов: ${effects.length}`);
+    console.log(`[getEffects] ✅ Получено эффектов: ${effects.length}`);
 
     // Сериализуем даты в строки для корректной передачи клиенту
     const serialized = effects.map(serializeEffect);
-    console.log(`[getEffects] Сериализовано эффектов: ${serialized.length}`);
+    console.log(`[getEffects] ✅ Сериализовано эффектов: ${serialized.length}`);
     
     return serialized;
   } catch (error) {
     console.error('[getEffects] ❌ ОШИБКА при получении эффектов:');
     console.error('[getEffects] Тип ошибки:', error instanceof Error ? error.constructor.name : typeof error);
     console.error('[getEffects] Сообщение:', error instanceof Error ? error.message : String(error));
+    
+    // Детальная информация об ошибке Prisma
+    if (error && typeof error === 'object' && 'code' in error) {
+      console.error('[getEffects] Код ошибки:', (error as any).code);
+    }
+    if (error && typeof error === 'object' && 'meta' in error) {
+      console.error('[getEffects] Meta:', (error as any).meta);
+    }
+    
     console.error('[getEffects] Stack:', error instanceof Error ? error.stack : 'N/A');
-    throw new Error('Не удалось загрузить эффекты');
+    
+    // Возвращаем пустой массив вместо выброса ошибки для graceful degradation
+    console.warn('[getEffects] ⚠️ Возвращаем пустой массив из-за ошибки');
+    return [];
   }
 }
 
@@ -292,7 +309,12 @@ export async function getQuizEffects(limit: number = 10): Promise<EffectResult[]
     return orderedEffects;
   } catch (error) {
     console.error('[getQuizEffects] ❌ ОШИБКА:', error);
-    throw new Error('Не удалось загрузить эффекты для квиза');
+    console.error('[getQuizEffects] Тип ошибки:', error instanceof Error ? error.constructor.name : typeof error);
+    console.error('[getQuizEffects] Сообщение:', error instanceof Error ? error.message : String(error));
+    
+    // Возвращаем пустой массив вместо выброса ошибки для graceful degradation
+    console.warn('[getQuizEffects] ⚠️ Возвращаем пустой массив из-за ошибки');
+    return [];
   }
 }
 
