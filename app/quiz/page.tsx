@@ -1,4 +1,4 @@
-import { getQuizEffects } from '@/app/actions/effects';
+import { getQuizEffects, type EffectResult } from '@/app/actions/effects';
 import QuizClient from './QuizClient';
 
 export const metadata = {
@@ -19,7 +19,7 @@ function parseVariantsFromContent(content: string): { variantA: string; variantB
 
 export default async function QuizPage() {
   // Загружаем 10 случайных эффектов для квиза с обработкой ошибок
-  let rawEffects = [];
+  let rawEffects: EffectResult[] = [];
   
   try {
     rawEffects = await getQuizEffects(10);
