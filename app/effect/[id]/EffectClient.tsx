@@ -214,7 +214,7 @@ export default function EffectClient({ effect: initialEffect, allEffects }: Effe
         setSelectedVariant(existingVote.variant as 'A' | 'B');
         setHasVoted(true);
         setIsVoting(false);
-        toast.info('Вы уже проголосовали за этот эффект');
+        toast('Вы уже проголосовали за этот эффект', { icon: 'ℹ️' });
         return;
       }
 
