@@ -445,9 +445,11 @@ export default function EffectClient({ effect: initialEffect, allEffects }: Effe
 
           {/* Вариант B */}
           <motion.div
-            whileHover={!hasVoted ? { scale: 1.02 } : {}}
+            whileHover={!hasVoted && !isCheckingVote ? { scale: 1.02 } : {}}
             className={`relative bg-darkCard p-8 rounded-xl transition-all duration-300 border-2 ${
-              selectedVariant === 'B'
+              isCheckingVote
+                ? 'opacity-50 pointer-events-none'
+                : selectedVariant === 'B'
                 ? 'border-secondary bg-secondary/10 shadow-lg shadow-secondary/20'
                 : hasVoted
                 ? 'border-transparent opacity-80'
