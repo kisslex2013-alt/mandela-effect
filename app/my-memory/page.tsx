@@ -12,6 +12,8 @@ import EmptyState from '@/components/EmptyState';
 import CustomSelect from '@/components/ui/CustomSelect';
 import SaveProgress from '@/components/SaveProgress';
 import { getEffects, type EffectResult } from '@/app/actions/effects';
+import { getUserVotes as getUserVotesFromDB } from '@/app/actions/votes';
+import { getVisitorId } from '@/lib/visitor';
 
 // Dynamic import только для DonutChart
 const DonutChart = dynamic(() => import('@/components/DonutChart').then(mod => ({ default: mod.DonutChart })), {
@@ -204,7 +206,49 @@ export default function MyMemoryPage() {
     const loadStats = async () => {
       try {
         setLoading(true);
-        const userVotes = getUserVotes();
+        
+        // Получаем visitorId
+        const visitorId = getVisitorId();
+        if (!visitorId) {
+          setStats(null);
+          setVotes([]);
+          setMemoryProfile('');
+          setLoading(false);
+          return;
+        }
+
+        // Загружаем голоса из БД
+        let serverVotesData;
+        try {
+          serverVotesData = await getUserVotesFromDB(visitorId);
+        } catch (error) {
+          console.error('[MyMemory] Ошибка загрузки голосов из БД:', error);
+          serverVotesData = { totalVotes: 0, votes: [] };
+        }
+        
+        // Также загружаем из localStorage как fallback
+        const localVotes = getUserVotes(); // локальная функция для localStorage
+        
+        // Объединяем голоса: сначала БД, потом localStorage (БД имеет приоритет)
+        const allVotesMap = new Map<string, Vote>();
+        
+        // Добавляем голоса из БД
+        serverVotesData.votes.forEach((vote) => {
+          allVotesMap.set(vote.effectId, {
+            effectId: vote.effectId,
+            variant: vote.variant as 'A' | 'B',
+            timestamp: new Date(vote.createdAt).getTime(),
+          });
+        });
+        
+        // Добавляем голоса из localStorage (если их нет в БД)
+        localVotes.forEach((vote) => {
+          if (!allVotesMap.has(vote.effectId)) {
+            allVotesMap.set(vote.effectId, vote);
+          }
+        });
+        
+        const userVotes = Array.from(allVotesMap.values());
 
         if (userVotes.length === 0) {
           setStats(null);
