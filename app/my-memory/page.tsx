@@ -633,18 +633,21 @@ export default function MyMemoryPage() {
                       
                       {/* Диаграмма */}
                       <div className="flex justify-center mb-4 md:mb-6 relative group/chart">
-                        <div className="transition-transform duration-500 group-hover/chart:scale-105">
-                          <ResponsiveContainer width="100%" height={200} className="max-w-[200px] md:max-w-[280px]">
+                        <div className="transition-transform duration-500 group-hover/chart:scale-105 w-[200px] h-[200px] md:w-[280px] md:h-[280px]">
+                          <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                               <Pie
                                 data={pieData}
                                 cx="50%"
                                 cy="50%"
-                                innerRadius={85}
-                                outerRadius={125}
+                                innerRadius="35%"
+                                outerRadius="50%"
                                 paddingAngle={3}
                                 dataKey="value"
                                 stroke="none"
+                                animationBegin={0}
+                                animationDuration={1000}
+                                animationEasing="ease-out"
                               >
                                 <Cell fill="#3B82F6" stroke="none" />
                                 <Cell fill="#F97316" stroke="none" />
