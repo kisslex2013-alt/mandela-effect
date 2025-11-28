@@ -633,16 +633,20 @@ export default function MyMemoryPage() {
                       
                       {/* Диаграмма */}
                       <div className="flex justify-center mb-4 md:mb-6 relative group/chart">
-                        <div className="relative transition-transform duration-500 group-hover/chart:scale-105 w-[240px] h-[240px] md:w-[320px] md:h-[320px] lg:w-[360px] lg:h-[360px]">
+                        <div className="relative transition-transform duration-500 group-hover/chart:scale-105 
+                          w-[240px] h-[240px] 
+                          md:w-[280px] md:h-[280px] 
+                          lg:w-[400px] lg:h-[400px] 
+                          xl:w-[450px] xl:h-[450px]">
                           <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                               <Pie
                                 data={pieData}
                                 cx="50%"
                                 cy="50%"
-                                innerRadius="45%"
-                                outerRadius="65%"
-                                paddingAngle={3}
+                                innerRadius="50%"
+                                outerRadius="75%"
+                                paddingAngle={4}
                                 dataKey="value"
                                 stroke="none"
                                 animationBegin={0}
@@ -656,15 +660,15 @@ export default function MyMemoryPage() {
                           </ResponsiveContainer>
                           
                           {/* Процент в центре (поверх диаграммы) - точно по центру контейнера графика */}
-                          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center pointer-events-none z-10">
-                            <p className={`text-3xl md:text-5xl lg:text-6xl font-bold mb-1 transition-all duration-300 group-hover/chart:scale-110 group-hover/chart:animate-pulse ${
+                          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center pointer-events-none z-10 w-[50%]">
+                            <p className={`text-2xl md:text-4xl lg:text-6xl xl:text-7xl font-bold mb-0.5 md:mb-1 transition-all duration-300 group-hover/chart:scale-110 group-hover/chart:animate-pulse leading-tight ${
                               stats.majorityPercent >= stats.minorityPercent 
                                 ? 'text-blue-400' 
                                 : 'text-orange-400'
                             }`}>
                               {Math.max(stats.majorityPercent, stats.minorityPercent).toFixed(0)}%
                             </p>
-                            <p className="text-light/60 text-xs md:text-sm lg:text-base">
+                            <p className="text-light/60 text-[10px] md:text-xs lg:text-sm xl:text-base leading-tight text-center">
                               {stats.majorityPercent >= stats.minorityPercent ? 'большинство' : 'меньшинство'}
                             </p>
                           </div>
