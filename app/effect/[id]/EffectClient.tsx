@@ -180,8 +180,19 @@ export default function EffectClient({ effect: initialEffect, allEffects }: Effe
     };
     
     checkVote();
+
+    // Слушаем события обновления голосов (если голос был добавлен на другой странице)
+    const handleVoteUpdate = () => {
+      if (isMounted) {
+        checkVote();
+      }
+    };
+    window.addEventListener('voteUpdated', handleVoteUpdate);
     
-    return () => { isMounted = false; };
+    return () => {
+      isMounted = false;
+      window.removeEventListener('voteUpdated', handleVoteUpdate);
+    };
   }, [effect.id]);
 
   // Навигация

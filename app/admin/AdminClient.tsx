@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { updateEffect, deleteEffect, logout, approveSubmission, rejectSubmission, createEffect } from '@/app/actions/admin';
 import { generateEffectInfo } from '@/app/actions/generate-content';
 import { getCategories, createCategory, updateCategory, deleteCategory, type Category } from '@/app/actions/category';
+import { recalculateAllVoteCounters } from '@/app/actions/recalculate-votes';
 import CustomSelect, { type SelectOption } from '@/components/ui/CustomSelect';
 import EmojiPickerInput from '@/components/ui/EmojiPickerInput';
 import toast from 'react-hot-toast';
@@ -99,6 +100,7 @@ export default function AdminClient({ effects: initialEffects, submissions: init
   const [bulkRunning, setBulkRunning] = useState(false);
   const [loading, setLoading] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
+  const [recalculating, setRecalculating] = useState(false);
   
   // Категории - редактирование
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -937,6 +939,45 @@ export default function AdminClient({ effects: initialEffects, submissions: init
             >
               <span>➕</span>
               Добавить эффект
+            </button>
+            <button
+              onClick={async () => {
+                if (confirm('Пересчитать счетчики голосов для всех эффектов из таблицы Vote? Это может занять некоторое время.')) {
+                  setRecalculating(true);
+                  try {
+                    const result = await recalculateAllVoteCounters();
+                    if (result.success) {
+                      toast.success(`✅ ${result.message}`);
+                      // Обновляем страницу для отображения новых данных
+                      router.refresh();
+                    } else {
+                      toast.error(`❌ Ошибка: ${result.message}`);
+                    }
+                  } catch (error) {
+                    console.error('[Admin] Ошибка пересчета:', error);
+                    toast.error('Ошибка при пересчете счетчиков');
+                  } finally {
+                    setRecalculating(false);
+                  }
+                }
+              }}
+              disabled={recalculating}
+              className="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {recalculating ? (
+                <>
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Пересчет...
+                </>
+              ) : (
+                <>
+                  <span>🔄</span>
+                  Пересчитать голоса
+                </>
+              )}
             </button>
             <button
               onClick={() => {
