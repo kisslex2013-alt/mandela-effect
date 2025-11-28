@@ -644,9 +644,9 @@ export default function MyMemoryPage() {
                                 data={pieData}
                                 cx="50%"
                                 cy="50%"
-                                innerRadius="50%"
-                                outerRadius="75%"
-                                paddingAngle={4}
+                                innerRadius="55%"
+                                outerRadius="80%"
+                                paddingAngle={5}
                                 dataKey="value"
                                 stroke="none"
                                 animationBegin={0}
@@ -659,16 +659,30 @@ export default function MyMemoryPage() {
                             </PieChart>
                           </ResponsiveContainer>
                           
-                          {/* Процент в центре (поверх диаграммы) - точно по центру контейнера графика */}
-                          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center pointer-events-none z-10 w-[50%]">
-                            <p className={`text-2xl md:text-4xl lg:text-6xl xl:text-7xl font-bold mb-0.5 md:mb-1 transition-all duration-300 group-hover/chart:scale-110 group-hover/chart:animate-pulse leading-tight ${
+                          {/* Процент в центре (поверх диаграммы) - строго внутри innerRadius с запасом */}
+                          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center pointer-events-none z-10" 
+                            style={{ 
+                              width: '45%', 
+                              height: '45%',
+                              maxWidth: '45%',
+                              maxHeight: '45%'
+                            }}>
+                            <p className={`font-bold mb-0.5 md:mb-1 transition-all duration-300 leading-tight text-center ${
                               stats.majorityPercent >= stats.minorityPercent 
                                 ? 'text-blue-400' 
                                 : 'text-orange-400'
-                            }`}>
+                            }`}
+                            style={{
+                              fontSize: 'clamp(1.25rem, 4vw, 4rem)',
+                              lineHeight: '1.1'
+                            }}>
                               {Math.max(stats.majorityPercent, stats.minorityPercent).toFixed(0)}%
                             </p>
-                            <p className="text-light/60 text-[10px] md:text-xs lg:text-sm xl:text-base leading-tight text-center">
+                            <p className="text-light/60 leading-tight text-center"
+                            style={{
+                              fontSize: 'clamp(0.625rem, 1.5vw, 0.875rem)',
+                              lineHeight: '1.2'
+                            }}>
                               {stats.majorityPercent >= stats.minorityPercent ? 'большинство' : 'меньшинство'}
                             </p>
                           </div>
