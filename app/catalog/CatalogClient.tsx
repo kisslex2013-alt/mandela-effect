@@ -61,15 +61,18 @@ export default function CatalogClient({
       const visitorId = getVisitorId();
       const votedIds: string[] = [];
 
+      console.log('[Catalog] Загрузка голосов, visitorId:', visitorId?.substring(0, 20) + '...');
+
       // 1. Загружаем голоса из БД
       if (visitorId) {
         try {
           const serverVotes = await getUserVotes(visitorId);
+          console.log('[Catalog] ✅ Загружено голосов из БД:', serverVotes.totalVotes);
           serverVotes.votes.forEach((vote) => {
             votedIds.push(vote.effectId);
           });
         } catch (error) {
-          console.error('[Catalog] Ошибка загрузки голосов из БД:', error);
+          console.error('[Catalog] ❌ Ошибка загрузки голосов из БД:', error);
         }
       }
 

@@ -47,16 +47,25 @@ export async function saveVote(data: VoteData): Promise<VoteResult> {
   try {
     const { visitorId, effectId, variant } = data;
 
+    console.log('[saveVote] Начало сохранения голоса:', {
+      visitorId: visitorId?.substring(0, 20) + '...',
+      effectId,
+      variant,
+    });
+
     // Валидация
     if (!visitorId || visitorId.length < 10) {
+      console.error('[saveVote] ❌ Некорректный visitorId:', visitorId?.substring(0, 20));
       return { success: false, error: 'Некорректный ID посетителя' };
     }
 
     if (!effectId) {
+      console.error('[saveVote] ❌ Отсутствует effectId');
       return { success: false, error: 'ID эффекта обязателен' };
     }
 
     if (variant !== 'A' && variant !== 'B') {
+      console.error('[saveVote] ❌ Некорректный variant:', variant);
       return { success: false, error: 'Вариант должен быть A или B' };
     }
 
@@ -66,8 +75,11 @@ export async function saveVote(data: VoteData): Promise<VoteResult> {
     });
 
     if (!effect) {
+      console.error('[saveVote] ❌ Эффект не найден:', effectId);
       return { success: false, error: 'Эффект не найден' };
     }
+
+    console.log('[saveVote] ✅ Эффект найден:', effect.title);
 
     // Проверяем, есть ли уже голос
     const existingVote = await prisma.vote.findUnique({
@@ -124,9 +136,11 @@ export async function saveVote(data: VoteData): Promise<VoteResult> {
       });
     } else {
       // Создаём новый голос
+      console.log('[saveVote] Создание нового голоса...');
       vote = await prisma.vote.create({
         data: { visitorId, effectId, variant },
       });
+      console.log('[saveVote] ✅ Голос создан:', vote.id);
 
       // Обновляем статистику эффекта
       await prisma.effect.update({
@@ -136,6 +150,7 @@ export async function saveVote(data: VoteData): Promise<VoteResult> {
           votesAgainst: variant === 'B' ? { increment: 1 } : undefined,
         },
       });
+      console.log('[saveVote] ✅ Статистика эффекта обновлена');
 
       isNewVote = true;
     }

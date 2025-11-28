@@ -46,19 +46,34 @@ export default function QuizClient({ effects }: QuizClientProps) {
       return;
     }
 
-    // Отправляем голос на сервер через saveVote (сохраняет в БД и обновляет статистику)
-    const result = await saveVote({
-      visitorId,
+    console.log('[Quiz] Сохранение голоса:', {
+      visitorId: visitorId.substring(0, 20) + '...',
       effectId: currentEffect.id,
       variant,
+      title: currentEffect.title,
     });
 
-    if (result.success) {
-      // Сохраняем локальный бэкап
-      saveLocalVote(currentEffect.id, variant, currentEffect.title);
-      
-      // Отправляем событие для обновления каталога
-      window.dispatchEvent(new Event('voteUpdated'));
+    // Отправляем голос на сервер через saveVote (сохраняет в БД и обновляет статистику)
+    try {
+      const result = await saveVote({
+        visitorId,
+        effectId: currentEffect.id,
+        variant,
+      });
+
+      if (result.success) {
+        console.log('[Quiz] ✅ Голос успешно сохранен:', result);
+        
+        // Сохраняем локальный бэкап
+        saveLocalVote(currentEffect.id, variant, currentEffect.title);
+        
+        // Отправляем событие для обновления каталога
+        window.dispatchEvent(new Event('voteUpdated'));
+      } else {
+        console.error('[Quiz] ❌ Ошибка сохранения голоса:', result.error);
+      }
+    } catch (error) {
+      console.error('[Quiz] ❌ Исключение при сохранении голоса:', error);
     }
 
     // Считаем очки (совпал с большинством?)

@@ -220,9 +220,11 @@ export default function MyMemoryPage() {
         // Загружаем голоса из БД
         let serverVotesData;
         try {
+          console.log('[MyMemory] Загрузка голосов из БД, visitorId:', visitorId.substring(0, 20) + '...');
           serverVotesData = await getUserVotesFromDB(visitorId);
+          console.log('[MyMemory] ✅ Загружено голосов из БД:', serverVotesData.totalVotes);
         } catch (error) {
-          console.error('[MyMemory] Ошибка загрузки голосов из БД:', error);
+          console.error('[MyMemory] ❌ Ошибка загрузки голосов из БД:', error);
           serverVotesData = { totalVotes: 0, votes: [] };
         }
         
