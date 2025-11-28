@@ -163,7 +163,7 @@ export default function EffectClient({ effect: initialEffect, allEffects }: Effe
             return; // Выходим сразу, не ждем сервер
           }
         } catch {
-          if (votedStr === 'A' || votedStr === 'B' && isMounted) {
+          if ((votedStr === 'A' || votedStr === 'B') && isMounted) {
             setSelectedVariant(votedStr);
             setHasVoted(true);
             setIsCheckingVote(false);
