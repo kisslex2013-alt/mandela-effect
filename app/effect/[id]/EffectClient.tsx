@@ -97,6 +97,7 @@ export default function EffectClient({ effect: initialEffect, allEffects }: Effe
   const [selectedVariant, setSelectedVariant] = useState<'A' | 'B' | null>(null);
   const [hasVoted, setHasVoted] = useState(false);
   const [isVoting, setIsVoting] = useState(false);
+  const [isCheckingVote, setIsCheckingVote] = useState(true); // Состояние проверки голоса
   const [showCurrentState, setShowCurrentState] = useState(false);
   const [showResidue, setShowResidue] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -133,6 +134,8 @@ export default function EffectClient({ effect: initialEffect, allEffects }: Effe
     let isMounted = true;
     
     const checkVote = async () => {
+      setIsCheckingVote(true); // Начинаем проверку
+      
       const visitorId = getVisitorId();
       
       if (visitorId) {
@@ -154,6 +157,7 @@ export default function EffectClient({ effect: initialEffect, allEffects }: Effe
         if (isMounted && serverVote.variant) {
           setSelectedVariant(serverVote.variant as 'A' | 'B');
           setHasVoted(true);
+          setIsCheckingVote(false); // Проверка завершена
           return;
         }
       }
@@ -176,6 +180,10 @@ export default function EffectClient({ effect: initialEffect, allEffects }: Effe
             setHasVoted(true);
           }
         }
+      }
+      
+      if (isMounted) {
+        setIsCheckingVote(false); // Проверка завершена
       }
     };
     
@@ -334,11 +342,26 @@ export default function EffectClient({ effect: initialEffect, allEffects }: Effe
 
         {/* Варианты */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 mb-8">
+          {/* Индикатор загрузки проверки голоса */}
+          {isCheckingVote && (
+            <div className="col-span-2 flex items-center justify-center py-8">
+              <div className="flex items-center gap-3 text-light/60">
+                <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                <span>Проверка статуса голосования...</span>
+              </div>
+            </div>
+          )}
+          
           {/* Вариант A */}
           <motion.div
-            whileHover={!hasVoted ? { scale: 1.02 } : {}}
+            whileHover={!hasVoted && !isCheckingVote ? { scale: 1.02 } : {}}
             className={`relative bg-darkCard p-8 rounded-xl transition-all duration-300 border-2 ${
-              selectedVariant === 'A'
+              isCheckingVote
+                ? 'opacity-50 pointer-events-none'
+                : selectedVariant === 'A'
                 ? 'border-primary bg-primary/10 shadow-lg shadow-primary/20'
                 : hasVoted
                 ? 'border-transparent opacity-80'
@@ -452,10 +475,10 @@ export default function EffectClient({ effect: initialEffect, allEffects }: Effe
               {variantB}
             </p>
 
-            {!hasVoted ? (
+            {!hasVoted && !isCheckingVote ? (
               <motion.button
                 onClick={() => handleVote('B')}
-                disabled={isVoting}
+                disabled={isVoting || isCheckingVote}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 className="w-full px-6 py-4 bg-dark rounded-lg text-light font-semibold hover:bg-gradient-to-r hover:from-secondary hover:to-secondary/80 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"

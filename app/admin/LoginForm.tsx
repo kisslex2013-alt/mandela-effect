@@ -21,8 +21,9 @@ export default function LoginForm() {
       } else {
         setError(result.error || 'Неверный пароль');
       }
-    } catch {
-      setError('Ошибка подключения');
+    } catch (error) {
+      console.error('[LoginForm] Ошибка при авторизации:', error);
+      setError('Ошибка конфигурации сервера. Проверьте переменные окружения ADMIN_PASSWORD в Vercel.');
     } finally {
       setLoading(false);
     }
