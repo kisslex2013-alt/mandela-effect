@@ -119,29 +119,39 @@ export default function HomeClient({
         const uniqueVotedCount = allVotesMap.size;
         if (uniqueVotedCount === 0) return;
 
-        // Используем переданные эффекты для подсчёта статистики
-        const allEffects = [...popularEffects, ...newEffects];
+        // Загружаем ВСЕ эффекты из БД для правильного подсчета статистики (как в "Моя память")
+        const { getEffects } = await import('@/app/actions/effects');
+        const allEffectsRaw = await getEffects({ limit: 1000 });
+        
+        // Создаем Map для быстрого доступа
+        const effectsMap = new Map<string, EffectResult>();
+        allEffectsRaw.forEach((effect) => {
+          effectsMap.set(effect.id, effect);
+        });
+
         let inMajority = 0;
         let inMinority = 0;
         let uniqueMemory = 0;
 
         allVotesMap.forEach(({ effectId, variant }) => {
-          const effect = allEffects.find((e) => e.id === effectId);
-          if (effect) {
-            const totalVotes = effect.votesFor + effect.votesAgainst;
-            if (totalVotes === 0) return;
+          const effect = effectsMap.get(effectId);
+          if (!effect) return;
 
-            const percentA = (effect.votesFor / totalVotes) * 100;
-            const percentB = (effect.votesAgainst / totalVotes) * 100;
-            const userPercent = variant === 'A' ? percentA : percentB;
+          const totalVotes = effect.votesFor + effect.votesAgainst;
+          if (totalVotes === 0) return;
 
-            if (userPercent > 50) {
-              inMajority++;
-            } else if (userPercent >= 30) {
-              inMinority++;
-            } else {
-              uniqueMemory++;
-            }
+          // Правильная проверка: в большинстве ли пользователь
+          // Если пользователь выбрал A, то он в большинстве если votesFor > votesAgainst
+          // Если пользователь выбрал B, то он в большинстве если votesAgainst > votesFor
+          const isInMajority = variant === 'A' 
+            ? effect.votesFor > effect.votesAgainst
+            : effect.votesAgainst > effect.votesFor;
+
+          if (isInMajority) {
+            inMajority++;
+          } else {
+            // Если не в большинстве, то в меньшинстве
+            inMinority++;
           }
         });
 
