@@ -136,48 +136,73 @@ export default function EffectClient({ effect: initialEffect, allEffects }: Effe
     const checkVote = async () => {
       setIsCheckingVote(true); // Начинаем проверку
       
-      const visitorId = getVisitorId();
-      
-      if (visitorId) {
-        // Сначала проверяем миграцию (один раз при первом входе)
-        if (needsMigration()) {
-          const localVotes = getLocalVotes();
-          if (localVotes.length > 0) {
-            console.log('[Migration] Мигрируем', localVotes.length, 'голосов...');
-            const result = await migrateLocalVotes(visitorId, localVotes);
-            if (result.success && result.migrated > 0) {
-              clearLocalVotes();
-              toast.success(`✅ Мигрировано ${result.migrated} голосов на сервер!`);
-            }
-          }
-        }
-        
-        // Проверяем голос на сервере
-        const serverVote = await getUserVote(visitorId, effect.id);
-        if (isMounted && serverVote.variant) {
-          setSelectedVariant(serverVote.variant as 'A' | 'B');
-          setHasVoted(true);
-          setIsCheckingVote(false); // Проверка завершена
-          return;
-        }
-      }
-      
-      // Fallback: проверяем localStorage (для оффлайн режима)
+      // СНАЧАЛА проверяем localStorage (мгновенно, синхронно)
       const votedKey = `voted_effect_${effect.id}`;
       const votedStr = localStorage.getItem(votedKey);
       
-      if (isMounted && votedStr) {
+      if (votedStr) {
         try {
           const voteData = JSON.parse(votedStr);
           const voted = typeof voteData === 'string' ? voteData : voteData.variant;
-          if (voted === 'A' || voted === 'B') {
+          if ((voted === 'A' || voted === 'B') && isMounted) {
             setSelectedVariant(voted);
             setHasVoted(true);
+            setIsCheckingVote(false); // Быстрая проверка завершена
+            // Параллельно проверяем сервер для синхронизации (не блокируем UI)
+            const visitorId = getVisitorId();
+            if (visitorId) {
+              getUserVote(visitorId, effect.id).then((serverVote) => {
+                if (isMounted && serverVote.variant && serverVote.variant !== voted) {
+                  // Если на сервере другой голос - обновляем
+                  setSelectedVariant(serverVote.variant as 'A' | 'B');
+                }
+              }).catch(() => {
+                // Игнорируем ошибки сервера, используем localStorage
+              });
+            }
+            return; // Выходим сразу, не ждем сервер
           }
         } catch {
-          if (votedStr === 'A' || votedStr === 'B') {
+          if (votedStr === 'A' || votedStr === 'B' && isMounted) {
             setSelectedVariant(votedStr);
             setHasVoted(true);
+            setIsCheckingVote(false);
+            return;
+          }
+        }
+      }
+      
+      // Если в localStorage нет - проверяем сервер
+      const visitorId = getVisitorId();
+      
+      if (visitorId) {
+        // Проверяем сервер с таймаутом (максимум 2 секунды)
+        const serverCheckPromise = getUserVote(visitorId, effect.id);
+        const timeoutPromise = new Promise<{ variant: null }>((resolve) => {
+          setTimeout(() => resolve({ variant: null }), 2000);
+        });
+        
+        const serverVote = await Promise.race([serverCheckPromise, timeoutPromise]);
+        
+        if (isMounted && serverVote.variant) {
+          setSelectedVariant(serverVote.variant as 'A' | 'B');
+          setHasVoted(true);
+          setIsCheckingVote(false);
+          return;
+        }
+        
+        // Параллельно проверяем миграцию (не блокируем UI)
+        if (needsMigration()) {
+          const localVotes = getLocalVotes();
+          if (localVotes.length > 0) {
+            migrateLocalVotes(visitorId, localVotes).then((result) => {
+              if (result.success && result.migrated > 0) {
+                clearLocalVotes();
+                toast.success(`✅ Мигрировано ${result.migrated} голосов на сервер!`);
+              }
+            }).catch(() => {
+              // Игнорируем ошибки миграции
+            });
           }
         }
       }

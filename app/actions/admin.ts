@@ -175,16 +175,29 @@ export async function checkAuth(
   password: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    // Проверяем переменную окружения (может быть undefined если не установлена)
     const adminPassword = process.env.ADMIN_PASSWORD;
 
+    console.log('[checkAuth] Проверка пароля:', {
+      hasPassword: !!password,
+      passwordLength: password?.length,
+      hasEnvVar: !!adminPassword,
+      envVarLength: adminPassword?.length,
+      envVarPreview: adminPassword ? adminPassword.substring(0, 3) + '...' : 'undefined',
+    });
+
     if (!adminPassword) {
-      console.error('ADMIN_PASSWORD не установлен в переменных окружения');
-      return { success: false, error: 'Ошибка конфигурации сервера' };
+      console.error('[checkAuth] ❌ ADMIN_PASSWORD не установлен в переменных окружения');
+      console.error('[checkAuth] Доступные env vars:', Object.keys(process.env).filter(k => k.includes('ADMIN')));
+      return { success: false, error: 'Ошибка конфигурации сервера. Переменная ADMIN_PASSWORD не найдена. Проверьте настройки Vercel и перезапустите деплой.' };
     }
 
     if (password !== adminPassword) {
+      console.warn('[checkAuth] ❌ Неверный пароль. Ожидалось:', adminPassword.substring(0, 3) + '...', 'Получено:', password.substring(0, 3) + '...');
       return { success: false, error: 'Неверный пароль' };
     }
+
+    console.log('[checkAuth] ✅ Пароль верный');
 
     // Устанавливаем cookie для сессии
     const cookieStore = await cookies();
