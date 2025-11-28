@@ -117,22 +117,34 @@ export async function saveVote(data: VoteData): Promise<VoteResult> {
       // Обновляем голос и пересчитываем статистику
       const oldVariant = existingVote.variant;
 
+      console.log('[saveVote] Обновление существующего голоса:', {
+        oldVariant,
+        newVariant: variant,
+        effectId,
+      });
+
       vote = await prisma.vote.update({
         where: { id: existingVote.id },
         data: { variant },
       });
+      console.log('[saveVote] ✅ Голос обновлен:', vote.id);
 
       // Пересчитываем: убираем старый голос, добавляем новый
+      // Если старый голос был A, а новый B: votesFor -1, votesAgainst +1
+      // Если старый голос был B, а новый A: votesFor +1, votesAgainst -1
+      const votesForIncrement = oldVariant === 'A' ? -1 : (variant === 'A' ? 1 : 0);
+      const votesAgainstIncrement = oldVariant === 'B' ? -1 : (variant === 'B' ? 1 : 0);
+
       await prisma.effect.update({
         where: { id: effectId },
         data: {
-          votesFor: {
-            increment: variant === 'A' ? 1 : (oldVariant === 'A' ? -1 : 0),
-          },
-          votesAgainst: {
-            increment: variant === 'B' ? 1 : (oldVariant === 'B' ? -1 : 0),
-          },
+          votesFor: { increment: votesForIncrement },
+          votesAgainst: { increment: votesAgainstIncrement },
         },
+      });
+      console.log('[saveVote] ✅ Статистика эффекта обновлена:', {
+        votesForIncrement,
+        votesAgainstIncrement,
       });
     } else {
       // Создаём новый голос

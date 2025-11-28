@@ -59,31 +59,64 @@ export default function HomeClient({
   useEffect(() => {
     const loadUserStats = async () => {
       try {
-        // Собираем уникальные голоса (ключи в localStorage уже уникальны по effectId)
-        const uniqueVotesMap = new Map<string, { effectId: string; variant: 'A' | 'B' }>();
+        // Получаем visitorId
+        const { getVisitorId } = await import('@/lib/visitor');
+        const visitorId = getVisitorId();
+        
+        if (!visitorId) {
+          return;
+        }
 
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (key?.startsWith('voted_effect_')) {
-            const effectId = key.replace('voted_effect_', '');
-            const voteDataStr = localStorage.getItem(key);
+        // Загружаем голоса из БД (единый источник данных)
+        const { getUserVotes: getUserVotesFromDB } = await import('@/app/actions/votes');
+        let serverVotesData;
+        try {
+          serverVotesData = await getUserVotesFromDB(visitorId);
+        } catch (error) {
+          console.error('[Home] Ошибка загрузки голосов из БД:', error);
+          serverVotesData = { totalVotes: 0, votes: [] };
+        }
 
-            if (!voteDataStr) continue;
-
-            try {
-              const voteData = JSON.parse(voteDataStr);
-              if (voteData.variant && (voteData.variant === 'A' || voteData.variant === 'B')) {
-                // Используем Map для гарантии уникальности по effectId
-                uniqueVotesMap.set(effectId, { effectId, variant: voteData.variant });
+        // Также загружаем из localStorage как fallback
+        const localVotes: Array<{ effectId: string; variant: 'A' | 'B' }> = [];
+        if (typeof window !== 'undefined') {
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key?.startsWith('voted_effect_')) {
+              const effectId = key.replace('voted_effect_', '');
+              const voteDataStr = localStorage.getItem(key);
+              if (!voteDataStr) continue;
+              try {
+                const voteData = JSON.parse(voteDataStr);
+                if (voteData.variant && (voteData.variant === 'A' || voteData.variant === 'B')) {
+                  localVotes.push({ effectId, variant: voteData.variant });
+                }
+              } catch {
+                // Игнорируем ошибки парсинга
               }
-            } catch {
-              // Игнорируем ошибки парсинга
             }
           }
         }
 
-        // Количество уникальных проголосованных эффектов
-        const uniqueVotedCount = uniqueVotesMap.size;
+        // Объединяем голоса: сначала БД, потом localStorage (БД имеет приоритет)
+        const allVotesMap = new Map<string, { effectId: string; variant: 'A' | 'B' }>();
+        
+        // Добавляем голоса из БД
+        serverVotesData.votes.forEach((vote) => {
+          allVotesMap.set(vote.effectId, {
+            effectId: vote.effectId,
+            variant: vote.variant as 'A' | 'B',
+          });
+        });
+        
+        // Добавляем голоса из localStorage (если их нет в БД)
+        localVotes.forEach((vote) => {
+          if (!allVotesMap.has(vote.effectId)) {
+            allVotesMap.set(vote.effectId, { effectId: vote.effectId, variant: vote.variant });
+          }
+        });
+
+        const uniqueVotedCount = allVotesMap.size;
         if (uniqueVotedCount === 0) return;
 
         // Используем переданные эффекты для подсчёта статистики
@@ -92,7 +125,7 @@ export default function HomeClient({
         let inMinority = 0;
         let uniqueMemory = 0;
 
-        uniqueVotesMap.forEach(({ effectId, variant }) => {
+        allVotesMap.forEach(({ effectId, variant }) => {
           const effect = allEffects.find((e) => e.id === effectId);
           if (effect) {
             const totalVotes = effect.votesFor + effect.votesAgainst;

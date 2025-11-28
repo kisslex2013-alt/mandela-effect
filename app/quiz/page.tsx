@@ -18,30 +18,7 @@ function parseVariantsFromContent(content: string): { variantA: string; variantB
 }
 
 export default async function QuizPage() {
-  // Загружаем 10 случайных эффектов для квиза с обработкой ошибок
-  let rawEffects: EffectResult[] = [];
-  
-  try {
-    rawEffects = await getQuizEffects(10);
-  } catch (error) {
-    console.error('[QuizPage] Ошибка при загрузке эффектов:', error);
-    // В случае ошибки используем пустой массив - компонент покажет empty state
-  }
-
-  // Преобразуем в формат для QuizClient
-  const effects = rawEffects.map((effect) => {
-    const { variantA, variantB } = parseVariantsFromContent(effect.content);
-    return {
-      id: effect.id,
-      title: effect.title,
-      question: effect.description,
-      variantA,
-      variantB,
-      votesA: effect.votesFor,
-      votesB: effect.votesAgainst,
-      category: effect.category,
-    };
-  });
-
-  return <QuizClient effects={effects} />;
+  // QuizClient теперь сам загружает эффекты на клиенте с учетом visitorId
+  // Передаем пустой массив, чтобы компонент загрузил эффекты сам
+  return <QuizClient />;
 }

@@ -281,11 +281,11 @@ export async function getStats(): Promise<{
 }
 
 /**
- * Получить случайные эффекты для квиза
+ * Получить случайные эффекты для квиза (исключая пройденные)
  */
-export async function getQuizEffects(limit: number = 10): Promise<EffectResult[]> {
+export async function getQuizEffects(limit: number = 10, visitorId?: string): Promise<EffectResult[]> {
   try {
-    console.log('[getQuizEffects] Запрос случайных эффектов, limit:', limit);
+    console.log('[getQuizEffects] Запрос случайных эффектов, limit:', limit, 'visitorId:', visitorId?.substring(0, 20) + '...');
 
     // 1. Получаем все ID эффектов
     const allIds = await prisma.effect.findMany({
@@ -297,22 +297,46 @@ export async function getQuizEffects(limit: number = 10): Promise<EffectResult[]
       return [];
     }
 
-    // 2. Перемешиваем массив ID (Fisher-Yates shuffle)
-    const shuffledIds = allIds.map((e) => e.id);
+    // 2. Если есть visitorId, исключаем эффекты, на которые уже есть голоса
+    let availableIds = allIds.map((e) => e.id);
+    
+    if (visitorId && visitorId.length >= 10) {
+      try {
+        const userVotes = await prisma.vote.findMany({
+          where: { visitorId },
+          select: { effectId: true },
+        });
+        
+        const votedEffectIds = new Set(userVotes.map((v) => v.effectId));
+        availableIds = availableIds.filter((id) => !votedEffectIds.has(id));
+        console.log('[getQuizEffects] Исключено пройденных эффектов:', votedEffectIds.size, 'Доступно:', availableIds.length);
+      } catch (error) {
+        console.error('[getQuizEffects] Ошибка при получении голосов пользователя:', error);
+        // Продолжаем без исключения, если ошибка
+      }
+    }
+
+    if (availableIds.length === 0) {
+      console.log('[getQuizEffects] Нет доступных эффектов (все пройдены)');
+      return [];
+    }
+
+    // 3. Перемешиваем массив ID (Fisher-Yates shuffle)
+    const shuffledIds = [...availableIds];
     for (let i = shuffledIds.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [shuffledIds[i], shuffledIds[j]] = [shuffledIds[j], shuffledIds[i]];
     }
 
-    // 3. Берём первые `limit` штук
+    // 4. Берём первые `limit` штук
     const selectedIds = shuffledIds.slice(0, Math.min(limit, shuffledIds.length));
 
-    // 4. Загружаем полные данные для выбранных ID
+    // 5. Загружаем полные данные для выбранных ID
     const effects = await prisma.effect.findMany({
       where: { id: { in: selectedIds } },
     });
 
-    // 5. Сортируем в том же порядке, что и selectedIds (чтобы сохранить случайный порядок)
+    // 6. Сортируем в том же порядке, что и selectedIds (чтобы сохранить случайный порядок)
     const effectsMap = new Map(effects.map((e) => [e.id, e]));
     const orderedEffects = selectedIds
       .map((id) => effectsMap.get(id))

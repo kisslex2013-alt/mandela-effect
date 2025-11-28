@@ -1,11 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { saveVote } from '@/app/actions/votes';
 import { getVisitorId } from '@/lib/visitor';
 import { saveLocalVote } from '@/lib/visitor';
+import { getQuizEffects } from '@/app/actions/effects';
 import Link from 'next/link';
+import Loading from '@/components/Loading';
+import EmptyState from '@/components/EmptyState';
 
 // Тип Effect для квиза
 interface Effect {
@@ -20,14 +23,68 @@ interface Effect {
 }
 
 interface QuizClientProps {
-  effects: Effect[];
+  initialEffects?: Effect[]; // Опционально для обратной совместимости
 }
 
-export default function QuizClient({ effects }: QuizClientProps) {
+export default function QuizClient({ initialEffects }: QuizClientProps) {
+  const [effects, setEffects] = useState<Effect[]>(initialEffects || []);
+  const [loading, setLoading] = useState(!initialEffects || initialEffects.length === 0);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showResult, setShowResult] = useState(false);
   const [lastVoteVariant, setLastVoteVariant] = useState<'A' | 'B' | null>(null);
   const [score, setScore] = useState(0); // Сколько раз совпал с большинством
+
+  // Загрузка эффектов для квиза (исключая пройденные)
+  useEffect(() => {
+    const loadQuizEffects = async () => {
+      const visitorId = getVisitorId();
+      if (!visitorId) {
+        console.error('[Quiz] Не удалось получить visitorId');
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const rawEffects = await getQuizEffects(10, visitorId);
+        
+        if (rawEffects.length === 0) {
+          setEffects([]);
+          setLoading(false);
+          return;
+        }
+
+        // Преобразуем в формат для квиза
+        const quizEffects: Effect[] = rawEffects.map((effect) => {
+          const lines = effect.content.split('\n');
+          const variantALine = lines.find((l) => l.startsWith('Вариант А:'));
+          const variantBLine = lines.find((l) => l.startsWith('Вариант Б:'));
+          return {
+            id: effect.id,
+            title: effect.title,
+            question: effect.description,
+            variantA: variantALine?.replace('Вариант А: ', '').trim() || 'Вариант А',
+            variantB: variantBLine?.replace('Вариант Б: ', '').trim() || 'Вариант Б',
+            votesA: effect.votesFor,
+            votesB: effect.votesAgainst,
+            category: effect.category,
+          };
+        });
+
+        setEffects(quizEffects);
+      } catch (error) {
+        console.error('[Quiz] Ошибка загрузки эффектов:', error);
+        setEffects([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // Загружаем только если нет initialEffects
+    if (!initialEffects || initialEffects.length === 0) {
+      loadQuizEffects();
+    }
+  }, [initialEffects]);
 
   const currentEffect = effects[currentIndex];
   const isFinished = currentIndex >= effects.length;
@@ -90,15 +147,26 @@ export default function QuizClient({ effects }: QuizClientProps) {
     setCurrentIndex((i) => i + 1);
   };
 
-  // Пустое состояние
+  // Состояние загрузки
+  if (loading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center text-center p-4 bg-dark">
+        <Loading text="Загружаем вопросы для квиза..." size="lg" />
+      </div>
+    );
+  }
+
+  // Пустое состояние - нет доступных эффектов
   if (!effects || effects.length === 0) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center text-center p-4 bg-dark">
-        <h1 className="text-4xl font-bold mb-4 text-light">Квиз недоступен</h1>
-        <p className="text-xl mb-8 text-light/80">Не удалось загрузить вопросы</p>
-        <Link href="/catalog" className="bg-primary px-6 py-3 rounded-lg font-bold text-white">
-          В каталог
-        </Link>
+        <EmptyState
+          icon="🎯"
+          title="Нет новых эффектов для квиза"
+          description="Вы уже прошли все доступные эффекты! Попробуйте другие эффекты в каталоге."
+          actionLabel="Перейти в каталог"
+          actionHref="/catalog"
+        />
       </div>
     );
   }
