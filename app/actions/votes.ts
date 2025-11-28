@@ -121,24 +121,23 @@ export async function saveVote(data: VoteData): Promise<VoteResult> {
     }
 
     // Создаём новый голос (если дошли сюда, значит голоса еще нет)
-      console.log('[saveVote] Создание нового голоса...');
-      vote = await prisma.vote.create({
-        data: { visitorId, effectId, variant },
-      });
-      console.log('[saveVote] ✅ Голос создан:', vote.id);
+    console.log('[saveVote] Создание нового голоса...');
+    vote = await prisma.vote.create({
+      data: { visitorId, effectId, variant },
+    });
+    console.log('[saveVote] ✅ Голос создан:', vote.id);
 
-      // Обновляем статистику эффекта
-      await prisma.effect.update({
-        where: { id: effectId },
-        data: {
-          votesFor: variant === 'A' ? { increment: 1 } : undefined,
-          votesAgainst: variant === 'B' ? { increment: 1 } : undefined,
-        },
-      });
-      console.log('[saveVote] ✅ Статистика эффекта обновлена');
+    // Обновляем статистику эффекта
+    await prisma.effect.update({
+      where: { id: effectId },
+      data: {
+        votesFor: variant === 'A' ? { increment: 1 } : undefined,
+        votesAgainst: variant === 'B' ? { increment: 1 } : undefined,
+      },
+    });
+    console.log('[saveVote] ✅ Статистика эффекта обновлена');
 
-      isNewVote = true;
-    }
+    isNewVote = true;
 
     // Получаем обновлённую статистику
     const updatedEffect = await prisma.effect.findUnique({
