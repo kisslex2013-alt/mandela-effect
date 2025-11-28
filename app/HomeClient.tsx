@@ -33,6 +33,7 @@ interface HomeClientProps {
     totalEffects: number;
     totalVotes: number;
     totalViews: number;
+    totalParticipants: number;
   };
   popularEffects: EffectResult[];
   newEffects: EffectResult[];
@@ -52,8 +53,8 @@ export default function HomeClient({
     uniqueMemory: 0,
   });
 
-  // Оценка участников (примерно 3 голоса на участника)
-  const estimatedParticipants = Math.round(initialStats.totalVotes / 3);
+  // Количество участников из БД (уникальные visitorId)
+  const totalParticipants = initialStats.totalParticipants;
 
   useEffect(() => {
     const loadUserStats = async () => {
@@ -127,7 +128,7 @@ export default function HomeClient({
 
   // Анимированные счётчики
   const countEffects = useCountUp(initialStats.totalEffects, 2000, initialStats.totalEffects > 0);
-  const countParticipants = useCountUp(estimatedParticipants, 2000, estimatedParticipants > 0);
+  const countParticipants = useCountUp(totalParticipants, 2000, totalParticipants > 0);
   const countVotes = useCountUp(initialStats.totalVotes, 2000, initialStats.totalVotes > 0);
 
   return (

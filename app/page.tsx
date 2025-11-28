@@ -7,7 +7,7 @@ export default async function Home() {
   // Загружаем данные на сервере с обработкой ошибок
   let popularEffects: EffectResult[] = [];
   let newEffects: EffectResult[] = [];
-  let stats: { totalEffects: number; totalVotes: number; totalViews: number } = { totalEffects: 0, totalVotes: 0, totalViews: 0 };
+  let stats: { totalEffects: number; totalVotes: number; totalViews: number; totalParticipants: number } = { totalEffects: 0, totalVotes: 0, totalViews: 0, totalParticipants: 0 };
   let mostControversial: (EffectResult & { controversy: number; percentA: number; percentB: number; totalVotes: number }) | null = null;
 
   try {

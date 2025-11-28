@@ -239,25 +239,40 @@ export async function getStats(): Promise<{
   totalEffects: number;
   totalVotes: number;
   totalViews: number;
+  totalParticipants: number;
 }> {
   console.log('[getStats] Запрос статистики из базы данных...');
   
   try {
+    // Статистика эффектов
     const stats = await prisma.effect.aggregate({
       _count: { id: true },
       _sum: { votesFor: true, votesAgainst: true, views: true },
     });
 
+    // Количество уникальных участников (уникальные visitorId из таблицы Vote)
+    const uniqueParticipants = await prisma.vote.groupBy({
+      by: ['visitorId'],
+      _count: { visitorId: true },
+    });
+
+    const totalEffects = stats._count.id;
+    const totalVotes = (stats._sum.votesFor || 0) + (stats._sum.votesAgainst || 0);
+    const totalViews = stats._sum.views || 0;
+    const totalParticipants = uniqueParticipants.length;
+
     console.log('[getStats] ✅ Статистика получена:', {
-      totalEffects: stats._count.id,
-      totalVotes: (stats._sum.votesFor || 0) + (stats._sum.votesAgainst || 0),
-      totalViews: stats._sum.views || 0,
+      totalEffects,
+      totalVotes,
+      totalViews,
+      totalParticipants,
     });
 
     return {
-      totalEffects: stats._count.id,
-      totalVotes: (stats._sum.votesFor || 0) + (stats._sum.votesAgainst || 0),
-      totalViews: stats._sum.views || 0,
+      totalEffects,
+      totalVotes,
+      totalViews,
+      totalParticipants,
     };
   } catch (error) {
     console.error('[getStats] ❌ ОШИБКА при получении статистики:', error);

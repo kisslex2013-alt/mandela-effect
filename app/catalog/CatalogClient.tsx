@@ -8,6 +8,8 @@ import Loading from '@/components/Loading';
 import EmptyState from '@/components/EmptyState';
 import CustomSelect from '@/components/ui/CustomSelect';
 import Toggle from '@/components/ui/Toggle';
+import { getUserVotes } from '@/app/actions/votes';
+import { getVisitorId } from '@/lib/visitor';
 import type { EffectResult } from '@/app/actions/effects';
 
 // Маппинг категорий на эмодзи и названия
@@ -39,6 +41,7 @@ export default function CatalogClient({
 }: CatalogClientProps) {
   const [allEffects] = useState<EffectResult[]>(initialEffects);
   const [loading] = useState(false);
+  const [votedEffectIds, setVotedEffectIds] = useState<string[]>([]);
   
   // Фильтры
   const [searchQuery, setSearchQuery] = useState('');
@@ -52,19 +55,52 @@ export default function CatalogClient({
   // Debounce для поиска
   const debouncedSearch = useDebounce(searchQuery, 300);
 
-  // Получение проголосованных эффектов из localStorage
-  const getVotedEffectIds = (): string[] => {
-    if (typeof window === 'undefined') return [];
-    const votedIds: string[] = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith('voted_effect_')) {
-        const id = key.replace('voted_effect_', '');
-        votedIds.push(id);
+  // Загрузка голосов из БД и localStorage
+  useEffect(() => {
+    const loadVotes = async () => {
+      const visitorId = getVisitorId();
+      const votedIds: string[] = [];
+
+      // 1. Загружаем голоса из БД
+      if (visitorId) {
+        try {
+          const serverVotes = await getUserVotes(visitorId);
+          serverVotes.votes.forEach((vote) => {
+            votedIds.push(vote.effectId);
+          });
+        } catch (error) {
+          console.error('[Catalog] Ошибка загрузки голосов из БД:', error);
+        }
       }
-    }
-    return votedIds;
-  };
+
+      // 2. Добавляем голоса из localStorage (fallback)
+      if (typeof window !== 'undefined') {
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('voted_effect_')) {
+            const id = key.replace('voted_effect_', '');
+            if (!votedIds.includes(id)) {
+              votedIds.push(id);
+            }
+          }
+        }
+      }
+
+      setVotedEffectIds(votedIds);
+    };
+
+    loadVotes();
+
+    // Слушаем события обновления голосов
+    const handleVoteUpdate = () => {
+      loadVotes();
+    };
+    window.addEventListener('voteUpdated', handleVoteUpdate);
+
+    return () => {
+      window.removeEventListener('voteUpdated', handleVoteUpdate);
+    };
+  }, []);
 
   // Фильтрация и сортировка
   const filteredAndSortedEffects = useMemo(() => {
@@ -89,8 +125,7 @@ export default function CatalogClient({
 
     // Только не проголосованные
     if (onlyUnvoted) {
-      const votedIds = getVotedEffectIds();
-      filtered = filtered.filter((effect) => !votedIds.includes(effect.id));
+      filtered = filtered.filter((effect) => !votedEffectIds.includes(effect.id));
     }
 
     // Сортировка

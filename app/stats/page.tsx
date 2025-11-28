@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Skeleton } from '@/components/Skeleton';
-import { getEffects } from '@/app/actions/effects';
+import { getEffects, getStats } from '@/app/actions/effects';
 
 // Маппинг категорий
 const categoryMap: Record<string, { emoji: string; name: string }> = {
@@ -111,10 +111,13 @@ export default function StatsPage() {
       try {
         setLoading(true);
         
-        // Загружаем все эффекты через Server Action
-        const rawEffects = await getEffects({ limit: 1000 });
+        // Загружаем статистику и эффекты через Server Actions
+        const [statsData, rawEffects] = await Promise.all([
+          getStats(),
+          getEffects({ limit: 1000 }),
+        ]);
         
-        // Преобразуем в нужный формат
+        // Преобразуем эффекты в нужный формат
         const allEffects: Effect[] = rawEffects.map((effect) => {
           const catInfo = categoryMap[effect.category] || { emoji: '❓', name: 'Другое' };
           return {
@@ -130,13 +133,10 @@ export default function StatsPage() {
         
         setEffects(allEffects);
 
-        // Общие цифры
-        const totalEffectsCount = allEffects.length;
-        const totalVotesCount = allEffects.reduce(
-          (sum, effect) => sum + effect.votesA + effect.votesB,
-          0
-        );
-        const estimatedParticipants = Math.floor(totalVotesCount / 3);
+        // Используем статистику из БД (единый источник данных)
+        const totalEffectsCount = statsData.totalEffects;
+        const totalVotesCount = statsData.totalVotes;
+        const totalParticipants = statsData.totalParticipants;
 
         // Подсчёт спорных эффектов (разница < 10%)
         let controversialCount = 0;
@@ -194,7 +194,7 @@ export default function StatsPage() {
         setStats({
           totalEffects: totalEffectsCount,
           totalVotes: totalVotesCount,
-          estimatedParticipants,
+          estimatedParticipants: totalParticipants,
           controversialCount,
         });
         setControversialEffects(topControversial);

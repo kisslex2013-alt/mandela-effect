@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { vote } from '@/app/actions/voting';
+import { saveVote } from '@/app/actions/votes';
+import { getVisitorId } from '@/lib/visitor';
+import { saveLocalVote } from '@/lib/visitor';
 import Link from 'next/link';
 
 // Тип Effect для квиза
@@ -37,8 +39,27 @@ export default function QuizClient({ effects }: QuizClientProps) {
     setLastVoteVariant(variant);
     setShowResult(true);
 
-    // Отправляем голос на сервер
-    await vote(currentEffect.id, variant);
+    // Получаем visitorId
+    const visitorId = getVisitorId();
+    if (!visitorId) {
+      console.error('[Quiz] Не удалось получить visitorId');
+      return;
+    }
+
+    // Отправляем голос на сервер через saveVote (сохраняет в БД и обновляет статистику)
+    const result = await saveVote({
+      visitorId,
+      effectId: currentEffect.id,
+      variant,
+    });
+
+    if (result.success) {
+      // Сохраняем локальный бэкап
+      saveLocalVote(currentEffect.id, variant, currentEffect.title);
+      
+      // Отправляем событие для обновления каталога
+      window.dispatchEvent(new Event('voteUpdated'));
+    }
 
     // Считаем очки (совпал с большинством?)
     const total = currentEffect.votesA + currentEffect.votesB + 1; // +1 наш голос
