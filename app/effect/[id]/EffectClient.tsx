@@ -190,7 +190,11 @@ export default function EffectClient({ effect: initialEffect, allEffects }: Effe
   const nextEffect = currentIndex < allEffects.length - 1 ? allEffects[currentIndex + 1] : null;
 
   const handleVote = async (variant: 'A' | 'B') => {
-    if (hasVoted || isVoting) return;
+    // Двойная проверка: и состояние, и проверка на сервере
+    if (hasVoted || isVoting) {
+      console.warn('[EffectClient] Попытка проголосовать повторно, hasVoted:', hasVoted, 'isVoting:', isVoting);
+      return;
+    }
 
     setIsVoting(true);
 
@@ -200,6 +204,17 @@ export default function EffectClient({ effect: initialEffect, allEffects }: Effe
       if (!visitorId) {
         toast.error('Не удалось идентифицировать пользователя');
         setIsVoting(false);
+        return;
+      }
+
+      // Дополнительная проверка: проверяем, нет ли уже голоса на сервере
+      const existingVote = await getUserVote(visitorId, effect.id);
+      if (existingVote.variant) {
+        console.warn('[EffectClient] Голос уже существует, блокируем повторное голосование');
+        setSelectedVariant(existingVote.variant as 'A' | 'B');
+        setHasVoted(true);
+        setIsVoting(false);
+        toast.info('Вы уже проголосовали за этот эффект');
         return;
       }
 
