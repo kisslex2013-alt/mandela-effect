@@ -247,7 +247,7 @@ export async function getStats(): Promise<{
     // Статистика эффектов
     const stats = await prisma.effect.aggregate({
       _count: { id: true },
-      _sum: { votesFor: true, votesAgainst: true, views: true },
+      _sum: { views: true },
     });
 
     // Количество уникальных участников (уникальные visitorId из таблицы Vote)
@@ -256,8 +256,11 @@ export async function getStats(): Promise<{
       _count: { visitorId: true },
     });
 
+    // Количество голосов = количество записей в таблице Vote (каждый голос = одна запись)
+    const totalVotesCount = await prisma.vote.count();
+
     const totalEffects = stats._count.id;
-    const totalVotes = (stats._sum.votesFor || 0) + (stats._sum.votesAgainst || 0);
+    const totalVotes = totalVotesCount; // Используем реальное количество голосов из БД
     const totalViews = stats._sum.views || 0;
     const totalParticipants = uniqueParticipants.length;
 
