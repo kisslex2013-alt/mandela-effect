@@ -63,8 +63,22 @@ interface PrismaEffect {
 
 // Вспомогательная функция для сериализации эффекта
 function serializeEffect(effect: PrismaEffect): EffectResult {
+  // Безопасная сериализация interpretations (может быть null или любым JSON значением)
+  let safeInterpretations: Prisma.JsonValue = null;
+  try {
+    // Если interpretations не null, проверяем что это валидный JSON
+    if (effect.interpretations !== null && effect.interpretations !== undefined) {
+      // Если это уже сериализуемый объект, оставляем как есть
+      safeInterpretations = effect.interpretations;
+    }
+  } catch (error) {
+    console.warn('[serializeEffect] Ошибка при обработке interpretations:', error);
+    safeInterpretations = null;
+  }
+
   return {
     ...effect,
+    interpretations: safeInterpretations,
     createdAt: effect.createdAt.toISOString(),
     updatedAt: effect.updatedAt.toISOString(),
   };
@@ -137,10 +151,18 @@ export async function getEffects(params: GetEffectsParams = {}): Promise<EffectR
       skip: offset,
     });
 
+    console.log(`[getEffects] Получено эффектов: ${effects.length}`);
+
     // Сериализуем даты в строки для корректной передачи клиенту
-    return effects.map(serializeEffect);
+    const serialized = effects.map(serializeEffect);
+    console.log(`[getEffects] Сериализовано эффектов: ${serialized.length}`);
+    
+    return serialized;
   } catch (error) {
-    console.error('Ошибка при получении эффектов:', error);
+    console.error('[getEffects] ❌ ОШИБКА при получении эффектов:');
+    console.error('[getEffects] Тип ошибки:', error instanceof Error ? error.constructor.name : typeof error);
+    console.error('[getEffects] Сообщение:', error instanceof Error ? error.message : String(error));
+    console.error('[getEffects] Stack:', error instanceof Error ? error.stack : 'N/A');
     throw new Error('Не удалось загрузить эффекты');
   }
 }

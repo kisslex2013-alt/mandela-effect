@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import { getEffects, getCategories } from '@/app/actions/effects';
 import CatalogClient from './CatalogClient';
+import ErrorState from '@/components/ErrorState';
 
 // Серверный компонент - загружает данные
 export default async function CatalogPage({
@@ -12,11 +13,27 @@ export default async function CatalogPage({
   const params = await searchParams;
   const initialCategory = params.category || null;
 
-  // Загружаем данные на сервере
-  const [effects, categories] = await Promise.all([
-    getEffects({ limit: 100 }),
-    getCategories(),
-  ]);
+  // Загружаем данные на сервере с обработкой ошибок
+  let effects, categories;
+  try {
+    [effects, categories] = await Promise.all([
+      getEffects({ limit: 100 }),
+      getCategories(),
+    ]);
+  } catch (error) {
+    console.error('[CatalogPage] Ошибка при загрузке данных:', error);
+    // Возвращаем страницу с ошибкой
+    return (
+      <main className="min-h-screen bg-dark py-8">
+        <div className="max-w-6xl mx-auto px-4">
+          <ErrorState
+            title="Ошибка загрузки каталога"
+            message="Не удалось загрузить эффекты. Попробуйте обновить страницу."
+          />
+        </div>
+      </main>
+    );
+  }
 
   return (
     <Suspense
