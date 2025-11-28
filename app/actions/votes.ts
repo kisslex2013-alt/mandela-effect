@@ -92,30 +92,33 @@ export async function saveVote(data: VoteData): Promise<VoteResult> {
     let isNewVote = false;
 
     if (existingVote) {
-      // Если голос тот же — ничего не делаем
-      if (existingVote.variant === variant) {
-        const totalVotes = effect.votesFor + effect.votesAgainst;
-        return {
-          success: true,
-          vote: {
-            id: existingVote.id,
-            visitorId: existingVote.visitorId,
-            effectId: existingVote.effectId,
-            variant: existingVote.variant,
-          },
-          effect: {
-            votesFor: effect.votesFor,
-            votesAgainst: effect.votesAgainst,
-            percentA: totalVotes > 0 ? (effect.votesFor / totalVotes) * 100 : 50,
-            percentB: totalVotes > 0 ? (effect.votesAgainst / totalVotes) * 100 : 50,
-            totalVotes,
-          },
-          isNewVote: false,
-        };
-      }
-
-      // Обновляем голос и пересчитываем статистику
-      const oldVariant = existingVote.variant;
+      // Если голос уже существует — возвращаем ошибку (не позволяем повторное голосование)
+      const totalVotes = effect.votesFor + effect.votesAgainst;
+      console.warn('[saveVote] ❌ Попытка проголосовать повторно, голос уже существует:', {
+        visitorId: visitorId?.substring(0, 20) + '...',
+        effectId,
+        existingVariant: existingVote.variant,
+        requestedVariant: variant,
+      });
+      return {
+        success: false,
+        error: 'Вы уже проголосовали за этот эффект',
+        vote: {
+          id: existingVote.id,
+          visitorId: existingVote.visitorId,
+          effectId: existingVote.effectId,
+          variant: existingVote.variant,
+        },
+        effect: {
+          votesFor: effect.votesFor,
+          votesAgainst: effect.votesAgainst,
+          percentA: totalVotes > 0 ? (effect.votesFor / totalVotes) * 100 : 50,
+          percentB: totalVotes > 0 ? (effect.votesAgainst / totalVotes) * 100 : 50,
+          totalVotes,
+        },
+        isNewVote: false,
+      };
+    }
 
       console.log('[saveVote] Обновление существующего голоса:', {
         oldVariant,
