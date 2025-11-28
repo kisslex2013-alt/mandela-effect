@@ -4,16 +4,24 @@ import prisma from '@/lib/prisma';
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://mandela-effect.vercel.app';
   
-  // Получаем все эффекты из базы данных
-  const effects = await prisma.effect.findMany({
-    select: {
-      id: true,
-      updatedAt: true,
-    },
-    orderBy: {
-      createdAt: 'desc',
-    },
-  });
+  // Получаем все эффекты из базы данных с обработкой ошибок
+  let effects: { id: string; updatedAt: Date }[] = [];
+  
+  try {
+    effects = await prisma.effect.findMany({
+      select: {
+        id: true,
+        updatedAt: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+  } catch (error) {
+    console.error('[sitemap] Ошибка при получении эффектов:', error);
+    // В случае ошибки возвращаем только статические страницы
+    // Это лучше, чем падение всего билда
+  }
   
   // Статические страницы
   const staticPages: MetadataRoute.Sitemap = [
