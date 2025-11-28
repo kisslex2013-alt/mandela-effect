@@ -659,29 +659,32 @@ export default function MyMemoryPage() {
                             </PieChart>
                           </ResponsiveContainer>
                           
-                          {/* Процент в центре (поверх диаграммы) - строго внутри innerRadius с запасом */}
-                          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center pointer-events-none z-10" 
+                          {/* Процент в центре (поверх диаграммы) - строго внутри innerRadius с запасом для анимации */}
+                          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center pointer-events-none z-10 origin-center" 
                             style={{ 
-                              width: '45%', 
-                              height: '45%',
-                              maxWidth: '45%',
-                              maxHeight: '45%'
+                              width: '40%', 
+                              height: '40%',
+                              maxWidth: '40%',
+                              maxHeight: '40%',
+                              transformOrigin: 'center center'
                             }}>
-                            <p className={`font-bold mb-0.5 md:mb-1 transition-all duration-300 leading-tight text-center ${
+                            <p className={`font-bold mb-0.5 md:mb-1 transition-transform duration-300 group-hover/chart:scale-110 leading-tight text-center ${
                               stats.majorityPercent >= stats.minorityPercent 
                                 ? 'text-blue-400' 
                                 : 'text-orange-400'
                             }`}
                             style={{
                               fontSize: 'clamp(1.25rem, 4vw, 4rem)',
-                              lineHeight: '1.1'
+                              lineHeight: '1.1',
+                              transformOrigin: 'center center'
                             }}>
                               {Math.max(stats.majorityPercent, stats.minorityPercent).toFixed(0)}%
                             </p>
-                            <p className="text-light/60 leading-tight text-center"
+                            <p className="text-light/60 leading-tight text-center transition-transform duration-300 group-hover/chart:scale-110"
                             style={{
                               fontSize: 'clamp(0.625rem, 1.5vw, 0.875rem)',
-                              lineHeight: '1.2'
+                              lineHeight: '1.2',
+                              transformOrigin: 'center center'
                             }}>
                               {stats.majorityPercent >= stats.minorityPercent ? 'большинство' : 'меньшинство'}
                             </p>
