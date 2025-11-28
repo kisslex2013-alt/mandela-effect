@@ -159,7 +159,7 @@ export default function CatalogClient({
     });
 
     return filtered;
-  }, [allEffects, debouncedSearch, selectedCategories, sortBy, onlyUnvoted]);
+  }, [allEffects, debouncedSearch, selectedCategories, sortBy, onlyUnvoted, votedEffectIds]);
 
   const handleCategoryToggle = (categoryId: string) => {
     setSelectedCategories((prev) =>
@@ -176,25 +176,6 @@ export default function CatalogClient({
       setSelectedCategories([...categories]);
     }
   };
-
-  const [votedEffectIds, setVotedEffectIds] = useState<string[]>([]);
-
-  // Обновляем список проголосованных эффектов
-  useEffect(() => {
-    setVotedEffectIds(getVotedEffectIds());
-    
-    const handleStorageChange = () => {
-      setVotedEffectIds(getVotedEffectIds());
-    };
-    
-    window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('voteUpdated', handleStorageChange);
-    
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('voteUpdated', handleStorageChange);
-    };
-  }, [onlyUnvoted, allEffects]);
 
   // Закрытие dropdown при клике вне
   useEffect(() => {
