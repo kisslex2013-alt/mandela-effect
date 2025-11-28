@@ -95,7 +95,7 @@ export default function Footer() {
 
         {/* Копирайт */}
         <div className="text-center text-light/60 pt-8 border-t border-darkCard">
-          <p>Создано с ❤️ • 2025</p>
+          <p>Сделано с ❤️ и немного с Claude, Gemini и ChatGPT • 2025</p>
         </div>
       </div>
     </footer>

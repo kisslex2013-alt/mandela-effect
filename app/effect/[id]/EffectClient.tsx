@@ -659,7 +659,7 @@ export default function EffectClient({ effect: initialEffect, allEffects }: Effe
               >
                 <div className="flex items-center gap-3">
                   <span className="text-2xl">👁️</span>
-                  <span className="text-lg font-semibold text-light">Показать текущее состояние реальности</span>
+                  <span className="text-lg font-semibold text-light">Текущее состояние (Реальность)</span>
                 </div>
                 <motion.svg
                   animate={{ rotate: showCurrentState ? 180 : 0 }}
@@ -783,7 +783,7 @@ export default function EffectClient({ effect: initialEffect, allEffects }: Effe
               >
                 <div className="flex items-center gap-3">
                   <span className="text-2xl">📜</span>
-                  <span className="text-lg font-semibold text-light">История / Временная шкала</span>
+                  <span className="text-lg font-semibold text-light">Временная шкала (История)</span>
                 </div>
                 <motion.svg
                   animate={{ rotate: showHistory ? 180 : 0 }}
