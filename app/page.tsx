@@ -1,14 +1,14 @@
 import { Suspense } from 'react';
-import { getEffects, getStats } from '@/app/actions/effects';
+import { getEffects, getStats, type EffectResult } from '@/app/actions/effects';
 import HomeClient from './HomeClient';
 
 // Серверный компонент - загружает данные
 export default async function Home() {
   // Загружаем данные на сервере с обработкой ошибок
-  let popularEffects = [];
-  let newEffects = [];
-  let stats = { totalEffects: 0, totalVotes: 0, totalViews: 0 };
-  let mostControversial = null;
+  let popularEffects: EffectResult[] = [];
+  let newEffects: EffectResult[] = [];
+  let stats: { totalEffects: number; totalVotes: number; totalViews: number } = { totalEffects: 0, totalVotes: 0, totalViews: 0 };
+  let mostControversial: (EffectResult & { controversy: number; percentA: number; percentB: number; totalVotes: number }) | null = null;
 
   try {
     [popularEffects, newEffects, stats] = await Promise.all([
