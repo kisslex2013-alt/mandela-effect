@@ -544,24 +544,24 @@ export default function MyMemoryPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
             >
-              <div className="max-w-6xl mx-auto bg-darkCard rounded-2xl p-6 border border-light/10">
+              <div className="max-w-6xl mx-auto bg-darkCard rounded-2xl p-4 md:p-6 border border-light/10">
                 {/* Заголовок */}
                 <motion.div 
-                  className="text-center mb-8"
+                  className="text-center mb-6 md:mb-8"
                   initial={{ opacity: 0, y: -20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5 }}
                 >
-                  <h2 className="text-4xl font-bold text-light mb-2">
+                  <h2 className="text-2xl md:text-4xl font-bold text-light mb-2">
                     Твоя статистика
                   </h2>
-                  <p className="text-light/60">
+                  <p className="text-sm md:text-base text-light/60">
                     Проголосовано: <span className="text-primary font-semibold">{stats.totalVotes}</span> из <span className="font-semibold">{totalEffects}</span> эффектов
                   </p>
                 </motion.div>
 
                 {/* Основная сетка */}
-                <div className="grid lg:grid-cols-3 gap-8 items-start">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 lg:gap-8 items-start">
                   
                   {/* ЛЕВАЯ КОЛОНКА: Профиль памяти */}
                   <motion.div 
@@ -570,23 +570,23 @@ export default function MyMemoryPage() {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.5, delay: 0.2 }}
                   >
-                    <div className="bg-dark p-6 rounded-xl border border-light/10 h-full transition-all duration-300 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/20 hover:-translate-y-1 group">
-                      <div className="flex items-center gap-3 mb-4">
+                    <div className="bg-dark p-4 md:p-6 rounded-xl border border-light/10 h-full transition-all duration-300 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/20 hover:-translate-y-1 group">
+                      <div className="flex items-center gap-2 md:gap-3 mb-3 md:mb-4">
                         <motion.span 
-                          className="text-3xl transition-transform duration-300 group-hover:scale-110 inline-block"
+                          className="text-2xl md:text-3xl transition-transform duration-300 group-hover:scale-110 inline-block"
                           initial={{ scale: 0 }}
                           animate={{ scale: 1 }}
                           transition={{ duration: 0.5, delay: 0.4, type: 'spring', stiffness: 200 }}
                         >
                           {profileIcon}
                         </motion.span>
-                        <h3 className="text-2xl font-bold text-light">
+                        <h3 className="text-lg md:text-2xl font-bold text-light">
                           Профиль памяти
                         </h3>
                       </div>
                       
-                      <div className="mb-6">
-                        <p className="text-xl text-light font-semibold mb-2">
+                      <div className="mb-4 md:mb-6">
+                        <p className="text-base md:text-xl text-light font-semibold mb-2">
                           {profileText}
                         </p>
                       </div>
@@ -626,15 +626,15 @@ export default function MyMemoryPage() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5, delay: 0.3 }}
                   >
-                    <div className="bg-dark p-8 rounded-xl border border-light/10 w-full transition-all duration-300 hover:border-orange-500/30 hover:shadow-lg hover:shadow-orange-500/20 hover:-translate-y-1 group">
-                      <h3 className="text-xl font-bold text-light text-center mb-6">
+                    <div className="bg-dark p-4 md:p-6 lg:p-8 rounded-xl border border-light/10 w-full transition-all duration-300 hover:border-orange-500/30 hover:shadow-lg hover:shadow-orange-500/20 hover:-translate-y-1 group">
+                      <h3 className="text-lg md:text-xl font-bold text-light text-center mb-4 md:mb-6">
                         Распределение голосов
                       </h3>
                       
                       {/* Диаграмма */}
-                      <div className="flex justify-center mb-6 relative group/chart">
+                      <div className="flex justify-center mb-4 md:mb-6 relative group/chart">
                         <div className="transition-transform duration-500 group-hover/chart:scale-105">
-                          <ResponsiveContainer width={280} height={280}>
+                          <ResponsiveContainer width="100%" height={200} className="max-w-[200px] md:max-w-[280px]">
                             <PieChart>
                               <Pie
                                 data={pieData}
@@ -655,14 +655,14 @@ export default function MyMemoryPage() {
                         
                         {/* Процент в центре (поверх диаграммы) - ИСПРАВЛЕНО */}
                         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                          <p className={`text-5xl font-bold mb-1 transition-all duration-300 group-hover/chart:scale-110 group-hover/chart:animate-pulse ${
+                          <p className={`text-3xl md:text-5xl font-bold mb-1 transition-all duration-300 group-hover/chart:scale-110 group-hover/chart:animate-pulse ${
                             stats.majorityPercent >= stats.minorityPercent 
                               ? 'text-blue-400' 
                               : 'text-orange-400'
                           }`}>
                             {Math.max(stats.majorityPercent, stats.minorityPercent).toFixed(0)}%
                           </p>
-                          <p className="text-light/60 text-sm">
+                          <p className="text-light/60 text-xs md:text-sm">
                             {stats.majorityPercent >= stats.minorityPercent ? 'большинство' : 'меньшинство'}
                           </p>
                         </div>
@@ -700,17 +700,17 @@ export default function MyMemoryPage() {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.5, delay: 0.4 }}
                   >
-                    <div className="bg-dark p-6 rounded-xl border border-light/10 h-full transition-all duration-300 hover:border-blue-500/30 hover:shadow-lg hover:shadow-blue-500/20 hover:-translate-y-1 group">
-                      <div className="flex items-center gap-3 mb-6">
+                    <div className="bg-dark p-4 md:p-6 rounded-xl border border-light/10 h-full transition-all duration-300 hover:border-blue-500/30 hover:shadow-lg hover:shadow-blue-500/20 hover:-translate-y-1 group">
+                      <div className="flex items-center gap-2 md:gap-3 mb-4 md:mb-6">
                         <motion.span 
-                          className="text-3xl transition-transform duration-300 group-hover:scale-110 inline-block"
+                          className="text-2xl md:text-3xl transition-transform duration-300 group-hover:scale-110 inline-block"
                           initial={{ scale: 0 }}
                           animate={{ scale: 1 }}
                           transition={{ duration: 0.5, delay: 0.6, type: 'spring', stiffness: 200 }}
                         >
                           📊
                         </motion.span>
-                        <h3 className="text-2xl font-bold text-light">
+                        <h3 className="text-lg md:text-2xl font-bold text-light">
                           Детали
                         </h3>
                       </div>
@@ -724,8 +724,8 @@ export default function MyMemoryPage() {
                           transition={{ duration: 0.3, delay: 0.5 }}
                         >
                           <div className="flex items-center justify-between mb-2">
-                            <span className="text-light/70 text-sm">Всего ответов</span>
-                            <span className="text-2xl font-bold text-primary transition-all duration-300 group-hover/progress:scale-110 inline-block">{stats.totalVotes}</span>
+                            <span className="text-light/70 text-xs md:text-sm">Всего ответов</span>
+                            <span className="text-xl md:text-2xl font-bold text-primary transition-all duration-300 group-hover/progress:scale-110 inline-block">{stats.totalVotes}</span>
                           </div>
                           <div className="w-full bg-dark h-2 rounded-full overflow-hidden">
                             <div 
@@ -747,10 +747,10 @@ export default function MyMemoryPage() {
                         >
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2">
-                              <span className="text-xl transition-transform duration-300 group-hover/detail:scale-125 inline-block">👥</span>
-                              <span className="text-light/90 font-medium">Большинство</span>
+                              <span className="text-lg md:text-xl transition-transform duration-300 group-hover/detail:scale-125 inline-block">👥</span>
+                              <span className="text-light/90 text-sm md:text-base font-medium">Большинство</span>
                             </div>
-                            <span className="text-3xl font-bold text-blue-400 transition-all duration-300 group-hover/detail:text-blue-300 group-hover/detail:scale-110 inline-block">{stats.withMajority}</span>
+                            <span className="text-2xl md:text-3xl font-bold text-blue-400 transition-all duration-300 group-hover/detail:text-blue-300 group-hover/detail:scale-110 inline-block">{stats.withMajority}</span>
                           </div>
                           <p className="text-light/60 text-sm">
                             Твой выбор совпал с большинством
@@ -766,10 +766,10 @@ export default function MyMemoryPage() {
                         >
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2">
-                              <span className="text-xl transition-transform duration-300 group-hover/detail:scale-125 inline-block">✨</span>
-                              <span className="text-light/90 font-medium">Меньшинство</span>
+                              <span className="text-lg md:text-xl transition-transform duration-300 group-hover/detail:scale-125 inline-block">✨</span>
+                              <span className="text-light/90 text-sm md:text-base font-medium">Меньшинство</span>
                             </div>
-                            <span className="text-3xl font-bold text-orange-400 transition-all duration-300 group-hover/detail:text-orange-300 group-hover/detail:scale-110 inline-block">{stats.withMinority}</span>
+                            <span className="text-2xl md:text-3xl font-bold text-orange-400 transition-all duration-300 group-hover/detail:text-orange-300 group-hover/detail:scale-110 inline-block">{stats.withMinority}</span>
                           </div>
                           <p className="text-light/60 text-sm">
                             Ты помнишь иначе чем большинство
@@ -814,10 +814,10 @@ export default function MyMemoryPage() {
         >
           <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
             {/* Табы фильтров */}
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <motion.button
                 onClick={() => handleFilterChange('all')}
-                className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                className={`px-3 md:px-4 py-1.5 md:py-2 text-sm md:text-base rounded-lg font-semibold transition-all ${
                   activeFilter === 'all'
                     ? 'bg-primary text-light'
                     : 'bg-dark text-light/60 hover:text-light'
@@ -833,7 +833,7 @@ export default function MyMemoryPage() {
               </motion.button>
               <motion.button
                 onClick={() => handleFilterChange('majority')}
-                className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                className={`px-3 md:px-4 py-1.5 md:py-2 text-sm md:text-base rounded-lg font-semibold transition-all ${
                   activeFilter === 'majority'
                     ? 'bg-primary text-light'
                     : 'bg-dark text-light/60 hover:text-light'
@@ -849,7 +849,7 @@ export default function MyMemoryPage() {
               </motion.button>
               <motion.button
                 onClick={() => handleFilterChange('minority')}
-                className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                className={`px-3 md:px-4 py-1.5 md:py-2 text-sm md:text-base rounded-lg font-semibold transition-all ${
                   activeFilter === 'minority'
                     ? 'bg-secondary text-light'
                     : 'bg-dark text-light/60 hover:text-light'
@@ -866,7 +866,7 @@ export default function MyMemoryPage() {
             </div>
 
             {/* Сортировка */}
-            <div className="w-56">
+            <div className="w-full md:w-56">
               <CustomSelect
                 value={sortBy}
                 onChange={(val) => setSortBy(val as 'date' | 'name' | 'controversy')}

@@ -118,7 +118,7 @@ export default function QuizClient({ initialEffects }: QuizClientProps) {
         variant,
       });
 
-      if (result.success) {
+      if (result.success && result.effect) {
         console.log('[Quiz] ✅ Голос успешно сохранен:', result);
         
         // Сохраняем локальный бэкап
@@ -126,19 +126,39 @@ export default function QuizClient({ initialEffects }: QuizClientProps) {
         
         // Отправляем событие для обновления каталога
         window.dispatchEvent(new Event('voteUpdated'));
+        
+        // Обновляем данные эффекта с актуальными значениями из БД
+        setEffects((prev) => {
+          const updated = [...prev];
+          const index = updated.findIndex((e) => e.id === currentEffect.id);
+          if (index !== -1) {
+            updated[index] = {
+              ...updated[index],
+              votesA: result.effect!.votesFor,
+              votesB: result.effect!.votesAgainst,
+            };
+          }
+          return updated;
+        });
+        
+        // Считаем очки ПОСЛЕ сохранения, используя актуальные данные из БД
+        const totalVotes = result.effect.votesFor + result.effect.votesAgainst;
+        if (totalVotes > 0) {
+          // Проверяем, в большинстве ли пользователь
+          const isInMajority = variant === 'A' 
+            ? result.effect.votesFor > result.effect.votesAgainst
+            : result.effect.votesAgainst > result.effect.votesFor;
+          
+          if (isInMajority) {
+            setScore((s) => s + 1);
+          }
+        }
       } else {
         console.error('[Quiz] ❌ Ошибка сохранения голоса:', result.error);
       }
     } catch (error) {
       console.error('[Quiz] ❌ Исключение при сохранении голоса:', error);
     }
-
-    // Считаем очки (совпал с большинством?)
-    const total = currentEffect.votesA + currentEffect.votesB + 1; // +1 наш голос
-    const votesForVariant = variant === 'A' ? currentEffect.votesA + 1 : currentEffect.votesB + 1;
-    const percent = (votesForVariant / total) * 100;
-
-    if (percent >= 50) setScore((s) => s + 1);
   };
 
   const nextQuestion = () => {
