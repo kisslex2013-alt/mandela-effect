@@ -120,53 +120,7 @@ export async function saveVote(data: VoteData): Promise<VoteResult> {
       };
     }
 
-      console.log('[saveVote] Обновление существующего голоса:', {
-        oldVariant,
-        newVariant: variant,
-        effectId,
-      });
-
-      vote = await prisma.vote.update({
-        where: { id: existingVote.id },
-        data: { variant },
-      });
-      console.log('[saveVote] ✅ Голос обновлен:', vote.id);
-
-      // Пересчитываем: убираем старый голос, добавляем новый
-      // Если старый голос был A, а новый B: votesFor -1, votesAgainst +1
-      // Если старый голос был B, а новый A: votesFor +1, votesAgainst -1
-      // Если старый голос был A, а новый A: ничего не меняем (уже обработано выше)
-      // Если старый голос был B, а новый B: ничего не меняем (уже обработано выше)
-      
-      let votesForIncrement = 0;
-      let votesAgainstIncrement = 0;
-      
-      if (oldVariant === 'A' && variant === 'B') {
-        // Меняем с A на B
-        votesForIncrement = -1;
-        votesAgainstIncrement = 1;
-      } else if (oldVariant === 'B' && variant === 'A') {
-        // Меняем с B на A
-        votesForIncrement = 1;
-        votesAgainstIncrement = -1;
-      }
-      // Если oldVariant === variant, то мы уже вернули результат выше, сюда не дойдем
-
-      if (votesForIncrement !== 0 || votesAgainstIncrement !== 0) {
-        await prisma.effect.update({
-          where: { id: effectId },
-          data: {
-            votesFor: { increment: votesForIncrement },
-            votesAgainst: { increment: votesAgainstIncrement },
-          },
-        });
-        console.log('[saveVote] ✅ Статистика эффекта обновлена:', {
-          votesForIncrement,
-          votesAgainstIncrement,
-        });
-      }
-    } else {
-      // Создаём новый голос
+    // Создаём новый голос (если дошли сюда, значит голоса еще нет)
       console.log('[saveVote] Создание нового голоса...');
       vote = await prisma.vote.create({
         data: { visitorId, effectId, variant },
