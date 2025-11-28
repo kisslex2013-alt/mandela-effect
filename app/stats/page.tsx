@@ -94,6 +94,7 @@ function StatCard({
 
 export default function StatsPage() {
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [effects, setEffects] = useState<Effect[]>([]);
   const [stats, setStats] = useState({
     totalEffects: 0,
@@ -200,7 +201,8 @@ export default function StatsPage() {
         setPopularEffects(topPopular);
         setCategoryStats(categories);
       } catch (error) {
-        console.error('Ошибка загрузки статистики:', error);
+        console.error('[StatsPage] Ошибка загрузки статистики:', error);
+        setError(error instanceof Error ? error.message : 'Не удалось загрузить статистику');
       } finally {
         setLoading(false);
       }
@@ -242,6 +244,30 @@ export default function StatsPage() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (error) {
+    return (
+      <main className="min-h-screen bg-dark py-16 px-4">
+        <div className="max-w-6xl mx-auto">
+          <div className="bg-darkCard p-8 rounded-xl text-center">
+            <div className="text-6xl mb-4">⚠️</div>
+            <h2 className="text-2xl font-bold text-light mb-2">Ошибка загрузки статистики</h2>
+            <p className="text-light/70 mb-6">{error}</p>
+            <button
+              onClick={() => {
+                setError(null);
+                setLoading(true);
+                window.location.reload();
+              }}
+              className="px-6 py-3 bg-primary text-light rounded-lg font-medium hover:bg-primary/80 transition-colors"
+            >
+              Обновить страницу
+            </button>
           </div>
         </div>
       </main>
