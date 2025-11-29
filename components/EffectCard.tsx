@@ -18,6 +18,7 @@ interface EffectCardProps {
   showProgress?: boolean;
   hasVoted?: boolean;
   className?: string;
+  priority?: boolean;
 }
 
 export default function EffectCard({
@@ -34,6 +35,7 @@ export default function EffectCard({
   showProgress = false,
   hasVoted = false,
   className = '',
+  priority = false,
 }: EffectCardProps) {
   // Логирование для отладки (только один раз при монтировании)
   const hasLogged = useRef(false);
@@ -67,6 +69,7 @@ export default function EffectCard({
               alt={title}
               fill
               className="object-cover transition-transform duration-500 hover:scale-105"
+              priority={priority}
             />
           </div>
         ) : (

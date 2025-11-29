@@ -267,6 +267,7 @@ export default function HomeClient() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
+          style={{ willChange: "transform, opacity" }}
           className="relative z-10 flex flex-col items-center justify-center text-center max-w-4xl mx-auto"
         >
           <motion.h1
@@ -274,6 +275,7 @@ export default function HomeClient() {
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.6 }}
+            style={{ willChange: "transform, opacity" }}
           >
             Как ты помнишь?
           </motion.h1>
@@ -292,6 +294,7 @@ export default function HomeClient() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
+            style={{ willChange: "transform, opacity" }}
           >
             <div className="flex items-center gap-2">
               <span className="text-2xl">🧠</span>
@@ -325,6 +328,7 @@ export default function HomeClient() {
           className="absolute bottom-24 left-1/2 -translate-x-1/2"
           animate={{ y: [0, 10, 0] }}
           transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+          style={{ willChange: "transform" }}
         >
           <button
             onClick={() => window.scrollTo({ top: window.innerHeight, behavior: 'smooth' })}
@@ -477,6 +481,7 @@ export default function HomeClient() {
                       createdAt={effect.createdAt}
                       badge="Новое"
                       hasVoted={hasVoted}
+                      priority={index < 2}
                       className="bg-dark border-light/10 hover:border-primary/50 hover:shadow-[0_0_25px_-5px_rgba(59,130,246,0.4)]"
                     />
                   </motion.div>

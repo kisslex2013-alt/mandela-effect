@@ -241,24 +241,53 @@ export default function EffectClient({ effect: initialEffect, allEffects }: Effe
       return;
     }
 
-    setIsVoting(true);
+    const visitorId = getVisitorId();
+    if (!visitorId) {
+      toast.error('Не удалось идентифицировать пользователя');
+      return;
+    }
 
+    // ОПТИМИСТИЧНОЕ ОБНОВЛЕНИЕ: сразу обновляем UI
+    const previousEffect = { ...effect };
+    const previousVariant = selectedVariant;
+    const previousHasVoted = hasVoted;
+
+    // Мгновенно обновляем состояние
+    setEffect({
+      ...effect,
+      votesFor: variant === 'A' ? effect.votesFor + 1 : effect.votesFor,
+      votesAgainst: variant === 'B' ? effect.votesAgainst + 1 : effect.votesAgainst,
+    });
+    setSelectedVariant(variant);
+    setHasVoted(true);
+    setIsVoting(false); // Убираем лоадер сразу
+
+    // Конфетти сразу
+    confetti({
+      particleCount: 100,
+      spread: 70,
+      origin: { y: 0.6 },
+      colors: variant === 'A' ? ['#3b82f6'] : ['#f59e0b'],
+    });
+
+    toast.success('Голос учтён! ✓');
+
+    // Сохраняем локальный бэкап сразу
+    saveLocalVote(effect.id, variant, effect.title);
+
+    // Отправляем событие для обновления каталога
+    window.dispatchEvent(new Event('voteUpdated'));
+
+    // Вызываем серверный экшен в фоне (без блокировки UI)
     try {
-      const visitorId = getVisitorId();
-      
-      if (!visitorId) {
-        toast.error('Не удалось идентифицировать пользователя');
-        setIsVoting(false);
-        return;
-      }
-
       // Дополнительная проверка: проверяем, нет ли уже голоса на сервере
       const existingVote = await getUserVote(visitorId, effect.id);
       if (existingVote.variant) {
-        console.warn('[EffectClient] Голос уже существует, блокируем повторное голосование');
-        setSelectedVariant(existingVote.variant as 'A' | 'B');
-        setHasVoted(true);
-        setIsVoting(false);
+        console.warn('[EffectClient] Голос уже существует на сервере');
+        // Откатываем оптимистичное обновление
+        setEffect(previousEffect);
+        setSelectedVariant(previousVariant);
+        setHasVoted(previousHasVoted);
         toast('Вы уже проголосовали за этот эффект', { icon: 'ℹ️' });
         return;
       }
@@ -271,39 +300,26 @@ export default function EffectClient({ effect: initialEffect, allEffects }: Effe
       });
 
       if (result.success && result.effect) {
-        // Сохраняем локальный бэкап (для оффлайн режима и быстрой проверки)
-        saveLocalVote(effect.id, variant, effect.title);
-
-        // Отправляем событие для обновления каталога
-        window.dispatchEvent(new Event('voteUpdated'));
-
-        // Обновляем состояние
+        // Актуализируем данные с сервера (хотя оптимистичное обновление уже показало верный результат)
         setEffect({
           ...effect,
           votesFor: result.effect.votesFor,
           votesAgainst: result.effect.votesAgainst,
         });
-
-        setSelectedVariant(variant);
-        setHasVoted(true);
-
-        // Конфетти
-        confetti({
-          particleCount: 100,
-          spread: 70,
-          origin: { y: 0.6 },
-          colors: variant === 'A' ? ['#3b82f6'] : ['#f59e0b'],
-        });
-
-        toast.success('Голос учтён! ✓');
       } else {
+        // Откатываем оптимистичное обновление при ошибке
+        setEffect(previousEffect);
+        setSelectedVariant(previousVariant);
+        setHasVoted(previousHasVoted);
         toast.error(result.error || 'Что-то пошло не так');
       }
     } catch (error) {
       console.error('Ошибка при голосовании:', error);
+      // Откатываем оптимистичное обновление при ошибке
+      setEffect(previousEffect);
+      setSelectedVariant(previousVariant);
+      setHasVoted(previousHasVoted);
       toast.error('Что-то пошло не так. Попробуйте снова');
-    } finally {
-      setIsVoting(false);
     }
   };
 

@@ -106,7 +106,7 @@ export default function ImageWithSkeleton({
               }
             }}
             priority={priority}
-            unoptimized={src?.includes('pollinations.ai')}
+            unoptimized={typeof src === 'string' && src.startsWith('http')}
           />
         </>
       )}
