@@ -325,6 +325,9 @@ export default function AdminClient({ effects: initialEffects, submissions: init
       scientificSource: interp?.scientificSource || '',
       communityInterpretation: interp?.community || '',
       communitySource: interp?.communitySource || '',
+      // Изображение
+      imageUrl: effect.imageUrl || '',
+      imagePrompt: '',
     });
   };
 
@@ -673,6 +676,9 @@ export default function AdminClient({ effects: initialEffects, submissions: init
       scientificSource: interp?.scientificSource || '',
       communityInterpretation: interp?.community || '',
       communitySource: interp?.communitySource || '',
+      // Изображение
+      imageUrl: '',
+      imagePrompt: '',
     });
   };
 
@@ -1378,6 +1384,9 @@ export default function AdminClient({ effects: initialEffects, submissions: init
                   communityInterpretation: '',
                   communitySource: '',
                   sourceLink: '',
+                  // Изображение
+                  imageUrl: '',
+                  imagePrompt: '',
                 });
                 setIsCreating(true);
               }}

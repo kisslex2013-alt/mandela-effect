@@ -41,3 +41,27 @@ yarn-error.log*
 next-env.d.ts
 
 /src/generated/prisma
+
+# Зависимости и сборка (стандарт для Next.js)
+node_modules/
+.next/
+build/
+dist/
+
+# Секреты и локальные настройки (КРИТИЧНО!)
+.env
+.env.local
+.env.production
+
+# Бекапы и мусор
+backups/
+api_backup/
+.enforcer/
+for_gemini/
+npm.dm
+restore.json
+
+# Настройки IDE
+.cursor/
+.idea/
+.vscode/
