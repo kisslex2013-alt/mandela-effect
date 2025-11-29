@@ -1279,8 +1279,6 @@ export default function AdminClient({ effects: initialEffects, submissions: init
             updatedAt: new Date().toISOString(),
           };
           setEffects((prev) => [newEffect, ...prev]);
-          // Добавляем в Set, чтобы не создавать дубли в этой же сессии
-          existingTitles.add(normalizedTitle);
           addLog(`${progress} ✅ "${item.title}" создан! (категория: ${categoryToSave})`);
           successCount++;
         } else {
