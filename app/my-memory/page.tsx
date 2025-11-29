@@ -11,6 +11,7 @@ import Loading from '@/components/Loading';
 import EmptyState from '@/components/EmptyState';
 import CustomSelect from '@/components/ui/CustomSelect';
 import SaveProgress from '@/components/SaveProgress';
+import ImageWithSkeleton from '@/components/ui/ImageWithSkeleton';
 import { getEffects, type EffectResult } from '@/app/actions/effects';
 import { getUserVotes as getUserVotesFromDB } from '@/app/actions/votes';
 import { getVisitorId } from '@/lib/visitor';
@@ -54,6 +55,7 @@ interface Effect {
   percentA: number;
   percentB: number;
   totalVotes: number;
+  imageUrl?: string | null;
 }
 
 interface EffectWithVote extends Effect {
@@ -286,6 +288,7 @@ export default function MyMemoryPage() {
             percentA,
             percentB,
             totalVotes,
+            imageUrl: effect.imageUrl,
           });
         });
 
@@ -1034,24 +1037,37 @@ const EffectCard = memo(({ effect }: { effect: EffectWithVote }) => {
       href={`/effect/${effect.id}`}
       className="block group"
     >
-      <div className="bg-darkCard hover:bg-darkCard/80 p-5 rounded-xl border border-light/10 hover:border-primary/30 transition-all duration-300 hover:-translate-y-2 hover:shadow-xl hover:shadow-primary/20">
-        {/* Шапка БЕЗ бейджа - больше места для названия */}
-        <div className="flex items-center gap-2 mb-3">
-          <span className="text-xl flex-shrink-0 transition-transform duration-300 group-hover:scale-125 inline-block">{effect.categoryEmoji}</span>
-          <h3 className="text-lg font-bold text-light group-hover:text-primary transition-colors line-clamp-2">
-            {effect.title}
-          </h3>
-        </div>
+      <div className="bg-darkCard hover:bg-darkCard/80 rounded-xl border border-light/10 hover:border-primary/30 transition-all duration-300 hover:-translate-y-2 hover:shadow-xl hover:shadow-primary/20 overflow-hidden">
+        {/* Изображение */}
+        {effect.imageUrl && (
+          <div className="relative w-full h-40">
+            <ImageWithSkeleton
+              src={effect.imageUrl}
+              alt={effect.title}
+              fill
+              className="object-cover"
+            />
+          </div>
+        )}
 
-        {/* Твой выбор */}
-        <div className="mb-3">
-          <p className="text-sm text-light/60">
-            Твой выбор: <span className="text-light font-semibold">{effect.userVariant === 'A' ? effect.variantA : effect.variantB}</span>
-          </p>
-        </div>
+        <div className="p-5">
+          {/* Шапка БЕЗ бейджа - больше места для названия */}
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-xl flex-shrink-0 transition-transform duration-300 group-hover:scale-125 inline-block">{effect.categoryEmoji}</span>
+            <h3 className="text-lg font-bold text-light group-hover:text-primary transition-colors line-clamp-2">
+              {effect.title}
+            </h3>
+          </div>
 
-        {/* Прогресс бары - выделяем выбранный вариант */}
-        <div className="mb-2">
+          {/* Твой выбор */}
+          <div className="mb-3">
+            <p className="text-sm text-light/60">
+              Твой выбор: <span className="text-light font-semibold">{effect.userVariant === 'A' ? effect.variantA : effect.variantB}</span>
+            </p>
+          </div>
+
+          {/* Прогресс бары - выделяем выбранный вариант */}
+          <div className="mb-2">
           <div className="flex items-center gap-2 mb-1.5">
             {/* Вариант А - выделяем если выбран */}
             <div className={`flex-1 h-2 rounded-full overflow-hidden transition-all duration-300 ${
@@ -1099,10 +1115,10 @@ const EffectCard = memo(({ effect }: { effect: EffectWithVote }) => {
               {effect.percentB.toFixed(1)}% <span className="text-light/40">({effect.votesB})</span>
             </span>
           </div>
-        </div>
+          </div>
 
-        {/* Футер с бейджем и стрелкой */}
-        <div className="flex items-center justify-between mt-3 pt-3 border-t border-light/5">
+          {/* Футер с бейджем и стрелкой */}
+          <div className="flex items-center justify-between mt-3 pt-3 border-t border-light/5">
           <div className="flex items-center gap-2">
             <p className="text-xs text-light/40">
               {relativeDate}
@@ -1119,6 +1135,7 @@ const EffectCard = memo(({ effect }: { effect: EffectWithVote }) => {
               Открыть
             </span>
             <span className="text-lg font-bold">→</span>
+          </div>
           </div>
         </div>
       </div>

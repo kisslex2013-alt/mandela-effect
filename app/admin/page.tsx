@@ -37,6 +37,8 @@ export default async function AdminPage() {
     description: effect.description,
     content: effect.content,
     category: effect.category,
+    imageUrl: effect.imageUrl,
+    videoUrl: effect.videoUrl,
     votesFor: effect.votesFor,
     votesAgainst: effect.votesAgainst,
     views: effect.views,

@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import confetti from 'canvas-confetti';
 import { submitEffect, getSubmitCategories } from '@/app/actions/submission';
-import { generateEffectInfo } from '@/app/actions/generate-content';
+import { generateEffectData } from '@/app/actions/generate-content';
 import CustomSelect, { type SelectOption } from '@/components/ui/CustomSelect';
 
 interface Category {
@@ -259,8 +259,24 @@ export default function SubmitPage() {
 
   // Заполнение формы через AI
   const handleAiFill = async () => {
+    // Проверяем обязательные поля перед вызовом AI
     if (!formData.title.trim()) {
       toast.error('Сначала введите название эффекта');
+      return;
+    }
+    
+    if (!formData.question.trim()) {
+      toast.error('Сначала введите вопрос');
+      return;
+    }
+    
+    if (!formData.variantA.trim()) {
+      toast.error('Сначала заполните Вариант А');
+      return;
+    }
+    
+    if (!formData.variantB.trim()) {
+      toast.error('Сначала заполните Вариант Б');
       return;
     }
 
@@ -268,7 +284,12 @@ export default function SubmitPage() {
 
     try {
       console.log('[SubmitPage] Запрос AI генерации для:', formData.title);
-      const result = await generateEffectInfo(formData.title, formData.question);
+      const result = await generateEffectData(
+        formData.title,
+        formData.question,
+        formData.variantA,
+        formData.variantB
+      );
 
       if (result.success && result.data) {
         // Проверяем, вернул ли AI ошибку валидации
@@ -278,14 +299,23 @@ export default function SubmitPage() {
           return;
         }
 
-        // Обновляем formData (currentState и sourceLink)
+        // Валидные категории
+        const validCategories = ['films', 'brands', 'music', 'popculture', 'childhood', 'people', 'geography', 'russian', 'other'];
+
+        // Обновляем formData (НЕ перезаписываем variantA и variantB, так как они уже введены пользователем)
         setFormData((prev) => ({
           ...prev,
+          // Категория (с валидацией)
+          category: result.data!.category && validCategories.includes(result.data!.category)
+            ? result.data!.category
+            : prev.category,
+          // Текущее состояние и основная ссылка
           currentState: result.data!.currentState || prev.currentState,
           sourceLink: result.data!.sourceLink || prev.sourceLink,
         }));
 
         // Обновляем interpretations (scientific, community и их ссылки)
+        // Примечание: history, residue, historySource, residueSource не используются в форме отправки
         setInterpretations((prev) => ({
           ...prev,
           scientific: result.data!.scientific || prev.scientific,

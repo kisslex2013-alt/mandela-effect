@@ -5,11 +5,12 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { updateEffect, deleteEffect, logout, approveSubmission, rejectSubmission, createEffect } from '@/app/actions/admin';
-import { generateEffectInfo } from '@/app/actions/generate-content';
+import { generateEffectData } from '@/app/actions/generate-content';
 import { getCategories, createCategory, updateCategory, deleteCategory, type Category } from '@/app/actions/category';
 import { recalculateAllVoteCounters } from '@/app/actions/recalculate-votes';
 import CustomSelect, { type SelectOption } from '@/components/ui/CustomSelect';
 import EmojiPickerInput from '@/components/ui/EmojiPickerInput';
+import ImageWithSkeleton from '@/components/ui/ImageWithSkeleton';
 import toast from 'react-hot-toast';
 
 interface Effect {
@@ -18,6 +19,8 @@ interface Effect {
   description: string;
   content: string;
   category: string;
+  imageUrl: string | null;
+  videoUrl: string | null;
   votesFor: number;
   votesAgainst: number;
   views: number;
@@ -102,6 +105,36 @@ export default function AdminClient({ effects: initialEffects, submissions: init
   const [aiLoading, setAiLoading] = useState(false);
   const [recalculating, setRecalculating] = useState(false);
   
+  // Быстрая генерация (для кнопок в списке)
+  const [quickLoading, setQuickLoading] = useState<{ id: string, type: 'data' | 'image' } | null>(null);
+  
+  // Модальное окно для увеличения картинки
+  const [imageModalUrl, setImageModalUrl] = useState<string | null>(null);
+  
+  // Модальное окно для ручной вставки ссылки
+  const [manualImageState, setManualImageState] = useState<{ isOpen: boolean; effect: Effect | null; url: string }>({
+    isOpen: false,
+    effect: null,
+    url: ''
+  });
+  
+  // Закрытие модального окна по ESC
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (imageModalUrl) {
+          setImageModalUrl(null);
+        }
+        if (manualImageState.isOpen) {
+          setManualImageState({ ...manualImageState, isOpen: false });
+        }
+      }
+    };
+    
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [imageModalUrl, manualImageState]);
+  
   // Категории - редактирование
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
@@ -143,6 +176,9 @@ export default function AdminClient({ effects: initialEffects, submissions: init
     scientificSource: '',
     communityInterpretation: '',
     communitySource: '',
+    // Изображение
+    imageUrl: '',
+    imagePrompt: '',
   });
 
   // Вычисляем статистику
@@ -316,6 +352,7 @@ export default function AdminClient({ effects: initialEffects, submissions: init
         description: formData.description,
         content: newContent,
         category: formData.category,
+        imageUrl: formData.imageUrl || undefined,
         residue: formData.residue || undefined,
         residueSource: formData.residueSource || undefined,
         history: formData.history || undefined,
@@ -324,31 +361,35 @@ export default function AdminClient({ effects: initialEffects, submissions: init
       });
 
       if (result.success) {
-        // Обновляем локальный стейт
+        // Обновляем локальный стейт НЕМЕДЛЕННО для мгновенного отображения
+        const updatedEffect = {
+          ...editingEffect,
+          title: formData.title,
+          description: formData.description,
+          content: newContent,
+          category: formData.category,
+          imageUrl: formData.imageUrl || null,
+          residue: formData.residue || null,
+          history: formData.history || null,
+          interpretations: Object.keys(interpretations).length > 0 ? interpretations : null,
+          updatedAt: new Date().toISOString(), // Добавляем timestamp для принудительного обновления
+        };
+
         setEffects((prev) =>
-          prev.map((e) =>
-            e.id === editingEffect.id
-              ? {
-                  ...e,
-                  title: formData.title,
-                  description: formData.description,
-                  content: newContent,
-                  category: formData.category,
-                  residue: formData.residue || null,
-                  history: formData.history || null,
-                  interpretations: Object.keys(interpretations).length > 0 ? interpretations : null,
-                }
-              : e
-          )
+          prev.map((e) => (e.id === editingEffect.id ? updatedEffect : e))
         );
+        
+        // Закрываем модальное окно сразу
         setEditingEffect(null);
+        setLoading(false); // Убираем лоадер немедленно
+        
         toast.success('Эффект обновлён!');
       } else {
         toast.error(result.error || 'Ошибка сохранения');
+        setLoading(false);
       }
     } catch (error) {
       toast.error('Ошибка сохранения');
-    } finally {
       setLoading(false);
     }
   };
@@ -371,6 +412,230 @@ export default function AdminClient({ effects: initialEffects, submissions: init
       toast.error('Ошибка удаления');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Быстрая генерация картинки
+  const handleQuickGenerateImage = async (effect: Effect) => {
+    setQuickLoading({ id: effect.id, type: 'image' });
+
+    try {
+      const { generateEffectImage } = await import('@/app/actions/generate-content');
+      const result = await generateEffectImage(effect.title);
+
+      if (result.success && result.imageUrl) {
+        // Сохраняем в БД
+        const updateResult = await updateEffect(effect.id, {
+          imageUrl: result.imageUrl
+        });
+
+        if (updateResult.success) {
+          // Обновляем UI
+          setEffects(prev => prev.map(e => 
+            e.id === effect.id ? { ...e, imageUrl: result.imageUrl!, updatedAt: new Date().toISOString() } : e
+          ));
+          toast.success('Картинка обновлена!');
+        } else {
+          toast.error('Ошибка сохранения в БД');
+        }
+      } else {
+        toast.error(result.error || 'Ошибка генерации');
+      }
+    } catch (e) {
+      toast.error('Ошибка при генерации');
+    } finally {
+      setQuickLoading(null);
+    }
+  };
+
+  // Быстрая генерация данных
+  const handleQuickGenerateData = async (effect: Effect) => {
+    setQuickLoading({ id: effect.id, type: 'data' });
+
+    try {
+      // Парсим варианты
+      const contentLines = effect.content.split('\n');
+      const variantALine = contentLines.find(line => line.startsWith('Вариант А:'));
+      const variantBLine = contentLines.find(line => line.startsWith('Вариант Б:'));
+      const variantA = variantALine?.replace('Вариант А: ', '').trim() || '';
+      const variantB = variantBLine?.replace('Вариант Б: ', '').trim() || '';
+
+      if (!variantA || !variantB) {
+        toast.error('Не найдены варианты А и Б в контенте');
+        setQuickLoading(null);
+        return;
+      }
+
+      const result = await generateEffectData(
+        effect.title, 
+        effect.description, 
+        variantA, 
+        variantB, 
+        { generateImage: false }
+      );
+
+      if (result.success && result.data) {
+        const aiData = result.data;
+        
+        // Формируем interpretations
+        const interpretations: Record<string, string> = {};
+        if (aiData.scientific) interpretations.scientific = aiData.scientific;
+        if (aiData.scientificSource) interpretations.scientificSource = aiData.scientificSource;
+        if (aiData.community) interpretations.community = aiData.community;
+        if (aiData.communitySource) interpretations.communitySource = aiData.communitySource;
+        if (aiData.sourceLink) interpretations.sourceLink = aiData.sourceLink;
+
+        // Формируем новый контент (сохраняя варианты, но обновляя currentState)
+        const newContent = `Вариант А: ${variantA}\nВариант Б: ${variantB}${
+          aiData.currentState ? `\nТекущее состояние: ${aiData.currentState}` : ''
+        }`;
+
+        // Обновляем в БД
+        const updateResult = await updateEffect(effect.id, {
+          content: newContent,
+          category: aiData.category && ['films', 'brands', 'music', 'popculture', 'childhood', 'people', 'geography', 'russian', 'other'].includes(aiData.category) ? aiData.category : undefined,
+          residue: aiData.residue || undefined,
+          residueSource: aiData.residueSource || undefined,
+          history: aiData.history || undefined,
+          historySource: aiData.historySource || undefined,
+          interpretations: Object.keys(interpretations).length > 0 ? interpretations : undefined,
+        });
+
+        if (updateResult.success) {
+           // Обновляем UI
+           setEffects(prev => prev.map(e => 
+             e.id === effect.id ? { 
+               ...e, 
+               content: newContent,
+               category: (aiData.category && ['films', 'brands', 'music', 'popculture', 'childhood', 'people', 'geography', 'russian', 'other'].includes(aiData.category)) ? aiData.category : e.category,
+               residue: aiData.residue || e.residue,
+               history: aiData.history || e.history,
+               interpretations: Object.keys(interpretations).length > 0 ? interpretations : e.interpretations,
+               updatedAt: new Date().toISOString()
+             } : e
+           ));
+           toast.success('Данные обновлены!');
+        } else {
+          toast.error('Ошибка сохранения');
+        }
+      } else {
+        toast.error(result.error || 'Ошибка AI');
+      }
+    } catch (e) {
+      toast.error('Критическая ошибка');
+      console.error(e);
+    } finally {
+      setQuickLoading(null);
+    }
+  };
+
+  // Ручная установка картинки по ссылке
+  const handleManualImage = (effect: Effect) => {
+    setManualImageState({
+      isOpen: true,
+      effect: effect,
+      url: effect.imageUrl || '' // Предзаполняем, если есть
+    });
+  };
+
+  // Поиск качественного изображения в Google или Яндекс
+  const handleSearchImage = (title: string, engine: 'google' | 'yandex') => {
+    const query = encodeURIComponent(`${title} фото высокое качество`);
+    let url = '';
+    
+    if (engine === 'google') {
+      url = `https://www.google.com/search?tbm=isch&q=${query}`;
+    } else {
+      url = `https://yandex.ru/images/search?text=${query}`;
+    }
+    
+    window.open(url, '_blank');
+  };
+
+  // Сохранение ссылки на картинку
+  const saveManualImage = async () => {
+    const { effect, url } = manualImageState;
+    if (!effect || !url.trim()) return;
+
+    if (!url.startsWith('http')) {
+      toast.error('Ссылка должна начинаться с http:// или https://');
+      return;
+    }
+
+    const toastId = toast.loading('Сохранение ссылки...');
+    try {
+      const updateResult = await updateEffect(effect.id, { imageUrl: url });
+      
+      if (updateResult.success) {
+        setEffects(prev => prev.map(e => e.id === effect.id ? { ...e, imageUrl: url, updatedAt: new Date().toISOString() } : e));
+        toast.success('Картинка установлена!', { id: toastId });
+        setManualImageState({ isOpen: false, effect: null, url: '' }); // Закрываем
+      } else {
+        toast.error('Ошибка сохранения', { id: toastId });
+      }
+    } catch (e) {
+      toast.error('Ошибка', { id: toastId });
+    }
+  };
+
+  // Умная стилизация (Img2Img)
+  const handleRestyleImage = async (effect: Effect) => {
+    if (!effect.imageUrl) return;
+    
+    // Используем существующий стейт загрузки, можно добавить тип 'restyle' в интерфейс стейта или использовать 'image'
+    setQuickLoading({ id: effect.id, type: 'image' }); 
+    const toastId = toast.loading('🎨 ИИ подбирает стиль и перерисовывает...');
+    
+    try {
+      const { restyleImage } = await import('@/app/actions/generate-content');
+      const result = await restyleImage(effect.title, effect.imageUrl);
+      
+      if (result.success && result.imageUrl) {
+        const updateResult = await updateEffect(effect.id, { imageUrl: result.imageUrl });
+        
+        if (updateResult.success) {
+          setEffects(prev => prev.map(e => e.id === effect.id ? { ...e, imageUrl: result.imageUrl!, updatedAt: new Date().toISOString() } : e));
+          toast.success('Стиль применен!', { id: toastId });
+        } else {
+          toast.error('Ошибка сохранения', { id: toastId });
+        }
+      } else {
+        toast.error('Не удалось стилизовать', { id: toastId });
+      }
+    } catch (e) {
+      toast.error('Ошибка соединения', { id: toastId });
+    } finally {
+      setQuickLoading(null);
+    }
+  };
+
+  // Подгонка формата изображения под 16:9
+  const handleFitImage = async (effect: Effect) => {
+    if (!effect.imageUrl) return;
+    
+    setQuickLoading({ id: effect.id, type: 'image' }); // Используем тип 'image' для спиннера
+    const toastId = toast.loading('📐 Подгоняем формат 16:9...');
+
+    try {
+      const { fitImageToFormat } = await import('@/app/actions/generate-content');
+      const result = await fitImageToFormat(effect.title, effect.imageUrl);
+
+      if (result.success && result.imageUrl) {
+        const updateResult = await updateEffect(effect.id, { imageUrl: result.imageUrl });
+        
+        if (updateResult.success) {
+          setEffects(prev => prev.map(e => e.id === effect.id ? { ...e, imageUrl: result.imageUrl!, updatedAt: new Date().toISOString() } : e));
+          toast.success('Формат обновлен!', { id: toastId });
+        } else {
+          toast.error('Ошибка сохранения', { id: toastId });
+        }
+      } else {
+        toast.error('Не удалось обработать', { id: toastId });
+      }
+    } catch (e) {
+      toast.error('Ошибка соединения', { id: toastId });
+    } finally {
+      setQuickLoading(null);
     }
   };
 
@@ -460,8 +725,14 @@ export default function AdminClient({ effects: initialEffects, submissions: init
 
   // AI заполнение полей
   const handleAiFill = async () => {
+    // Проверяем обязательные поля перед вызовом AI
     if (!formData.title.trim()) {
       toast.error('Сначала введите название эффекта');
+      return;
+    }
+    
+    if (!formData.variantA.trim() || !formData.variantB.trim()) {
+      toast.error('Сначала заполните Варианты А и Б');
       return;
     }
 
@@ -469,7 +740,13 @@ export default function AdminClient({ effects: initialEffects, submissions: init
 
     try {
       console.log('[AdminClient] Запрос AI генерации для:', formData.title);
-      const result = await generateEffectInfo(formData.title, formData.description);
+      const result = await generateEffectData(
+        formData.title,
+        formData.description || `Как вы помните ${formData.title}?`,
+        formData.variantA,
+        formData.variantB,
+        { generateImage: true }
+      );
 
       if (result.success && result.data) {
         // Проверяем, вернул ли AI ошибку валидации
@@ -479,9 +756,13 @@ export default function AdminClient({ effects: initialEffects, submissions: init
           return;
         }
 
-        // Маппинг полей AI -> formData
+        // Маппинг полей AI -> formData (НЕ перезаписываем variantA и variantB)
         setFormData((prev) => ({
           ...prev,
+          // Категория (если валидна)
+          category: result.data!.category && ['films', 'brands', 'music', 'popculture', 'childhood', 'people', 'geography', 'russian', 'other'].includes(result.data!.category)
+            ? result.data!.category
+            : prev.category,
           // Текстовые поля
           currentState: result.data!.currentState || prev.currentState,
           residue: result.data!.residue || prev.residue,
@@ -494,6 +775,9 @@ export default function AdminClient({ effects: initialEffects, submissions: init
           historySource: result.data!.historySource || prev.historySource,
           scientificSource: result.data!.scientificSource || prev.scientificSource,
           communitySource: result.data!.communitySource || prev.communitySource,
+          // Изображение
+          imageUrl: result.data!.imageUrl || prev.imageUrl,
+          imagePrompt: (result.data as any).imagePrompt || prev.imagePrompt,
         }));
 
         toast.success('Поля заполнены с помощью AI! ✨');
@@ -505,6 +789,104 @@ export default function AdminClient({ effects: initialEffects, submissions: init
     } catch (err) {
       console.error('[AdminClient] Исключение при AI генерации:', err);
       toast.error('Произошла ошибка при обращении к AI');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  // Генерация только дополнительных данных (без изображения)
+  const handleAiFillDataOnly = async () => {
+    if (!formData.title.trim()) {
+      toast.error('Сначала введите название эффекта');
+      return;
+    }
+    
+    if (!formData.variantA.trim() || !formData.variantB.trim()) {
+      toast.error('Сначала заполните Варианты А и Б');
+      return;
+    }
+
+    setAiLoading(true);
+
+    try {
+      console.log('[AdminClient] Запрос AI генерации данных (без изображения) для:', formData.title);
+      const result = await generateEffectData(
+        formData.title,
+        formData.description || `Как вы помните ${formData.title}?`,
+        formData.variantA,
+        formData.variantB,
+        { generateImage: false }
+      );
+
+      if (result.success && result.data) {
+        if (result.data.error) {
+          toast.error(result.data.error);
+          console.log('[AdminClient] AI отклонил запрос:', result.data.error);
+          return;
+        }
+
+        setFormData((prev) => ({
+          ...prev,
+          category: result.data!.category && ['films', 'brands', 'music', 'popculture', 'childhood', 'people', 'geography', 'russian', 'other'].includes(result.data!.category)
+            ? result.data!.category
+            : prev.category,
+          currentState: result.data!.currentState || prev.currentState,
+          residue: result.data!.residue || prev.residue,
+          history: result.data!.history || prev.history,
+          scientificInterpretation: result.data!.scientific || prev.scientificInterpretation,
+          communityInterpretation: result.data!.community || prev.communityInterpretation,
+          sourceLink: result.data!.sourceLink || prev.sourceLink,
+          residueSource: result.data!.residueSource || prev.residueSource,
+          historySource: result.data!.historySource || prev.historySource,
+          scientificSource: result.data!.scientificSource || prev.scientificSource,
+          communitySource: result.data!.communitySource || prev.communitySource,
+        }));
+
+        toast.success('Данные заполнены AI (изображение не изменено)! 📝');
+        console.log('[AdminClient] AI успешно заполнил данные без изображения:', result.data);
+      } else {
+        toast.error(result.error || 'Не удалось сгенерировать контент');
+        console.error('[AdminClient] Ошибка AI:', result.error);
+      }
+    } catch (err) {
+      console.error('[AdminClient] Исключение при AI генерации:', err);
+      toast.error('Произошла ошибка при обращении к AI');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  // Генерация только изображения
+  const handleAiImageOnly = async () => {
+    if (!formData.title.trim()) {
+      toast.error('Сначала введите название эффекта');
+      return;
+    }
+
+    setAiLoading(true);
+
+    try {
+      console.log('[AdminClient] Запрос генерации изображения для:', formData.title);
+      console.log('[AdminClient] Используется imagePrompt:', formData.imagePrompt || 'не задан, будет использован title');
+      const { generateEffectImage } = await import('@/app/actions/generate-content');
+      // Передаём imagePrompt, если он есть (после AI генерации данных)
+      const result = await generateEffectImage(formData.title, formData.imagePrompt || undefined);
+
+      if (result.success && result.imageUrl) {
+        setFormData((prev) => ({
+          ...prev,
+          imageUrl: result.imageUrl || prev.imageUrl,
+        }));
+
+        toast.success('Изображение сгенерировано! 🖼️');
+        console.log('[AdminClient] Изображение успешно сгенерировано:', result.imageUrl);
+      } else {
+        toast.error(result.error || 'Не удалось сгенерировать изображение');
+        console.error('[AdminClient] Ошибка генерации изображения:', result.error);
+      }
+    } catch (err) {
+      console.error('[AdminClient] Исключение при генерации изображения:', err);
+      toast.error('Произошла ошибка при генерации изображения');
     } finally {
       setAiLoading(false);
     }
@@ -564,6 +946,8 @@ export default function AdminClient({ effects: initialEffects, submissions: init
           description: formData.description,
           content: newContent,
           category: formData.category,
+          imageUrl: null,
+          videoUrl: null,
           residue: formData.residue || null,
           history: formData.history || null,
           interpretations: Object.keys(interpretations).length > 0 ? interpretations : null,
@@ -709,16 +1093,37 @@ export default function AdminClient({ effects: initialEffects, submissions: init
 
   // Массовая генерация эффектов через AI
   const handleBulkGenerate = async () => {
-    // Парсим JSON
-    let items: Array<{ title: string; question: string; category?: string; variantA?: string; variantB?: string }>;
+    // Умный парсинг JSON с очисткой от Markdown и форматирования
+    let items: Array<{ title: string; question?: string; category?: string; variantA: string; variantB: string }>;
     try {
-      items = JSON.parse(bulkInput);
+      // 1. Очистка от пробелов
+      let cleanJson = bulkInput.trim();
+      
+      // 2. Удаляем маркеры кода Markdown
+      cleanJson = cleanJson.replace(/```json/gi, '').replace(/```/g, '');
+      
+      // 3. Ищем границы массива (первая [ и последняя ])
+      const firstBracket = cleanJson.indexOf('[');
+      const lastBracket = cleanJson.lastIndexOf(']');
+      
+      if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
+        // 4. Обрезаем строку только до границ массива
+        cleanJson = cleanJson.substring(firstBracket, lastBracket + 1);
+      } else {
+        // Если скобки не найдены, пробуем парсить как есть
+        // (может быть уже чистый JSON)
+      }
+      
+      // 5. Парсим очищенный JSON
+      items = JSON.parse(cleanJson);
+      
       if (!Array.isArray(items)) {
         toast.error('Ожидается JSON массив');
         return;
       }
-    } catch {
-      toast.error('Некорректный JSON формат');
+    } catch (error) {
+      console.error('[handleBulkGenerate] Ошибка парсинга JSON:', error);
+      toast.error('Некорректный JSON формат. Проверьте синтаксис и попробуйте снова.');
       return;
     }
 
@@ -734,9 +1139,7 @@ export default function AdminClient({ effects: initialEffects, submissions: init
       setBulkLogs((prev) => [...prev, message]);
     };
 
-    // Создаём Set из существующих названий для проверки дублей
-    const existingTitles = new Set(effects.map((e) => e.title.toLowerCase().trim()));
-    addLog(`📋 В базе уже ${existingTitles.size} эффектов`);
+    addLog(`📋 В базе уже ${effects.length} эффектов`);
     addLog('');
 
     let successCount = 0;
@@ -753,19 +1156,40 @@ export default function AdminClient({ effects: initialEffects, submissions: init
         continue;
       }
 
-      // Проверка на дубли
-      const normalizedTitle = item.title.toLowerCase().trim();
-      if (existingTitles.has(normalizedTitle)) {
-        addLog(`${progress} ⚠️ "${item.title}" уже есть в базе, пропускаем`);
+      // Проверка на дубли (нечеткий поиск)
+      // Нормализуем текущий заголовок из JSON
+      const currentNorm = normalizeText(item.title);
+
+      // Ищем совпадение в УЖЕ существующих эффектах (из стейта effects)
+      const isDuplicate = effects.some(e => {
+        const existingNorm = normalizeText(e.title);
+        // Проверяем вхождение одной строки в другую (в обе стороны)
+        return existingNorm.includes(currentNorm) || currentNorm.includes(existingNorm);
+      });
+
+      if (isDuplicate) {
+        addLog(`${progress} ⚠️ "${item.title}" похож на существующий эффект, пропускаем`);
         skippedCount++;
         continue;
       }
 
       addLog(`${progress} 🔄 Генерируем "${item.title}"...`);
 
+      // Проверяем наличие обязательных полей для AI
+      if (!item.variantA?.trim() || !item.variantB?.trim()) {
+        addLog(`${progress} ⚠️ Пропущен: нет вариантов А/Б`);
+        errorCount++;
+        continue;
+      }
+
       try {
-        // 1. Генерируем контент через AI
-        const aiResult = await generateEffectInfo(item.title, item.question || `Как вы помните ${item.title}?`);
+        // 1. Генерируем контент через AI (передаем variantA и variantB)
+        const aiResult = await generateEffectData(
+          item.title,
+          item.question || `Как вы помните ${item.title}?`,
+          item.variantA.trim(),
+          item.variantB.trim()
+        );
 
         if (!aiResult.success || !aiResult.data) {
           addLog(`${progress} ⚠️ AI не смог сгенерировать: ${aiResult.error || 'неизвестная ошибка'}`);
@@ -792,9 +1216,9 @@ export default function AdminClient({ effects: initialEffects, submissions: init
         if (!validCategories.includes(categoryToSave)) {
           categoryToSave = 'other';
         }
-        // Приоритет: варианты из JSON > варианты от AI > фоллбэки
-        const variantA = item.variantA?.trim() || aiData.variantA?.trim() || 'Как многие помнят';
-        const variantB = item.variantB?.trim() || aiData.variantB?.trim() || 'Как на самом деле';
+        // Используем варианты из JSON (они обязательны)
+        const variantA = item.variantA.trim();
+        const variantB = item.variantB.trim();
 
         const interpretations: Record<string, string> = {};
         if (aiData.scientific) interpretations.scientific = aiData.scientific;
@@ -813,6 +1237,7 @@ export default function AdminClient({ effects: initialEffects, submissions: init
           description: item.question || `Как вы помните ${item.title}?`,
           content,
           category: categoryToSave,
+          imageUrl: aiData.imageUrl || undefined,
           residue: aiData.residue || undefined,
           residueSource: aiData.residueSource || undefined,
           history: aiData.history || undefined,
@@ -821,6 +1246,11 @@ export default function AdminClient({ effects: initialEffects, submissions: init
         });
 
         if (createResult.success && createResult.id) {
+          // Логируем, если картинка была сгенерирована
+          if (aiData.imageUrl) {
+            addLog(`${progress} 🖼️ Картинка сгенерирована`);
+          }
+
           // Добавляем в локальный стейт
           const newEffect: Effect = {
             id: createResult.id,
@@ -828,6 +1258,8 @@ export default function AdminClient({ effects: initialEffects, submissions: init
             description: item.question || `Как вы помните ${item.title}?`,
             content,
             category: categoryToSave,
+            imageUrl: aiData.imageUrl || null,
+            videoUrl: null,
             residue: aiData.residue || null,
             residueSource: aiData.residueSource || null,
             history: aiData.history || null,
@@ -883,6 +1315,20 @@ export default function AdminClient({ effects: initialEffects, submissions: init
     } else {
       toast.error('Не удалось создать ни одного эффекта');
     }
+  };
+
+  // Функция нормализации: убирает спецсимволы, пробелы и приводит к нижнему регистру
+  const normalizeText = (text: string) => text.toLowerCase().replace(/[^a-zа-яё0-9]/g, '');
+
+  const findDuplicate = (submissionTitle: string) => {
+    const cleanSubmission = normalizeText(submissionTitle);
+    if (cleanSubmission.length < 3) return null; // Слишком короткие не проверяем
+
+    return effects.find(effect => {
+      const cleanEffect = normalizeText(effect.title);
+      // Проверяем полное совпадение или вхождение
+      return cleanEffect.includes(cleanSubmission) || cleanSubmission.includes(cleanEffect);
+    });
   };
 
   return (
@@ -1186,6 +1632,21 @@ export default function AdminClient({ effects: initialEffects, submissions: init
                       {/* Основная информация */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start gap-3">
+                          {/* Миниатюра картинки */}
+                          <div 
+                            className="flex-shrink-0 w-16 h-10 rounded-lg overflow-hidden border border-light/10 cursor-pointer hover:border-primary/50 transition-all"
+                            onClick={() => effect.imageUrl && setImageModalUrl(effect.imageUrl)}
+                            title="Нажмите для увеличения"
+                          >
+                            <ImageWithSkeleton
+                              key={`${effect.id}-${effect.imageUrl || 'no-image'}-${effect.updatedAt || ''}`}
+                              src={effect.imageUrl}
+                              alt={effect.title}
+                              width={64}
+                              height={40}
+                              objectFit="cover"
+                            />
+                          </div>
                           <span className="text-2xl flex-shrink-0">{catInfo.emoji}</span>
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2 flex-wrap">
@@ -1251,6 +1712,99 @@ export default function AdminClient({ effects: initialEffects, submissions: init
 
                         {/* Кнопки действий */}
                         <div className="flex items-center gap-2">
+                          {/* Быстрая генерация данных */}
+                          <button
+                            onClick={() => handleQuickGenerateData(effect)}
+                            disabled={quickLoading?.id === effect.id && quickLoading?.type === 'data'}
+                            className="px-3 py-2 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Быстрая генерация данных"
+                          >
+                            {quickLoading?.id === effect.id && quickLoading?.type === 'data' ? (
+                              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                              </svg>
+                            ) : (
+                              '📝'
+                            )}
+                          </button>
+                          {/* Быстрая генерация картинки */}
+                          <button
+                            onClick={() => handleQuickGenerateImage(effect)}
+                            disabled={quickLoading?.id === effect.id && quickLoading?.type === 'image'}
+                            className="px-3 py-2 bg-orange-500/20 text-orange-400 rounded-lg hover:bg-orange-500/30 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Быстрая генерация картинки"
+                          >
+                            {quickLoading?.id === effect.id && quickLoading?.type === 'image' ? (
+                              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                              </svg>
+                            ) : (
+                              '🖼️'
+                            )}
+                          </button>
+                          {/* Группа кнопок поиска */}
+                          <div className="flex gap-1">
+                            <button
+                              onClick={() => handleSearchImage(effect.title, 'google')}
+                              className="px-2 py-1 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded hover:bg-blue-500/20 transition-colors text-sm font-bold min-w-[28px]"
+                              title="Найти в Google Картинках"
+                            >
+                              G
+                            </button>
+                            <button
+                              onClick={() => handleSearchImage(effect.title, 'yandex')}
+                              className="px-2 py-1 bg-red-500/10 text-red-400 border border-red-500/20 rounded hover:bg-red-500/20 transition-colors text-sm font-bold min-w-[28px]"
+                              title="Найти в Яндекс Картинках"
+                            >
+                              Я
+                            </button>
+                          </div>
+                          {/* Вставить ссылку на картинку */}
+                          <button
+                            onClick={() => handleManualImage(effect)}
+                            className="px-3 py-2 bg-purple-500/20 text-purple-400 rounded-lg hover:bg-purple-500/30 transition-colors text-sm font-medium"
+                            title="Вставить ссылку на картинку"
+                          >
+                            🔗
+                          </button>
+                          {/* Умная стилизация (Img2Img) - показывается только если есть картинка */}
+                          {effect.imageUrl && (
+                            <button
+                              onClick={() => handleRestyleImage(effect)}
+                              disabled={quickLoading?.id === effect.id && quickLoading?.type === 'image'}
+                              className="px-3 py-2 bg-pink-500/20 text-pink-400 rounded-lg hover:bg-pink-500/30 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                              title="Умная стилизация изображения"
+                            >
+                              {quickLoading?.id === effect.id && quickLoading?.type === 'image' ? (
+                                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                </svg>
+                              ) : (
+                                '🎨'
+                              )}
+                            </button>
+                          )}
+                          {/* Подгонка формата под 16:9 - показывается только если есть картинка */}
+                          {effect.imageUrl && (
+                            <button
+                              onClick={() => handleFitImage(effect)}
+                              disabled={quickLoading?.id === effect.id && quickLoading?.type === 'image'}
+                              className="px-3 py-2 bg-purple-500/20 text-purple-400 rounded-lg hover:bg-purple-500/30 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                              title="Подгнать под 16:9 (Fit)"
+                            >
+                              {quickLoading?.id === effect.id && quickLoading?.type === 'image' ? (
+                                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                </svg>
+                              ) : (
+                                '📐'
+                              )}
+                            </button>
+                          )}
                           <button
                             onClick={() => handleEdit(effect)}
                             className="px-3 py-2 bg-primary/20 text-primary rounded-lg hover:bg-primary/30 transition-colors text-sm font-medium"
@@ -1361,6 +1915,32 @@ export default function AdminClient({ effects: initialEffects, submissions: init
                           )}
                         </div>
                       )}
+
+                      {/* Проверка на дубликаты */}
+                      {(() => {
+                        const duplicate = findDuplicate(submission.title);
+                        return duplicate ? (
+                          <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg flex items-start gap-3">
+                            <span className="text-2xl">⚠️</span>
+                            <div>
+                              <div className="font-bold text-red-400">Найден возможный дубликат!</div>
+                              <div className="text-sm text-light/70 mt-1">
+                                В базе уже есть эффект: <span className="text-light font-medium">"{duplicate.title}"</span>
+                              </div>
+                              <div className="text-xs text-light/50 mt-1">
+                                ID: {duplicate.id} • Категория: {duplicate.category}
+                              </div>
+                            </div>
+                            <Link 
+                              href={`/effect/${duplicate.id}`} 
+                              target="_blank"
+                              className="ml-auto px-3 py-1.5 bg-dark/50 hover:bg-dark text-xs rounded border border-light/10 text-light transition-colors"
+                            >
+                              Открыть ↗
+                            </Link>
+                          </div>
+                        ) : null;
+                      })()}
 
                       {/* Кнопки действий */}
                       <div className="flex items-center gap-3">
@@ -1576,7 +2156,7 @@ export default function AdminClient({ effects: initialEffects, submissions: init
                   <button
                     type="button"
                     onClick={handleAiFill}
-                    disabled={aiLoading || !formData.title.trim()}
+                    disabled={aiLoading || !formData.title.trim() || !formData.variantA.trim() || !formData.variantB.trim()}
                     className="px-4 py-2 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white rounded-lg transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                   >
                     {aiLoading ? (
@@ -1849,37 +2429,88 @@ export default function AdminClient({ effects: initialEffects, submissions: init
                   Редактирование эффекта
                 </h2>
 
-                {/* Кнопка AI заполнения */}
-                <div className="flex items-center justify-between p-4 bg-gradient-to-r from-purple-500/10 to-blue-500/10 border border-purple-500/30 rounded-xl mb-6">
-                  <div>
-                    <h4 className="text-light font-medium flex items-center gap-2">
-                      ✨ AI-помощник
-                    </h4>
-                    <p className="text-light/60 text-sm">
-                      Автоматически заполнит все дополнительные поля
-                    </p>
+                {/* Кнопки AI */}
+                <div className="p-4 bg-gradient-to-r from-purple-500/10 to-blue-500/10 border border-purple-500/30 rounded-xl mb-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <h4 className="text-light font-medium flex items-center gap-2">
+                        ✨ AI-помощник
+                      </h4>
+                      <p className="text-light/60 text-sm">
+                        Автоматически заполнит все дополнительные поля
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAiFill}
+                      disabled={aiLoading || !formData.title.trim() || !formData.variantA.trim() || !formData.variantB.trim()}
+                      className="px-4 py-2 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white rounded-lg transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                      {aiLoading ? (
+                        <>
+                          <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                          </svg>
+                          Генерация...
+                        </>
+                      ) : (
+                        <>
+                          <span>✨</span>
+                          Заполнить всё
+                        </>
+                      )}
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleAiFill}
-                    disabled={aiLoading || !formData.title.trim()}
-                    className="px-4 py-2 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white rounded-lg transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                  >
-                    {aiLoading ? (
-                      <>
-                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                        </svg>
-                        Генерация...
-                      </>
-                    ) : (
-                      <>
-                        <span>✨</span>
-                        Заполнить через AI
-                      </>
-                    )}
-                  </button>
+
+                  {/* Дополнительные кнопки */}
+                  <div className="flex gap-2 pt-3 border-t border-purple-500/20">
+                    <button
+                      type="button"
+                      onClick={handleAiFillDataOnly}
+                      disabled={aiLoading || !formData.title.trim() || !formData.variantA.trim() || !formData.variantB.trim()}
+                      className="flex-1 px-3 py-2 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 hover:from-blue-500/30 hover:to-cyan-500/30 text-light border border-blue-500/30 rounded-lg transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
+                    >
+                      {aiLoading ? (
+                        <>
+                          <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                          </svg>
+                          <span className="hidden sm:inline">Генерация...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>📝</span>
+                          <span className="hidden sm:inline">Только данные</span>
+                          <span className="sm:hidden">Данные</span>
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleAiImageOnly}
+                      disabled={aiLoading || !formData.title.trim()}
+                      className="flex-1 px-3 py-2 bg-gradient-to-r from-orange-500/20 to-pink-500/20 hover:from-orange-500/30 hover:to-pink-500/30 text-light border border-orange-500/30 rounded-lg transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
+                    >
+                      {aiLoading ? (
+                        <>
+                          <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                          </svg>
+                          <span className="hidden sm:inline">Генерация...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>🖼️</span>
+                          <span className="hidden sm:inline">Только картинка</span>
+                          <span className="sm:hidden">Картинка</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="space-y-6">
@@ -2135,37 +2766,88 @@ export default function AdminClient({ effects: initialEffects, submissions: init
                   Создание нового эффекта
                 </h2>
 
-                {/* Кнопка AI заполнения */}
-                <div className="flex items-center justify-between p-4 bg-gradient-to-r from-purple-500/10 to-blue-500/10 border border-purple-500/30 rounded-xl mb-6">
-                  <div>
-                    <h4 className="text-light font-medium flex items-center gap-2">
-                      ✨ AI-помощник
-                    </h4>
-                    <p className="text-light/60 text-sm">
-                      Автоматически заполнит все дополнительные поля
-                    </p>
+                {/* Кнопки AI */}
+                <div className="p-4 bg-gradient-to-r from-purple-500/10 to-blue-500/10 border border-purple-500/30 rounded-xl mb-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <h4 className="text-light font-medium flex items-center gap-2">
+                        ✨ AI-помощник
+                      </h4>
+                      <p className="text-light/60 text-sm">
+                        Автоматически заполнит все дополнительные поля
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAiFill}
+                      disabled={aiLoading || !formData.title.trim() || !formData.variantA.trim() || !formData.variantB.trim()}
+                      className="px-4 py-2 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white rounded-lg transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                      {aiLoading ? (
+                        <>
+                          <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                          </svg>
+                          Генерация...
+                        </>
+                      ) : (
+                        <>
+                          <span>✨</span>
+                          Заполнить всё
+                        </>
+                      )}
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleAiFill}
-                    disabled={aiLoading || !formData.title.trim()}
-                    className="px-4 py-2 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white rounded-lg transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                  >
-                    {aiLoading ? (
-                      <>
-                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                        </svg>
-                        Генерация...
-                      </>
-                    ) : (
-                      <>
-                        <span>✨</span>
-                        Заполнить через AI
-                      </>
-                    )}
-                  </button>
+
+                  {/* Дополнительные кнопки */}
+                  <div className="flex gap-2 pt-3 border-t border-purple-500/20">
+                    <button
+                      type="button"
+                      onClick={handleAiFillDataOnly}
+                      disabled={aiLoading || !formData.title.trim() || !formData.variantA.trim() || !formData.variantB.trim()}
+                      className="flex-1 px-3 py-2 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 hover:from-blue-500/30 hover:to-cyan-500/30 text-light border border-blue-500/30 rounded-lg transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
+                    >
+                      {aiLoading ? (
+                        <>
+                          <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                          </svg>
+                          <span className="hidden sm:inline">Генерация...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>📝</span>
+                          <span className="hidden sm:inline">Только данные</span>
+                          <span className="sm:hidden">Данные</span>
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleAiImageOnly}
+                      disabled={aiLoading || !formData.title.trim()}
+                      className="flex-1 px-3 py-2 bg-gradient-to-r from-orange-500/20 to-pink-500/20 hover:from-orange-500/30 hover:to-pink-500/30 text-light border border-orange-500/30 rounded-lg transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
+                    >
+                      {aiLoading ? (
+                        <>
+                          <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                          </svg>
+                          <span className="hidden sm:inline">Генерация...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>🖼️</span>
+                          <span className="hidden sm:inline">Только картинка</span>
+                          <span className="sm:hidden">Картинка</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="space-y-6">
@@ -2445,7 +3127,7 @@ export default function AdminClient({ effects: initialEffects, submissions: init
                   onChange={(e) => setBulkInput(e.target.value)}
                   disabled={bulkRunning}
                   rows={8}
-                  placeholder='[{ "title": "Название эффекта", "question": "Вопрос?" }, ...]'
+                  placeholder='[{ "title": "...", "question": "...", "variantA": "...", "variantB": "..." }]'
                   className="w-full px-4 py-3 bg-dark border border-light/10 rounded-xl text-light font-mono text-sm focus:border-purple-500 focus:outline-none transition-colors resize-none placeholder:text-light/30 mb-4 disabled:opacity-50"
                 />
 
@@ -2502,6 +3184,107 @@ export default function AdminClient({ effects: initialEffects, submissions: init
                     Закрыть
                   </button>
                 )}
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Модальное окно для увеличения картинки */}
+        <AnimatePresence>
+          {imageModalUrl && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center p-4"
+              onClick={() => setImageModalUrl(null)}
+            >
+              <motion.div
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.8, opacity: 0 }}
+                className="relative w-full max-w-5xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Кнопка закрытия */}
+                <button
+                  onClick={() => setImageModalUrl(null)}
+                  className="absolute -top-12 right-0 text-white/80 hover:text-white text-4xl font-light transition-colors z-10"
+                  title="Закрыть (ESC)"
+                >
+                  ×
+                </button>
+                
+                {/* Изображение с фиксированным aspect ratio */}
+                <div className="relative w-full aspect-video bg-dark rounded-xl overflow-hidden border border-light/20 shadow-2xl">
+                  <ImageWithSkeleton
+                    src={imageModalUrl}
+                    alt="Увеличенное изображение"
+                    fill
+                    objectFit="contain"
+                    priority
+                  />
+                </div>
+                
+                {/* Подсказка */}
+                <div className="text-center text-white/60 text-sm mt-4">
+                  Нажмите ESC или кликните вне изображения для закрытия
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Модальное окно ручной вставки ссылки */}
+        <AnimatePresence>
+          {manualImageState.isOpen && manualImageState.effect && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-[60]"
+              onClick={() => setManualImageState({ ...manualImageState, isOpen: false })}
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-darkCard p-6 rounded-2xl border border-light/10 max-w-md w-full"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <h3 className="text-xl font-bold text-light mb-4">Вставить ссылку на изображение</h3>
+                
+                <div className="mb-4">
+                  <label className="block text-sm text-light/60 mb-2">Прямая ссылка (JPG/PNG/WEBP)</label>
+                  <input
+                    type="url"
+                    value={manualImageState.url}
+                    onChange={(e) => setManualImageState({ ...manualImageState, url: e.target.value })}
+                    placeholder="https://example.com/image.jpg"
+                    className="w-full px-4 py-3 bg-dark border border-light/10 rounded-xl text-light focus:border-primary focus:outline-none"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') saveManualImage();
+                      if (e.key === 'Escape') setManualImageState({ ...manualImageState, isOpen: false });
+                    }}
+                  />
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={saveManualImage}
+                    disabled={!manualImageState.url.trim()}
+                    className="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/80 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Сохранить
+                  </button>
+                  <button
+                    onClick={() => setManualImageState({ ...manualImageState, isOpen: false })}
+                    className="flex-1 px-4 py-2 bg-light/10 text-light rounded-lg hover:bg-light/20 transition-colors"
+                  >
+                    Отмена
+                  </button>
+                </div>
               </motion.div>
             </motion.div>
           )}

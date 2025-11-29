@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import toast from 'react-hot-toast';
 import AccordionButton from '@/components/AccordionButton';
+import ImageWithSkeleton from '@/components/ui/ImageWithSkeleton';
 import { saveVote, getUserVote, migrateLocalVotes } from '@/app/actions/votes';
 import { getVisitorId, getLocalVotes, clearLocalVotes, saveLocalVote, needsMigration } from '@/lib/visitor';
 import type { EffectResult } from '@/app/actions/effects';
@@ -359,6 +360,23 @@ export default function EffectClient({ effect: initialEffect, allEffects }: Effe
             {effect.title}
           </h1>
         </div>
+
+        {/* Изображение */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5 }}
+          className="w-full h-64 md:h-96 mb-8 rounded-2xl overflow-hidden border border-light/10 shadow-2xl relative"
+        >
+          <ImageWithSkeleton
+            src={effect.imageUrl}
+            alt={effect.title}
+            fill
+            className="rounded-2xl"
+            objectFit="cover"
+            priority
+          />
+        </motion.div>
 
         {/* Вопрос */}
         <p className="text-2xl md:text-3xl font-semibold text-center mb-12 text-light">

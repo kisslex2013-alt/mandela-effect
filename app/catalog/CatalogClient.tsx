@@ -8,9 +8,10 @@ import Loading from '@/components/Loading';
 import EmptyState from '@/components/EmptyState';
 import CustomSelect from '@/components/ui/CustomSelect';
 import Toggle from '@/components/ui/Toggle';
+import EffectCard from '@/components/EffectCard';
+import { getEffects, getCategories, type EffectResult } from '@/app/actions/effects';
 import { getUserVotes } from '@/app/actions/votes';
 import { getVisitorId } from '@/lib/visitor';
-import type { EffectResult } from '@/app/actions/effects';
 
 // Маппинг категорий на эмодзи и названия
 const categoryMap: Record<string, { emoji: string; name: string }> = {
@@ -27,20 +28,17 @@ const categoryMap: Record<string, { emoji: string; name: string }> = {
 };
 
 interface CatalogClientProps {
-  initialEffects: EffectResult[];
-  categories: string[];
-  initialCategory: string | null;
+  initialCategory?: string | null;
 }
 
 type SortOption = 'popularity' | 'controversy' | 'newest' | 'alphabetical';
 
 export default function CatalogClient({ 
-  initialEffects, 
-  categories, 
-  initialCategory 
+  initialCategory = null
 }: CatalogClientProps) {
-  const [allEffects] = useState<EffectResult[]>(initialEffects);
-  const [loading] = useState(false);
+  const [allEffects, setAllEffects] = useState<EffectResult[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
   const [votedEffectIds, setVotedEffectIds] = useState<string[]>([]);
   
   // Фильтры
@@ -55,49 +53,70 @@ export default function CatalogClient({
   // Debounce для поиска
   const debouncedSearch = useDebounce(searchQuery, 300);
 
-  // Загрузка голосов из БД и localStorage
-  useEffect(() => {
-    const loadVotes = async () => {
-      const visitorId = getVisitorId();
-      const votedIds: string[] = [];
+  // Загрузка голосов (отдельная функция для переиспользования)
+  const loadVotes = async () => {
+    const visitorId = getVisitorId();
+    const votedIds: string[] = [];
 
-      console.log('[Catalog] Загрузка голосов, visitorId:', visitorId?.substring(0, 20) + '...');
-
-      // 1. Загружаем голоса из БД
-      if (visitorId) {
-        try {
-          const serverVotes = await getUserVotes(visitorId);
-          console.log('[Catalog] ✅ Загружено голосов из БД:', serverVotes.totalVotes);
-          serverVotes.votes.forEach((vote) => {
-            votedIds.push(vote.effectId);
-          });
-        } catch (error) {
-          console.error('[Catalog] ❌ Ошибка загрузки голосов из БД:', error);
-        }
+    // 1. Загружаем голоса из БД
+    if (visitorId) {
+      try {
+        const serverVotes = await getUserVotes(visitorId);
+        serverVotes.votes.forEach((vote) => {
+          votedIds.push(vote.effectId);
+        });
+      } catch (error) {
+        console.error('Ошибка загрузки голосов из БД:', error);
       }
+    }
 
-      // 2. Добавляем голоса из localStorage (fallback)
-      if (typeof window !== 'undefined') {
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (key && key.startsWith('voted_effect_')) {
-            const id = key.replace('voted_effect_', '');
-            if (!votedIds.includes(id)) {
-              votedIds.push(id);
-            }
+    // 2. Добавляем голоса из localStorage (fallback)
+    if (typeof window !== 'undefined') {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('voted_effect_')) {
+          const id = key.replace('voted_effect_', '');
+          if (!votedIds.includes(id)) {
+            votedIds.push(id);
           }
         }
       }
+    }
 
-      setVotedEffectIds(votedIds);
+    return votedIds;
+  };
+
+  // ОБЪЕДИНЕННАЯ загрузка данных и голосов при монтировании
+  useEffect(() => {
+    const loadAllData = async () => {
+      try {
+        setLoading(true);
+        
+        // Загружаем эффекты, категории И голоса параллельно
+        const [effectsData, categoriesData, votedIds] = await Promise.all([
+          getEffects({ limit: 100 }),
+          getCategories(),
+          loadVotes(),
+        ]);
+        
+        setAllEffects(effectsData);
+        setCategories(categoriesData);
+        setVotedEffectIds(votedIds);
+      } catch (error) {
+        console.error('Ошибка при загрузке данных:', error);
+      } finally {
+        setLoading(false);
+      }
     };
 
-    loadVotes();
+    loadAllData();
 
     // Слушаем события обновления голосов
-    const handleVoteUpdate = () => {
-      loadVotes();
+    const handleVoteUpdate = async () => {
+      const votedIds = await loadVotes();
+      setVotedEffectIds(votedIds);
     };
+    
     window.addEventListener('voteUpdated', handleVoteUpdate);
 
     return () => {
@@ -418,63 +437,18 @@ export default function CatalogClient({
                       }
                     }}
                   >
-                    <Link
-                      href={`/effect/${effect.id}`}
-                      className="group bg-darkCard rounded-xl p-6 border border-light/10 hover:border-primary/30 transition-all duration-300 hover:-translate-y-2 hover:shadow-xl hover:shadow-primary/20 flex flex-col"
-                    >
-                      {/* Категория */}
-                      <div className="flex items-center gap-3 mb-4">
-                        <span className="text-2xl transition-transform duration-300 group-hover:scale-125 inline-block">
-                          {catInfo.emoji}
-                        </span>
-                        <span className="text-sm text-light/60">
-                          {catInfo.name}
-                        </span>
-                      </div>
-
-                      {/* Название */}
-                      <h3 className="text-xl font-bold text-light mb-3 transition-colors duration-300 group-hover:text-primary">
-                        {effect.title}
-                      </h3>
-
-                      {/* Разделитель */}
-                      <div className="border-b border-dark mb-4" />
-
-                      {/* Вопрос */}
-                      <p className="text-light/80 mb-4 flex-grow">{questionPreview}</p>
-
-                      {/* Прогресс-бар */}
-                      {totalVotes > 0 && (
-                        <div className="mb-4">
-                          <div className="flex justify-between items-center mb-2 text-sm">
-                            <span className="text-primary font-semibold">{percentA}%</span>
-                            <span className="text-secondary font-semibold">{percentB}%</span>
-                          </div>
-                          <div className="relative h-2 rounded-full bg-dark/50 overflow-hidden transition-all duration-300 group-hover:shadow-md">
-                            <div
-                              className="absolute inset-0 rounded-full"
-                              style={{
-                                background: `linear-gradient(to right, #3b82f6 ${percentA}%, #f59e0b ${percentA}%)`,
-                              }}
-                            />
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Количество голосов и статус */}
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-light/60 transition-all duration-300 group-hover:text-light group-hover:font-semibold">
-                          {totalVotes.toLocaleString('ru-RU')} голосов
-                        </span>
-                        <span
-                          className={`font-semibold ${
-                            hasVoted ? 'text-green-400' : 'text-light/40'
-                          }`}
-                        >
-                          {hasVoted ? '✓ Проголосовал' : 'Не проголосовал'}
-                        </span>
-                      </div>
-                    </Link>
+                    <EffectCard
+                      id={effect.id}
+                      title={effect.title}
+                      description={questionPreview}
+                      category={catInfo.name}
+                      categoryEmoji={catInfo.emoji}
+                      imageUrl={effect.imageUrl}
+                      votesFor={effect.votesFor}
+                      votesAgainst={effect.votesAgainst}
+                      showProgress={totalVotes > 0}
+                      hasVoted={hasVoted}
+                    />
                   </motion.div>
                 );
               })}

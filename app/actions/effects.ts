@@ -154,6 +154,27 @@ export async function getEffects(params: GetEffectsParams = {}): Promise<EffectR
       orderBy,
       take: limit,
       skip: offset,
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        content: true,
+        category: true,
+        imageUrl: true,
+        videoUrl: true,
+        votesFor: true,
+        votesAgainst: true,
+        views: true,
+        residue: true,
+        residueSource: true,
+        history: true,
+        historySource: true,
+        yearDiscovered: true,
+        similarEffectIds: true,
+        interpretations: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     });
 
     console.log(`[getEffects] ✅ Получено эффектов: ${effects.length}`);
@@ -191,6 +212,27 @@ export async function getEffectById(id: string): Promise<EffectResult | null> {
   try {
     const effect = await prisma.effect.findUnique({
       where: { id },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        content: true,
+        category: true,
+        imageUrl: true,
+        videoUrl: true,
+        votesFor: true,
+        votesAgainst: true,
+        views: true,
+        residue: true,
+        residueSource: true,
+        history: true,
+        historySource: true,
+        yearDiscovered: true,
+        similarEffectIds: true,
+        interpretations: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     });
 
     return effect ? serializeEffect(effect) : null;
@@ -337,6 +379,27 @@ export async function getQuizEffects(limit: number = 10, visitorId?: string): Pr
     // 5. Загружаем полные данные для выбранных ID
     const effects = await prisma.effect.findMany({
       where: { id: { in: selectedIds } },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        content: true,
+        category: true,
+        imageUrl: true,
+        videoUrl: true,
+        votesFor: true,
+        votesAgainst: true,
+        views: true,
+        residue: true,
+        residueSource: true,
+        history: true,
+        historySource: true,
+        yearDiscovered: true,
+        similarEffectIds: true,
+        interpretations: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     });
 
     // 6. Сортируем в том же порядке, что и selectedIds (чтобы сохранить случайный порядок)

@@ -4,8 +4,10 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { useCountUp } from '@/lib/hooks/useCountUp';
-import { redirectToRandomEffect, type EffectResult } from '@/app/actions/effects';
+import { redirectToRandomEffect, getEffects, getStats, type EffectResult } from '@/app/actions/effects';
 import { HomeEmptyState, EffectCardSkeleton, ControversialSkeleton } from '@/components/EmptyState';
+import EffectCard from '@/components/EffectCard';
+import ImageWithSkeleton from '@/components/ui/ImageWithSkeleton';
 
 // Маппинг категорий на эмодзи
 const categoryEmojis: Record<string, string> = {
@@ -28,24 +30,19 @@ interface MostControversialEffect extends EffectResult {
   totalVotes: number;
 }
 
-interface HomeClientProps {
-  initialStats: {
-    totalEffects: number;
-    totalVotes: number;
-    totalViews: number;
-    totalParticipants: number;
-  };
-  popularEffects: EffectResult[];
-  newEffects: EffectResult[];
-  mostControversial: MostControversialEffect | null;
-}
-
-export default function HomeClient({
-  initialStats,
-  popularEffects,
-  newEffects,
-  mostControversial,
-}: HomeClientProps) {
+export default function HomeClient() {
+  // Состояния для данных
+  const [stats, setStats] = useState({
+    totalEffects: 0,
+    totalVotes: 0,
+    totalViews: 0,
+    totalParticipants: 0,
+  });
+  const [popularEffects, setPopularEffects] = useState<EffectResult[]>([]);
+  const [newEffects, setNewEffects] = useState<EffectResult[]>([]);
+  const [mostControversial, setMostControversial] = useState<MostControversialEffect | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [votedEffectIds, setVotedEffectIds] = useState<string[]>([]);
   const [userStats, setUserStats] = useState({
     voted: 0,
     inMajority: 0,
@@ -53,9 +50,95 @@ export default function HomeClient({
     uniqueMemory: 0,
   });
 
-  // Количество участников из БД (уникальные visitorId)
-  const totalParticipants = initialStats.totalParticipants;
+  // Загрузка голосов (для синхронизации с каталогом)
+  const loadVotes = async () => {
+    const { getVisitorId } = await import('@/lib/visitor');
+    const { getUserVotes } = await import('@/app/actions/votes');
+    
+    const visitorId = getVisitorId();
+    const votedIds: string[] = [];
 
+    // 1. Загружаем голоса из БД
+    if (visitorId) {
+      try {
+        const serverVotes = await getUserVotes(visitorId);
+        serverVotes.votes.forEach((vote) => {
+          votedIds.push(vote.effectId);
+        });
+      } catch (error) {
+        console.error('Ошибка загрузки голосов из БД:', error);
+      }
+    }
+
+    // 2. Добавляем голоса из localStorage (fallback)
+    if (typeof window !== 'undefined') {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('voted_effect_')) {
+          const id = key.replace('voted_effect_', '');
+          if (!votedIds.includes(id)) {
+            votedIds.push(id);
+          }
+        }
+      }
+    }
+
+    return votedIds;
+  };
+
+  // Загрузка данных при монтировании
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        const [popularData, newData, statsData, votedIds] = await Promise.all([
+          getEffects({ sort: 'popular', limit: 3 }),
+          getEffects({ sort: 'newest', limit: 6 }),
+          getStats(),
+          loadVotes(),
+        ]);
+
+        setPopularEffects(popularData);
+        setNewEffects(newData);
+        setStats(statsData);
+        setVotedEffectIds(votedIds);
+
+        // Находим самый спорный эффект
+        const allEffects = await getEffects({ limit: 50 });
+        const controversial = allEffects
+          .filter(e => (e.votesFor + e.votesAgainst) > 0)
+          .map(e => {
+            const total = e.votesFor + e.votesAgainst;
+            const percentA = (e.votesFor / total) * 100;
+            const controversy = Math.abs(50 - percentA);
+            return { ...e, controversy, percentA, percentB: 100 - percentA, totalVotes: total };
+          })
+          .sort((a, b) => a.controversy - b.controversy)[0] || null;
+
+        setMostControversial(controversial);
+      } catch (error) {
+        console.error('Ошибка при загрузке данных:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+
+    // Слушаем события обновления голосов
+    const handleVoteUpdate = async () => {
+      const votedIds = await loadVotes();
+      setVotedEffectIds(votedIds);
+    };
+    
+    window.addEventListener('voteUpdated', handleVoteUpdate);
+
+    return () => {
+      window.removeEventListener('voteUpdated', handleVoteUpdate);
+    };
+  }, []);
+
+  // Загрузка статистики пользователя
   useEffect(() => {
     const loadUserStats = async () => {
       try {
@@ -73,7 +156,7 @@ export default function HomeClient({
         try {
           serverVotesData = await getUserVotesFromDB(visitorId);
         } catch (error) {
-          console.error('[Home] Ошибка загрузки голосов из БД:', error);
+          console.error('Ошибка загрузки голосов из БД:', error);
           serverVotesData = { totalVotes: 0, votes: [] };
         }
 
@@ -170,9 +253,9 @@ export default function HomeClient({
   }, [popularEffects, newEffects]);
 
   // Анимированные счётчики
-  const countEffects = useCountUp(initialStats.totalEffects, 2000, initialStats.totalEffects > 0);
-  const countParticipants = useCountUp(totalParticipants, 2000, totalParticipants > 0);
-  const countVotes = useCountUp(initialStats.totalVotes, 2000, initialStats.totalVotes > 0);
+  const countEffects = useCountUp(stats.totalEffects, 800, stats.totalEffects > 0);
+  const countParticipants = useCountUp(stats.totalParticipants, 800, stats.totalParticipants > 0);
+  const countVotes = useCountUp(stats.totalVotes, 800, stats.totalVotes > 0);
 
   return (
     <main id="main-content" className="min-h-screen" role="main">
@@ -270,19 +353,35 @@ export default function HomeClient({
             Самое спорное сейчас 🔥
           </h2>
 
-          {mostControversial ? (
+          {loading ? (
+            <ControversialSkeleton />
+          ) : mostControversial ? (
             <Link href={`/effect/${mostControversial.id}`} className="block">
-              <div className="bg-darkCard p-8 rounded-2xl border-2 border-red-500 hover:-translate-y-2 hover:shadow-2xl hover:shadow-red-500/30 transition-all duration-300 cursor-pointer">
-                <div className="flex items-center gap-3 mb-4">
-                  <span className="text-3xl">{categoryEmojis[mostControversial.category] || '❓'}</span>
-                  <h3 className="text-2xl md:text-3xl font-bold text-light">
-                    {mostControversial.title}
-                  </h3>
-                </div>
+              <div className="bg-darkCard rounded-2xl border-2 border-red-500 hover:-translate-y-2 hover:shadow-2xl hover:shadow-red-500/30 transition-all duration-300 cursor-pointer overflow-hidden">
+                {/* Изображение */}
+                {mostControversial.imageUrl && (
+                  <div className="relative w-full h-64 md:h-80">
+                    <ImageWithSkeleton
+                      src={mostControversial.imageUrl}
+                      alt={mostControversial.title}
+                      fill
+                      className="object-cover"
+                      priority
+                    />
+                  </div>
+                )}
 
-                <p className="text-lg md:text-xl text-light/90 mb-6">
-                  {mostControversial.description}
-                </p>
+                <div className="p-8">
+                  <div className="flex items-center gap-3 mb-4">
+                    <span className="text-3xl">{categoryEmojis[mostControversial.category] || '❓'}</span>
+                    <h3 className="text-2xl md:text-3xl font-bold text-light">
+                      {mostControversial.title}
+                    </h3>
+                  </div>
+
+                  <p className="text-lg md:text-xl text-light/90 mb-6">
+                    {mostControversial.description}
+                  </p>
 
                 <div className="flex justify-between mb-6 text-sm text-light/60">
                   <span>Вариант А</span>
@@ -311,17 +410,18 @@ export default function HomeClient({
                   </div>
                 </div>
 
-                <p className="text-center text-light/60 mb-6">
-                  {mostControversial.totalVotes.toLocaleString('ru-RU')} голосов
-                </p>
+                  <p className="text-center text-light/60 mb-6">
+                    {mostControversial.totalVotes.toLocaleString('ru-RU')} голосов
+                  </p>
 
-                <div className="text-center">
-                  <button
-                    className="text-light font-semibold px-6 py-3 rounded-lg hover:shadow-lg transition-all"
-                    style={{ background: 'linear-gradient(to right, #3b82f6, #f59e0b)' }}
-                  >
-                    Посмотреть и проголосовать →
-                  </button>
+                  <div className="text-center">
+                    <button
+                      className="text-light font-semibold px-6 py-3 rounded-lg hover:shadow-lg transition-all"
+                      style={{ background: 'linear-gradient(to right, #3b82f6, #f59e0b)' }}
+                    >
+                      Посмотреть и проголосовать →
+                    </button>
+                  </div>
                 </div>
               </div>
             </Link>
@@ -343,43 +443,45 @@ export default function HomeClient({
             </Link>
           </div>
 
-          {newEffects.length > 0 ? (
+          {loading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[1, 2, 3].map((i) => (
+                <EffectCardSkeleton key={i} />
+              ))}
+            </div>
+          ) : newEffects.length > 0 ? (
             <motion.div
               className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.5, delay: 0.2 }}
             >
-              {newEffects.map((effect, index) => (
-                <motion.div
-                  key={effect.id}
-                  initial={{ opacity: 0, y: 30 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: 0.6 + index * 0.1 }}
-                >
-                  <Link href={`/effect/${effect.id}`}>
-                    <div className="bg-dark p-6 rounded-xl border border-light/10 hover:border-primary/50 hover:-translate-y-1 hover:shadow-[0_0_25px_-5px_rgba(59,130,246,0.4)] transition-all duration-300 cursor-pointer h-full">
-                      <div className="flex items-center gap-2 mb-3">
-                        <span className="text-2xl">{categoryEmojis[effect.category] || '❓'}</span>
-                        <span className="text-xs bg-primary/20 text-primary px-2 py-1 rounded">
-                          Новое
-                        </span>
-                      </div>
-
-                      <h3 className="text-lg font-semibold text-light mb-2">{effect.title}</h3>
-
-                      <p className="text-sm text-light/60 mb-4 line-clamp-2">{effect.description}</p>
-
-                      <div className="flex items-center justify-between text-xs text-light/40">
-                        <span>
-                          {(effect.votesFor + effect.votesAgainst).toLocaleString('ru-RU')} голосов
-                        </span>
-                        <span>{new Date(effect.createdAt).toLocaleDateString('ru-RU')}</span>
-                      </div>
-                    </div>
-                  </Link>
-                </motion.div>
-              ))}
+              {newEffects.map((effect, index) => {
+                const hasVoted = votedEffectIds.includes(effect.id);
+                return (
+                  <motion.div
+                    key={effect.id}
+                    initial={{ opacity: 0, y: 30 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: 0.6 + index * 0.1 }}
+                  >
+                    <EffectCard
+                      id={effect.id}
+                      title={effect.title}
+                      description={effect.description}
+                      category={effect.category}
+                      categoryEmoji={categoryEmojis[effect.category]}
+                      imageUrl={effect.imageUrl}
+                      votesFor={effect.votesFor}
+                      votesAgainst={effect.votesAgainst}
+                      createdAt={effect.createdAt}
+                      badge="Новое"
+                      hasVoted={hasVoted}
+                      className="bg-dark border-light/10 hover:border-primary/50 hover:shadow-[0_0_25px_-5px_rgba(59,130,246,0.4)]"
+                    />
+                  </motion.div>
+                );
+              })}
             </motion.div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -398,45 +500,32 @@ export default function HomeClient({
             Популярное за неделю 📈
           </h2>
 
-          {popularEffects.length > 0 ? (
+          {loading ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {[1, 2, 3].map((i) => (
+                <EffectCardSkeleton key={i} />
+              ))}
+            </div>
+          ) : popularEffects.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {popularEffects.map((effect, index) => {
-                const totalVotes = effect.votesFor + effect.votesAgainst;
-                const percentA = totalVotes > 0 ? (effect.votesFor / totalVotes) * 100 : 50;
-
+                const hasVoted = votedEffectIds.includes(effect.id);
                 return (
-                  <Link key={effect.id} href={`/effect/${effect.id}`}>
-                    <div className="bg-darkCard p-6 rounded-xl border-2 border-light/10 hover:border-secondary/50 hover:-translate-y-1 hover:shadow-[0_0_25px_-5px_rgba(168,85,247,0.4)] transition-all duration-300 cursor-pointer">
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-2">
-                          <span className="text-2xl">{categoryEmojis[effect.category] || '❓'}</span>
-                          <span className="text-3xl font-bold text-secondary">#{index + 1}</span>
-                        </div>
-                      </div>
-
-                      <h3 className="text-xl font-bold text-light mb-3">{effect.title}</h3>
-
-                      <p className="text-sm text-light/70 mb-4 line-clamp-2">{effect.description}</p>
-
-                      <div className="mb-3">
-                        <div className="h-2 rounded-full bg-dark/50 overflow-hidden">
-                          <div
-                            className="h-full bg-gradient-to-r from-primary to-secondary transition-all duration-500"
-                            style={{ width: `${percentA}%` }}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-light/60">
-                          {totalVotes.toLocaleString('ru-RU')} голосов
-                        </span>
-                        <span className="text-secondary font-semibold">
-                          🔥 {Math.round(percentA)}% / {Math.round(100 - percentA)}%
-                        </span>
-                      </div>
-                    </div>
-                  </Link>
+                  <EffectCard
+                    key={effect.id}
+                    id={effect.id}
+                    title={effect.title}
+                    description={effect.description}
+                    category={effect.category}
+                    categoryEmoji={categoryEmojis[effect.category]}
+                    imageUrl={effect.imageUrl}
+                  votesFor={effect.votesFor}
+                  votesAgainst={effect.votesAgainst}
+                    badge={`#${index + 1}`}
+                    showProgress={true}
+                    hasVoted={hasVoted}
+                    className="bg-darkCard border-2 border-light/10 hover:border-secondary/50 hover:shadow-[0_0_25px_-5px_rgba(168,85,247,0.4)]"
+                  />
                 );
               })}
             </div>
