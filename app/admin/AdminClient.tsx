@@ -15,6 +15,11 @@ import ImageWithSkeleton from '@/components/ui/ImageWithSkeleton';
 import toast from 'react-hot-toast';
 import { CATEGORY_MAP, getCategoryInfo } from '@/lib/constants';
 
+// Доступные цвета для категорий
+const AVAILABLE_COLORS = [
+  'red', 'blue', 'purple', 'pink', 'yellow', 'cyan', 'green', 'amber', 'indigo', 'rose', 'gray'
+];
+
 interface Effect {
   id: string;
   title: string;
@@ -2210,7 +2215,7 @@ export default function AdminClient({ effects: initialEffects, submissions: init
                         onChange={(val) => setCategoryForm({ ...categoryForm, color: val })}
                         options={[
                           { value: '', label: 'Без цвета' },
-                          ...Object.keys(colorMap).map((color) => ({
+                          ...AVAILABLE_COLORS.map((color) => ({
                             value: color,
                             label: color.charAt(0).toUpperCase() + color.slice(1),
                           })),
