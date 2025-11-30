@@ -54,25 +54,34 @@ interface ModelConfig {
  * Приоритет: Качество → Скорость → Резерв
  */
 const PROVIDERS: ModelConfig[] = [
-  // 1. Google (Умный, большой контекст, бесплатно)
+  // 1. Google (База: умный, бесплатно)
   { provider: 'google', model: 'gemini-2.0-flash-exp' },
   
-  // 2. SiliconFlow (DeepSeek V3 - SOTA уровень, часто бесплатно/дешево)
+  // 2. Claude 3.5 Sonnet (ТОП качество через OpenRouter)
+  { provider: 'openrouter', model: 'anthropic/claude-3.5-sonnet' },
+  
+  // 3. Perplexity (Доступ к интернету для фактов)
+  { provider: 'openrouter', model: 'perplexity/llama-3.1-sonar-large-128k-online' },
+  
+  // 4. DeepSeek V3 (SOTA уровень через OpenRouter)
+  { provider: 'openrouter', model: 'deepseek/deepseek-chat' },
+  
+  // 5. SiliconFlow (DeepSeek V3 - резерв через прямой API)
   { provider: 'siliconflow', model: 'deepseek-ai/DeepSeek-V3' },
 
-  // 3. Hyperbolic (Llama 405B - Самая умная открытая модель)
+  // 6. Hyperbolic (Llama 405B - Самая умная открытая модель)
   { provider: 'hyperbolic', model: 'meta-llama/Meta-Llama-3.1-405B-Instruct' },
 
-  // 4. Cerebras (Сверхскорость)
+  // 7. Cerebras (Сверхскорость)
   { provider: 'cerebras', model: 'llama3.1-70b' },
 
-  // 5. Groq (Скорость)
+  // 8. Groq (Скорость)
   { provider: 'groq', model: 'llama-3.3-70b-versatile' },
 
-  // 6. SiliconFlow Резерв (Qwen 2.5)
+  // 9. SiliconFlow Резерв (Qwen 2.5)
   { provider: 'siliconflow', model: 'Qwen/Qwen2.5-72B-Instruct' },
   
-  // 7. OpenRouter (Последний шанс)
+  // 10. OpenRouter Резерв (бесплатная модель)
   { provider: 'openrouter', model: 'google/gemini-2.0-flash-lite-preview-02-05:free' },
 ];
 
