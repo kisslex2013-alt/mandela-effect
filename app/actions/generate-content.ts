@@ -29,12 +29,14 @@ interface GeneratedEffectInfo {
 interface GenerateResult {
   success: boolean;
   data?: GeneratedEffectInfo;
+  usedModel?: string;
   error?: string;
 }
 
 interface GenerateImageResult {
   success: boolean;
   imageUrl?: string;
+  usedModel?: string;
   error?: string;
 }
 
@@ -714,9 +716,13 @@ export async function generateEffectData(
       currentModelIndex = modelIndex;
       console.log(`[generateEffectData] 🎯 Запомнили конфигурацию #${modelIndex} (${config.provider}/${config.model}) как рабочую`);
 
+      // Формируем название модели для отображения
+      const usedModel = `${config.provider}/${config.model}`;
+      
       return {
         success: true,
         data: parsed,
+        usedModel,
       };
 
     } catch (error) {
@@ -927,6 +933,7 @@ export async function generateEffectImage(
     return {
       success: true,
       imageUrl,
+      usedModel: 'flux',
     };
   } catch (error) {
     console.error('[generateEffectImage] ❌ Ошибка:', error);
@@ -977,6 +984,7 @@ export async function restyleImage(
     return {
       success: true,
       imageUrl: finalUrl,
+      usedModel: 'flux',
     };
   } catch (error) {
     console.error('[restyleImage] ❌ Ошибка:', error);
@@ -1009,6 +1017,7 @@ export async function fitImageToFormat(
     return {
       success: true,
       imageUrl: finalUrl,
+      usedModel: 'flux',
     };
   } catch (error) {
     console.error('[fitImageToFormat] ❌ Ошибка:', error);

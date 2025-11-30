@@ -111,6 +111,7 @@ export default function AdminClient({ effects: initialEffects, submissions: init
   const [foundEffects, setFoundEffects] = useState<any[]>([]);
   const [finderLoading, setFinderLoading] = useState(false);
   const [selectedFound, setSelectedFound] = useState<Set<number>>(new Set());
+  const [finderModel, setFinderModel] = useState<string | null>(null);
 
   
   // Закрытие модального окна по ESC
@@ -469,7 +470,12 @@ export default function AdminClient({ effects: initialEffects, submissions: init
         if (updateResult.success) {
           // Обновляем UI
           setEffects(prev => prev.map(e => 
-            e.id === effect.id ? { ...e, imageUrl: result.imageUrl!, updatedAt: new Date().toISOString() } : e
+            e.id === effect.id ? { 
+              ...e, 
+              imageUrl: result.imageUrl!, 
+              updatedAt: new Date().toISOString(),
+              lastModel: (result as any).usedModel,
+            } : e
           ));
           toast.success('Картинка обновлена!');
         } else {
@@ -548,10 +554,12 @@ export default function AdminClient({ effects: initialEffects, submissions: init
                residue: aiData.residue || e.residue,
                history: aiData.history || e.history,
                interpretations: Object.keys(interpretations).length > 0 ? interpretations : e.interpretations,
-               updatedAt: new Date().toISOString()
+               updatedAt: new Date().toISOString(),
+               lastModel: result.usedModel,
              } : e
            ));
-           toast.success('Данные обновлены!');
+           const modelInfo = result.usedModel ? ` (AI: ${result.usedModel})` : '';
+           toast.success(`Данные обновлены!${modelInfo}`);
         } else {
           toast.error('Ошибка сохранения');
         }
@@ -631,7 +639,12 @@ export default function AdminClient({ effects: initialEffects, submissions: init
         const updateResult = await updateEffect(effect.id, { imageUrl: result.imageUrl });
         
         if (updateResult.success) {
-          setEffects(prev => prev.map(e => e.id === effect.id ? { ...e, imageUrl: result.imageUrl!, updatedAt: new Date().toISOString() } : e));
+          setEffects(prev => prev.map(e => e.id === effect.id ? { 
+            ...e, 
+            imageUrl: result.imageUrl!, 
+            updatedAt: new Date().toISOString(),
+            lastModel: (result as any).usedModel,
+          } : e));
           toast.success('Стиль применен!', { id: toastId });
         } else {
           toast.error('Ошибка сохранения', { id: toastId });
@@ -661,7 +674,12 @@ export default function AdminClient({ effects: initialEffects, submissions: init
         const updateResult = await updateEffect(effect.id, { imageUrl: result.imageUrl });
         
         if (updateResult.success) {
-          setEffects(prev => prev.map(e => e.id === effect.id ? { ...e, imageUrl: result.imageUrl!, updatedAt: new Date().toISOString() } : e));
+          setEffects(prev => prev.map(e => e.id === effect.id ? { 
+            ...e, 
+            imageUrl: result.imageUrl!, 
+            updatedAt: new Date().toISOString(),
+            lastModel: (result as any).usedModel,
+          } : e));
           toast.success('Формат обновлен!', { id: toastId });
         } else {
           toast.error('Ошибка сохранения', { id: toastId });
@@ -820,7 +838,8 @@ export default function AdminClient({ effects: initialEffects, submissions: init
           imagePrompt: (result.data as any).imagePrompt || prev.imagePrompt,
         }));
 
-        toast.success('Поля заполнены с помощью AI! ✨');
+        const modelInfo = result.usedModel ? ` (AI: ${result.usedModel})` : '';
+        toast.success(`Поля заполнены с помощью AI! ✨${modelInfo}`);
         console.log('[AdminClient] AI успешно заполнил поля:', result.data);
       } else {
         toast.error(result.error || 'Не удалось сгенерировать контент');
@@ -882,7 +901,8 @@ export default function AdminClient({ effects: initialEffects, submissions: init
           communitySource: result.data!.communitySource || prev.communitySource,
         }));
 
-        toast.success('Данные заполнены AI (изображение не изменено)! 📝');
+        const modelInfo = result.usedModel ? ` (AI: ${result.usedModel})` : '';
+        toast.success(`Данные заполнены AI (изображение не изменено)! 📝${modelInfo}`);
         console.log('[AdminClient] AI успешно заполнил данные без изображения:', result.data);
       } else {
         toast.error(result.error || 'Не удалось сгенерировать контент');
@@ -1136,6 +1156,7 @@ export default function AdminClient({ effects: initialEffects, submissions: init
     setFinderLoading(true);
     setFoundEffects([]);
     setSelectedFound(new Set());
+    setFinderModel(null);
     
     try {
       // Получаем список существующих заголовков
@@ -1145,11 +1166,38 @@ export default function AdminClient({ effects: initialEffects, submissions: init
       
       const result = await findNewEffects(existingTitles);
       
-      if (result.success && result.effects) {
-        setFoundEffects(result.effects);
-        // По умолчанию выбираем все
-        setSelectedFound(new Set(result.effects.map((_, i) => i)));
-        toast.success(`Найдено ${result.effects.length} эффектов`, { id: 'finder' });
+      if (result.success && result.data) {
+        // Сохраняем модель
+        if (result.usedModel) {
+          setFinderModel(result.usedModel);
+        }
+        
+        // Проверяем дубликаты на клиенте
+        const effectsWithDuplicates = result.data.map((effect: any) => {
+          const currentNorm = normalizeText(effect.title);
+          const isDuplicate = effects.some(e => {
+            const existingNorm = normalizeText(e.title);
+            return existingNorm.includes(currentNorm) || currentNorm.includes(existingNorm);
+          });
+          
+          return {
+            ...effect,
+            isDuplicate,
+          };
+        });
+        
+        setFoundEffects(effectsWithDuplicates);
+        
+        // По умолчанию выбираем только те, что НЕ дубликаты
+        const nonDuplicateIndices = effectsWithDuplicates
+          .map((_, i) => i)
+          .filter(i => !effectsWithDuplicates[i].isDuplicate);
+        setSelectedFound(new Set(nonDuplicateIndices));
+        
+        const duplicateCount = effectsWithDuplicates.filter((e: any) => e.isDuplicate).length;
+        const modelInfo = result.usedModel ? ` (Модель: ${result.usedModel})` : '';
+        const duplicateInfo = duplicateCount > 0 ? ` (${duplicateCount} возможных дублей)` : '';
+        toast.success(`Найдено ${result.data.length} эффектов${duplicateInfo}${modelInfo}`, { id: 'finder' });
       } else {
         toast.error(result.error || 'Ошибка поиска', { id: 'finder' });
       }
@@ -1783,7 +1831,14 @@ export default function AdminClient({ effects: initialEffects, submissions: init
 
                   {/* Середина: Контент */}
                   <div className="p-4 flex-1 flex flex-col">
-                    <h3 className="font-semibold text-light line-clamp-2 mb-2">{effect.title}</h3>
+                    <div className="flex items-start gap-2 mb-2">
+                      <h3 className="font-semibold text-light line-clamp-2 flex-1">{effect.title}</h3>
+                      {(effect as any).lastModel && (
+                        <span className="text-xs font-mono bg-purple-500/10 text-purple-300 px-2 py-0.5 rounded border border-purple-500/20 whitespace-nowrap flex-shrink-0">
+                          🤖 {(effect as any).lastModel}
+                        </span>
+                      )}
+                    </div>
                     <p className="text-sm text-light/60 line-clamp-2 mb-3 flex-1">{effect.description}</p>
                     
                     {/* Индикаторы заполненности */}
@@ -3350,6 +3405,11 @@ export default function AdminClient({ effects: initialEffects, submissions: init
                 <h2 className="text-2xl font-bold text-light mb-4 flex items-center gap-3">
                   <span>🕵️</span>
                   Результаты поиска
+                  {finderModel && (
+                    <span className="text-sm font-normal text-light/60 ml-2">
+                      (Модель: <span className="font-mono text-purple-300">{finderModel}</span>)
+                    </span>
+                  )}
                 </h2>
 
                 {/* Загрузка */}
@@ -3373,15 +3433,23 @@ export default function AdminClient({ effects: initialEffects, submissions: init
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => {
-                            if (selectedFound.size === foundEffects.length) {
+                            const nonDuplicateIndices = foundEffects
+                              .map((_, i) => i)
+                              .filter(i => !foundEffects[i].isDuplicate);
+                            
+                            if (selectedFound.size === nonDuplicateIndices.length && 
+                                nonDuplicateIndices.every(i => selectedFound.has(i))) {
                               setSelectedFound(new Set());
                             } else {
-                              setSelectedFound(new Set(foundEffects.map((_, i) => i)));
+                              setSelectedFound(new Set(nonDuplicateIndices));
                             }
                           }}
                           className="px-3 py-1.5 text-sm bg-white/5 text-light/70 hover:bg-white/10 rounded-lg transition-colors"
                         >
-                          {selectedFound.size === foundEffects.length ? 'Снять все' : 'Выбрать все'}
+                          {selectedFound.size === foundEffects.filter((e: any) => !e.isDuplicate).length && 
+                           foundEffects.filter((e: any) => !e.isDuplicate).length > 0
+                            ? 'Снять все' 
+                            : 'Выбрать все (без дублей)'}
                         </button>
                       </div>
                     </div>
@@ -3391,6 +3459,8 @@ export default function AdminClient({ effects: initialEffects, submissions: init
                         const isSelected = selectedFound.has(index);
                         const categoryInfo = getCategoryInfo(effect.category || 'other');
                         
+                        const isDuplicate = effect.isDuplicate || false;
+                        
                         return (
                           <div
                             key={index}
@@ -3398,7 +3468,7 @@ export default function AdminClient({ effects: initialEffects, submissions: init
                               isSelected
                                 ? 'bg-cyan-500/10 border-cyan-500/30'
                                 : 'bg-dark/50 border-light/10 hover:border-light/20'
-                            }`}
+                            } ${isDuplicate ? 'opacity-70' : ''}`}
                           >
                             <div className="flex items-start gap-3">
                               {/* Чекбокс */}
@@ -3421,9 +3491,16 @@ export default function AdminClient({ effects: initialEffects, submissions: init
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-start justify-between gap-2 mb-2">
                                   <div className="flex-1">
-                                    <h3 className="text-light font-semibold text-lg mb-1">
-                                      {effect.title}
-                                    </h3>
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <h3 className="text-light font-semibold text-lg">
+                                        {effect.title}
+                                      </h3>
+                                      {isDuplicate && (
+                                        <span className="px-2 py-0.5 text-xs font-medium bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 rounded-lg">
+                                          ⚠️ Возможный дубль
+                                        </span>
+                                      )}
+                                    </div>
                                     <p className="text-light/60 text-sm mb-2">
                                       {effect.question}
                                     </p>
