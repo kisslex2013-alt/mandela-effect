@@ -944,28 +944,91 @@ export async function generateEffectImage(
   }
 }
 
+/**
+ * Генерирует умный стилевой промпт для изображения через AI
+ */
+async function getSmartStylePrompt(title: string): Promise<string> {
+  if (!process.env.OPENROUTER_API_KEY) {
+    console.warn('[getSmartStylePrompt] ⚠️ OPENROUTER_API_KEY не настроен, используем дефолтный стиль');
+    return 'professional photography, 4k, sharp focus, high resolution, clear details, color correction';
+  }
+
+  try {
+    const openai = new OpenAI({
+      baseURL: 'https://openrouter.ai/api/v1',
+      apiKey: process.env.OPENROUTER_API_KEY,
+      defaultHeaders: {
+        'HTTP-Referer': process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000',
+        'X-Title': 'Mandela Effect Style Generator',
+      },
+    });
+
+    const systemPrompt = `You are a professional Colorist and Director of Photography.
+Your task: Return a comma-separated string of VISUAL STYLE keywords for the given Mandela Effect title.
+
+Rules:
+1. Do NOT describe the subject (no 'man', 'cat', 'logo'). Only LIGHTING, TEXTURE, COLOR GRADING, CAMERA TYPE.
+2. If historical/retro -> 'VHS quality, noise, datamosh, low res, 90s TV style'.
+3. If movie -> 'cinematic lighting, teal and orange, 35mm film grain'.
+4. If cartoon -> 'vibrant colors, cel shading, clear lines'.
+5. If brand -> 'studio lighting, macro photography, sharp focus, product shot'.
+6. Keep it short (10-15 words).`;
+
+    const userPrompt = `Generate visual style keywords for: "${title}"`;
+
+    // Пробуем Claude сначала, затем Llama
+    const models = [
+      'anthropic/claude-3.5-sonnet',
+      'meta-llama/llama-3.3-70b-instruct',
+    ];
+
+    for (const model of models) {
+      try {
+        console.log(`[getSmartStylePrompt] 🎨 Генерация стиля через ${model}...`);
+        
+        const completion = await openai.chat.completions.create({
+          model,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+          temperature: 0.7,
+          max_tokens: 100,
+        });
+
+        const styleKeywords = completion.choices[0]?.message?.content?.trim();
+        
+        if (styleKeywords) {
+          console.log(`[getSmartStylePrompt] ✅ Стиль сгенерирован (${model}):`, styleKeywords);
+          return styleKeywords;
+        }
+      } catch (error: any) {
+        console.warn(`[getSmartStylePrompt] ⚠️ Модель ${model} недоступна:`, error.message);
+        continue;
+      }
+    }
+
+    // Если все модели недоступны, возвращаем дефолт
+    console.warn('[getSmartStylePrompt] ⚠️ Все модели недоступны, используем дефолтный стиль');
+    return 'professional photography, 4k, sharp focus, high resolution, clear details, color correction';
+  } catch (error) {
+    console.error('[getSmartStylePrompt] ❌ Ошибка:', error);
+    return 'professional photography, 4k, sharp focus, high resolution, clear details, color correction';
+  }
+}
+
 export async function restyleImage(
   title: string,
   sourceImageUrl: string
 ): Promise<GenerateImageResult> {
-  console.log('[restyleImage] 🎨 Стилизация (Flux + Context):', title);
+  console.log('[restyleImage] 🎨 Стилизация (Flux + AI Style):', title);
 
   try {
-    // 1. Определяем ретро-контекст
-    const isRetro = /ельцин|горбач|ссср|ленин|сталин|кеннеди|90|80/i.test(title);
+    // 1. Генерируем умный стилевой промпт через AI
+    const styleKeywords = await getSmartStylePrompt(title);
     
-    let stylePrompt = "";
-    
-    // ВАЖНО: Передаем ${title}, чтобы модель знала СЮЖЕТ.
-    // Добавляем команды на сохранение композиции.
-    
-    if (isRetro) {
-      // Ретро: добавляем шум, зерно, но просим сохранить лицо
-      stylePrompt = `${title}, 1990s TV news aesthetic, VHS tape texture, slight noise, color graded, authentic look, maintain facial features, realistic, no deformation`;
-    } else {
-      // Современное: просто улучшаем четкость
-      stylePrompt = `${title}, professional photography, 4k, sharp focus, high resolution, clear details, color correction, maintain original composition`;
-    }
+    // 2. Формируем финальный промпт с акцентом на сохранение композиции и лица
+    const stylePrompt = `${title}, ${styleKeywords}, maintain composition, maintain facial features, realistic texture, no distortion`;
 
     console.log('[restyleImage] 🔧 Промпт:', stylePrompt);
 
@@ -996,28 +1059,31 @@ export async function restyleImage(
 }
 
 export async function fitImageToFormat(
-  title: string,
+  title: string, // Оставляем аргумент для совместимости, но не используем
   sourceImageUrl: string
 ): Promise<GenerateImageResult> {
-  console.log('[fitImageToFormat] 📐 Подгонка формата:', title);
+  console.log('[fitImageToFormat] 📐 Технический ресайз через wsrv.nl');
 
   try {
-    // Промпт фокусируется на сохранении контента и качества
-    const fitPrompt = `${title}, high quality, maintain original composition, 16:9 aspect ratio, wide shot, uncropped, 4k, clear details, professional photography`;
-
-    const promptEncoded = encodeURIComponent(fitPrompt);
-    const imageEncoded = encodeURIComponent(sourceImageUrl);
-    const timestamp = Date.now();
+    // Удаляем префикс https:// или http://, так как wsrv принимает url=domain.com/img.jpg
+    const cleanSource = sourceImageUrl.replace(/^https?:\/\//, '');
     
-    // Принудительно задаем 1280x720
-    const finalUrl = `https://image.pollinations.ai/prompt/${promptEncoded}?model=flux&width=1280&height=720&nologo=true&image=${imageEncoded}&seed=${timestamp}`;
+    // Формируем URL
+    // w=1280, h=720: размер
+    // fit=contain: вписать полностью
+    // cbg=101010: темно-серый фон (почти черный) для полей
+    // output=webp: современный формат
+    const finalUrl = `https://wsrv.nl/?url=${encodeURIComponent(cleanSource)}&w=1280&h=720&fit=contain&cbg=101010&output=webp`;
 
     console.log('[fitImageToFormat] ✅ URL:', finalUrl);
+
+    // Имитируем задержку, чтобы UI успел показать лоадер (опционально)
+    await new Promise(r => setTimeout(r, 500));
 
     return {
       success: true,
       imageUrl: finalUrl,
-      usedModel: 'flux',
+      usedModel: 'wsrv.nl',
     };
   } catch (error) {
     console.error('[fitImageToFormat] ❌ Ошибка:', error);

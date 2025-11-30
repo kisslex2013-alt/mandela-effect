@@ -37,6 +37,7 @@ interface Effect {
   historySource: string | null;
   yearDiscovered: number | null;
   interpretations: Record<string, string> | null;
+  isVisible?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -113,6 +114,34 @@ export default function AdminClient({ effects: initialEffects, submissions: init
   const [selectedFound, setSelectedFound] = useState<Set<number>>(new Set());
   const [finderModel, setFinderModel] = useState<string | null>(null);
 
+  // Массовые операции
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkLoading, setBulkLoading] = useState(false);
+
+  // Переключение выбора одного эффекта
+  const toggleSelection = (id: string) => {
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  // Переключение выбора всей группы (категории)
+  const toggleSelectAll = (items: Effect[]) => {
+    const itemIds = items.map(e => e.id);
+    const allSelected = itemIds.every(id => selectedIds.has(id));
+    
+    const newSelected = new Set(selectedIds);
+    if (allSelected) {
+      itemIds.forEach(id => newSelected.delete(id));
+    } else {
+      itemIds.forEach(id => newSelected.add(id));
+    }
+    setSelectedIds(newSelected);
+  };
   
   // Закрытие модального окна по ESC
   useEffect(() => {
@@ -210,11 +239,13 @@ export default function AdminClient({ effects: initialEffects, submissions: init
 
   // Опции для CustomSelect
   const categoryOptions: SelectOption[] = useMemo(() => {
-    return categories.map((cat) => ({
-      value: cat.slug,
-      label: cat.name,
-      emoji: cat.emoji,
-    }));
+    return categories
+      .map((cat) => ({
+        value: cat.slug,
+        label: cat.name,
+        emoji: cat.emoji,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'ru'));
   }, [categories]);
 
   // Опции для фильтра (включая "Все")
@@ -408,6 +439,20 @@ export default function AdminClient({ effects: initialEffects, submissions: init
     } catch (error) {
       toast.error('Ошибка сохранения');
       setLoading(false);
+    }
+  };
+
+  // Переключение видимости эффекта
+  const handleToggleVisibility = async (effect: Effect) => {
+    const newVisibility = !effect.isVisible;
+    const result = await updateEffect(effect.id, { isVisible: newVisibility });
+    if (result.success) {
+      setEffects(prev => prev.map(e => 
+        e.id === effect.id ? { ...e, isVisible: newVisibility } : e
+      ));
+      toast.success(newVisibility ? 'Эффект показан' : 'Эффект скрыт');
+    } else {
+      toast.error(result.error || 'Ошибка обновления');
     }
   };
 
@@ -1209,6 +1254,13 @@ export default function AdminClient({ effects: initialEffects, submissions: init
     }
   };
 
+  // Функция для редактирования найденного эффекта прямо в списке
+  const handleFoundEffectChange = (index: number, field: string, value: string) => {
+    const newEffects = [...foundEffects];
+    newEffects[index] = { ...newEffects[index], [field]: value };
+    setFoundEffects(newEffects);
+  };
+
   // Добавление выбранных эффектов в массовую генерацию
   const handleAddSelectedToBulk = () => {
     const selected = Array.from(selectedFound)
@@ -1471,6 +1523,142 @@ export default function AdminClient({ effects: initialEffects, submissions: init
       // Проверяем полное совпадение или вхождение
       return cleanEffect.includes(cleanSubmission) || cleanSubmission.includes(cleanEffect);
     });
+  };
+
+  // Массовые операции
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`Удалить ${selectedIds.size} эффектов? Это действие нельзя отменить.`)) return;
+
+    setBulkLoading(true);
+    const idsArray = Array.from(selectedIds);
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const id of idsArray) {
+      try {
+        const result = await deleteEffect(id);
+        if (result.success) {
+          successCount++;
+          // Оптимистичное обновление UI
+          setEffects(prev => prev.filter(e => e.id !== id));
+        } else {
+          errorCount++;
+        }
+      } catch (error) {
+        errorCount++;
+      }
+    }
+
+    setSelectedIds(new Set());
+    setBulkLoading(false);
+    
+    if (successCount > 0) {
+      toast.success(`Удалено ${successCount} эффектов`);
+    }
+    if (errorCount > 0) {
+      toast.error(`Ошибка при удалении ${errorCount} эффектов`);
+    }
+  };
+
+  const handleBulkVisibility = async (isVisible: boolean) => {
+    if (selectedIds.size === 0) return;
+
+    setBulkLoading(true);
+    const idsArray = Array.from(selectedIds);
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const id of idsArray) {
+      try {
+        const result = await updateEffect(id, { isVisible });
+        if (result.success) {
+          successCount++;
+          // Оптимистичное обновление UI
+          setEffects(prev => prev.map(e => 
+            e.id === id ? { ...e, isVisible } : e
+          ));
+        } else {
+          errorCount++;
+        }
+      } catch (error) {
+        errorCount++;
+      }
+    }
+
+    setBulkLoading(false);
+    
+    if (successCount > 0) {
+      toast.success(`${isVisible ? 'Показано' : 'Скрыто'} ${successCount} эффектов`);
+    }
+    if (errorCount > 0) {
+      toast.error(`Ошибка при обновлении ${errorCount} эффектов`);
+    }
+  };
+
+  const handleBulkRegenerateImage = async () => {
+    if (selectedIds.size === 0) return;
+
+    setBulkLoading(true);
+    const idsArray = Array.from(selectedIds);
+    const toastId = toast.loading(`Генерация изображений: 0/${idsArray.length}`);
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (let i = 0; i < idsArray.length; i++) {
+      const id = idsArray[i];
+      const effect = effects.find(e => e.id === id);
+      
+      if (!effect) {
+        errorCount++;
+        continue;
+      }
+
+      try {
+        const { generateEffectImage } = await import('@/app/actions/generate-content');
+        const result = await generateEffectImage(effect.title);
+        
+        if (result.success && result.imageUrl) {
+          const updateResult = await updateEffect(id, { imageUrl: result.imageUrl });
+          
+          if (updateResult.success) {
+            successCount++;
+            setEffects(prev => prev.map(e => 
+              e.id === id ? { 
+                ...e, 
+                imageUrl: result.imageUrl!, 
+                updatedAt: new Date().toISOString(),
+                lastModel: (result as any).usedModel,
+              } : e
+            ));
+          } else {
+            errorCount++;
+          }
+        } else {
+          errorCount++;
+        }
+      } catch (error) {
+        errorCount++;
+      }
+
+      // Обновляем прогресс
+      toast.loading(`Генерация изображений: ${i + 1}/${idsArray.length}`, { id: toastId });
+      
+      // Небольшая задержка между запросами
+      if (i < idsArray.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+
+    setBulkLoading(false);
+    toast.dismiss(toastId);
+    
+    if (successCount > 0) {
+      toast.success(`Сгенерировано ${successCount} изображений`);
+    }
+    if (errorCount > 0) {
+      toast.error(`Ошибка при генерации ${errorCount} изображений`);
+    }
   };
 
   return (
@@ -1770,6 +1958,13 @@ export default function AdminClient({ effects: initialEffects, submissions: init
                   <span>{getCategoryInfo(category).emoji}</span>
                   {getCategoryInfo(category).name}
                   <span className="text-sm font-normal text-light/40 ml-2">({items.length})</span>
+                  <button
+                    onClick={() => toggleSelectAll(items)}
+                    className="ml-auto px-3 py-1 text-xs bg-white/5 hover:bg-white/10 text-light/70 rounded-lg transition-colors"
+                    title={items.every(e => selectedIds.has(e.id)) ? 'Снять выделение' : 'Выбрать все'}
+                  >
+                    {items.every(e => selectedIds.has(e.id)) ? '☑️ Все' : '☐ Все'}
+                  </button>
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                   {items.map((effect) => {
@@ -1789,8 +1984,22 @@ export default function AdminClient({ effects: initialEffects, submissions: init
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   onDoubleClick={() => handleEdit(effect)}
-                  className="bg-darkCard border border-light/10 rounded-xl overflow-hidden hover:border-primary/30 transition-all flex flex-col h-full relative group cursor-pointer"
+                  className={`bg-darkCard border border-light/10 rounded-xl overflow-hidden hover:border-primary/30 transition-all flex flex-col h-full relative group cursor-pointer ${
+                    effect.isVisible === false ? 'opacity-60 grayscale' : ''
+                  }`}
                 >
+                  {/* Чекбокс для массового выделения */}
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(effect.id)}
+                    onChange={(e) => {
+                      e.stopPropagation();
+                      toggleSelection(effect.id);
+                    }}
+                    className="absolute top-2 left-2 z-20 w-5 h-5 cursor-pointer accent-primary"
+                    onClick={(e) => e.stopPropagation()}
+                  />
+
                   {/* Верх: Картинка */}
                   <div 
                     className="relative h-32 w-full cursor-pointer"
@@ -1815,6 +2024,14 @@ export default function AdminClient({ effects: initialEffects, submissions: init
                             {catInfo.name}
                           </span>
                         </div>
+                        {/* Бейдж "Скрыто" если эффект скрыт */}
+                        {effect.isVisible === false && (
+                          <div className="absolute top-2 left-10 z-10">
+                            <span className="px-2 py-1 text-xs rounded-full border backdrop-blur-sm bg-red-500/20 text-red-400 border-red-500/30">
+                              🔒 Скрыто
+                            </span>
+                          </div>
+                        )}
                       </>
                     ) : (
                       <div className="h-full w-full bg-gradient-to-br from-primary/20 via-secondary/20 to-primary/20 flex items-center justify-center">
@@ -1825,6 +2042,14 @@ export default function AdminClient({ effects: initialEffects, submissions: init
                             {catInfo.name}
                           </span>
                         </div>
+                        {/* Бейдж "Скрыто" если эффект скрыт */}
+                        {effect.isVisible === false && (
+                          <div className="absolute top-2 left-10 z-10">
+                            <span className="px-2 py-1 text-xs rounded-full border backdrop-blur-sm bg-red-500/20 text-red-400 border-red-500/30">
+                              🔒 Скрыто
+                            </span>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1890,20 +2115,20 @@ export default function AdminClient({ effects: initialEffects, submissions: init
                     </div>
 
                     {/* Кнопки действий */}
-                    <div className="flex items-center justify-between mt-auto pt-4 gap-2">
-                      {/* Группа 1: AI Инструменты */}
-                      <div className="flex items-center gap-1 bg-white/5 p-1 rounded-lg">
+                    <div className="flex items-center justify-between mt-auto pt-2 border-t border-white/5 gap-1">
+                      {/* Левая часть: Генерация */}
+                      <div className="flex items-center bg-white/5 rounded-md">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             handleQuickGenerateData(effect);
                           }}
                           disabled={quickLoading?.id === effect.id && quickLoading?.type === 'data'}
-                          className="p-1.5 hover:bg-white/10 rounded text-blue-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                          title="AI Данные"
+                          className="w-6 h-6 flex items-center justify-center rounded hover:bg-white/10 transition-colors text-xs text-light/50 hover:text-light disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Данные"
                         >
                           {quickLoading?.id === effect.id && quickLoading?.type === 'data' ? (
-                            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                            <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">
                               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                             </svg>
@@ -1917,11 +2142,11 @@ export default function AdminClient({ effects: initialEffects, submissions: init
                             handleQuickGenerateImage(effect);
                           }}
                           disabled={quickLoading?.id === effect.id && quickLoading?.type === 'image'}
-                          className="p-1.5 hover:bg-white/10 rounded text-orange-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                          title="AI Картинка"
+                          className="w-6 h-6 flex items-center justify-center rounded hover:bg-white/10 transition-colors text-xs text-light/50 hover:text-light disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Картинка"
                         >
                           {quickLoading?.id === effect.id && quickLoading?.type === 'image' ? (
-                            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                            <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">
                               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                             </svg>
@@ -1936,12 +2161,12 @@ export default function AdminClient({ effects: initialEffects, submissions: init
                                 e.stopPropagation();
                                 handleRestyleImage(effect);
                               }}
-                              disabled={quickLoading?.id === effect.id && quickLoading?.type === 'image'}
-                              className="p-1.5 hover:bg-white/10 rounded text-purple-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                              title="AI Стилизация"
+                              disabled={quickLoading?.id === effect.id && quickLoading?.type === 'restyle'}
+                              className="w-6 h-6 flex items-center justify-center rounded hover:bg-white/10 transition-colors text-xs text-light/50 hover:text-light disabled:opacity-50 disabled:cursor-not-allowed"
+                              title="Стиль"
                             >
-                              {quickLoading?.id === effect.id && quickLoading?.type === 'image' ? (
-                                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                              {quickLoading?.id === effect.id && quickLoading?.type === 'restyle' ? (
+                                <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">
                                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                                 </svg>
@@ -1954,12 +2179,12 @@ export default function AdminClient({ effects: initialEffects, submissions: init
                                 e.stopPropagation();
                                 handleFitImage(effect);
                               }}
-                              disabled={quickLoading?.id === effect.id && quickLoading?.type === 'image'}
-                              className="p-1.5 hover:bg-white/10 rounded text-pink-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                              title="AI Формат"
+                              disabled={quickLoading?.id === effect.id && quickLoading?.type === 'fit'}
+                              className="w-6 h-6 flex items-center justify-center rounded hover:bg-white/10 transition-colors text-xs text-light/50 hover:text-light disabled:opacity-50 disabled:cursor-not-allowed"
+                              title="Формат"
                             >
-                              {quickLoading?.id === effect.id && quickLoading?.type === 'image' ? (
-                                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                              {quickLoading?.id === effect.id && quickLoading?.type === 'fit' ? (
+                                <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">
                                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                                 </svg>
@@ -1971,51 +2196,66 @@ export default function AdminClient({ effects: initialEffects, submissions: init
                         )}
                       </div>
 
-                      {/* Группа 2: Источники */}
-                      <div className="flex items-center gap-1 bg-white/5 p-1 rounded-lg">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleManualImage(effect);
-                          }}
-                          className="p-1.5 hover:bg-white/10 rounded text-light/70 transition-colors"
-                          title="Вставить ссылку"
-                        >
-                          🔗
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSearchImage(effect.title, 'google');
-                          }}
-                          className="px-1.5 py-0.5 hover:bg-white/10 rounded text-blue-400 font-bold text-xs transition-colors"
-                          title="Google"
-                        >
-                          G
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSearchImage(effect.title, 'yandex');
-                          }}
-                          className="px-1.5 py-0.5 hover:bg-white/10 rounded text-red-400 font-bold text-xs transition-colors"
-                          title="Yandex"
-                        >
-                          Я
-                        </button>
-                      </div>
+                      {/* Правая часть: Источники и Управление */}
+                      <div className="flex items-center gap-1.5">
+                        {/* Источники */}
+                        <div className="flex items-center bg-white/5 rounded-md">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleManualImage(effect);
+                            }}
+                            className="w-6 h-6 flex items-center justify-center rounded hover:bg-white/10 transition-colors text-xs text-light/50 hover:text-light"
+                            title="Ссылка"
+                          >
+                            🔗
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSearchImage(effect.title, 'google');
+                            }}
+                            className="w-5 h-6 flex items-center justify-center rounded hover:bg-white/10 transition-colors text-blue-400 font-bold text-[10px]"
+                            title="Google"
+                          >
+                            G
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSearchImage(effect.title, 'yandex');
+                            }}
+                            className="w-5 h-6 flex items-center justify-center rounded hover:bg-white/10 transition-colors text-red-400 font-bold text-[10px]"
+                            title="Yandex"
+                          >
+                            Я
+                          </button>
+                        </div>
 
-                      {/* Группа 3: Удаление */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDelete(effect.id);
-                        }}
-                        className="p-2 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors ml-auto"
-                        title="Удалить"
-                      >
-                        🗑️
-                      </button>
+                        {/* Управление */}
+                        <div className="flex items-center gap-0.5">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleVisibility(effect);
+                            }}
+                            className="w-6 h-6 flex items-center justify-center rounded hover:bg-white/10 transition-colors text-xs text-light/50 hover:text-light"
+                            title={effect.isVisible === false ? 'Показать' : 'Скрыть'}
+                          >
+                            {effect.isVisible === false ? '🔒' : '👁️'}
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(effect.id);
+                            }}
+                            className="w-6 h-6 flex items-center justify-center rounded hover:bg-red-500/20 transition-colors text-xs text-red-400"
+                            title="Удалить"
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </motion.div>
@@ -3406,8 +3646,8 @@ export default function AdminClient({ effects: initialEffects, submissions: init
                   <span>🕵️</span>
                   Результаты поиска
                   {finderModel && (
-                    <span className="text-sm font-normal text-light/60 ml-2">
-                      (Модель: <span className="font-mono text-purple-300">{finderModel}</span>)
+                    <span className="text-xs font-mono bg-purple-500/10 text-purple-300 px-2 py-1 rounded border border-purple-500/20 flex items-center gap-1">
+                      <span>🤖</span> {finderModel}
                     </span>
                   )}
                 </h2>
@@ -3491,21 +3731,28 @@ export default function AdminClient({ effects: initialEffects, submissions: init
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-start justify-between gap-2 mb-2">
                                   <div className="flex-1">
-                                    <div className="flex items-center gap-2 mb-1">
-                                      <h3 className="text-light font-semibold text-lg">
-                                        {effect.title}
-                                      </h3>
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <input
+                                        type="text"
+                                        value={effect.title}
+                                        onChange={(e) => handleFoundEffectChange(index, 'title', e.target.value)}
+                                        className="text-lg font-bold bg-transparent border-b border-transparent hover:border-light/20 focus:border-primary focus:outline-none w-full text-light"
+                                        onClick={(e) => e.stopPropagation()}
+                                      />
                                       {isDuplicate && (
-                                        <span className="px-2 py-0.5 text-xs font-medium bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 rounded-lg">
+                                        <span className="px-2 py-0.5 text-xs font-medium bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 rounded-lg flex-shrink-0">
                                           ⚠️ Возможный дубль
                                         </span>
                                       )}
                                     </div>
-                                    <p className="text-light/60 text-sm mb-2">
-                                      {effect.question}
-                                    </p>
+                                    <textarea
+                                      value={effect.question}
+                                      onChange={(e) => handleFoundEffectChange(index, 'question', e.target.value)}
+                                      className="text-sm text-light/60 bg-transparent w-full resize-y min-h-[40px] focus:outline-none border-b border-transparent focus:border-primary mb-2"
+                                      onClick={(e) => e.stopPropagation()}
+                                    />
                                   </div>
-                                  <span className={`px-2 py-1 rounded-lg text-xs font-medium whitespace-nowrap ${categoryInfo.color}`}>
+                                  <span className={`px-2 py-1 rounded-lg text-xs font-medium whitespace-nowrap flex-shrink-0 ${categoryInfo.color}`}>
                                     {categoryInfo.emoji} {categoryInfo.name}
                                   </span>
                                 </div>
@@ -3514,11 +3761,21 @@ export default function AdminClient({ effects: initialEffects, submissions: init
                                 <div className="grid grid-cols-2 gap-2 mb-3">
                                   <div className="p-2 bg-red-500/10 border border-red-500/20 rounded-lg">
                                     <p className="text-xs text-red-400/60 mb-1">Вариант А (ложное)</p>
-                                    <p className="text-light text-sm">{effect.variantA}</p>
+                                    <textarea
+                                      value={effect.variantA}
+                                      onChange={(e) => handleFoundEffectChange(index, 'variantA', e.target.value)}
+                                      className="text-sm text-red-200 bg-transparent w-full resize-y min-h-[60px] focus:outline-none"
+                                      onClick={(e) => e.stopPropagation()}
+                                    />
                                   </div>
                                   <div className="p-2 bg-green-500/10 border border-green-500/20 rounded-lg">
                                     <p className="text-xs text-green-400/60 mb-1">Вариант Б (реальность)</p>
-                                    <p className="text-light text-sm">{effect.variantB}</p>
+                                    <textarea
+                                      value={effect.variantB}
+                                      onChange={(e) => handleFoundEffectChange(index, 'variantB', e.target.value)}
+                                      className="text-sm text-green-200 bg-transparent w-full resize-y min-h-[60px] focus:outline-none"
+                                      onClick={(e) => e.stopPropagation()}
+                                    />
                                   </div>
                                 </div>
                                 
@@ -3704,6 +3961,80 @@ export default function AdminClient({ effects: initialEffects, submissions: init
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Плавающий бар массовых действий */}
+        {selectedIds.size > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50"
+          >
+            <div className="bg-darkCard/95 backdrop-blur-md border border-light/20 rounded-2xl shadow-2xl px-6 py-4 flex items-center gap-3">
+              <span className="text-light/70 text-sm font-medium">
+                Выбрано: <span className="text-primary font-semibold">{selectedIds.size}</span>
+              </span>
+              
+              <div className="h-6 w-px bg-light/20" />
+              
+              <button
+                onClick={() => setSelectedIds(new Set())}
+                className="px-3 py-2 bg-white/5 hover:bg-white/10 text-light/70 rounded-lg transition-colors text-sm"
+                disabled={bulkLoading}
+              >
+                ✕ Снять выделение
+              </button>
+              
+              <div className="h-6 w-px bg-light/20" />
+              
+              <button
+                onClick={() => handleBulkVisibility(true)}
+                className="px-4 py-2 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-lg transition-colors text-sm font-medium"
+                disabled={bulkLoading}
+              >
+                👁️ Показать ({selectedIds.size})
+              </button>
+              
+              <button
+                onClick={() => handleBulkVisibility(false)}
+                className="px-4 py-2 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 rounded-lg transition-colors text-sm font-medium"
+                disabled={bulkLoading}
+              >
+                🔒 Скрыть ({selectedIds.size})
+              </button>
+              
+              <div className="h-6 w-px bg-light/20" />
+              
+              <button
+                onClick={handleBulkRegenerateImage}
+                className="px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-lg transition-colors text-sm font-medium"
+                disabled={bulkLoading}
+              >
+                {bulkLoading ? (
+                  <span className="flex items-center gap-2">
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Генерация...
+                  </span>
+                ) : (
+                  `🖼️ Перегенерировать картинки (${selectedIds.size})`
+                )}
+              </button>
+              
+              <div className="h-6 w-px bg-light/20" />
+              
+              <button
+                onClick={handleBulkDelete}
+                className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition-colors text-sm font-medium"
+                disabled={bulkLoading}
+              >
+                🗑️ Удалить ({selectedIds.size})
+              </button>
+            </div>
+          </motion.div>
+        )}
         </>
         )}
       </div>

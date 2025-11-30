@@ -19,6 +19,7 @@ interface EffectData {
   historySource?: string;
   yearDiscovered?: number;
   interpretations?: object;
+  isVisible?: boolean;
 }
 
 interface CreateEffectData {
@@ -80,6 +81,11 @@ export async function updateEffect(
       }
     }
 
+    // Видимость эффекта
+    if (data.isVisible !== undefined) {
+      updateData.isVisible = data.isVisible;
+    }
+
     console.log('[updateEffect] Данные для Prisma:', JSON.stringify(updateData, null, 2));
 
     // Выполняем обновление
@@ -127,6 +133,7 @@ export async function createEffect(
         historySource: data.historySource || null,
         yearDiscovered: data.yearDiscovered || null,
         interpretations: data.interpretations ? data.interpretations : Prisma.JsonNull,
+        isVisible: true, // По умолчанию видимый
         votesFor: 0,
         votesAgainst: 0,
         views: 0,
@@ -319,6 +326,7 @@ export async function approveSubmission(
         historySource: data.historySource || null,
         yearDiscovered: data.yearDiscovered || null,
         interpretations: data.interpretations ? data.interpretations : Prisma.JsonNull,
+        isVisible: true, // По умолчанию видимый
         votesFor: 0,
         votesAgainst: 0,
         views: 0,

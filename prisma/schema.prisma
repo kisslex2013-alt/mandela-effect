@@ -39,6 +39,9 @@ model Effect {
   // Интерпретации (научные объяснения и версии сообщества)
   interpretations  Json?
   
+  // Видимость эффекта
+  isVisible         Boolean  @default(true) // Скрыт ли эффект от публичного каталога
+  
   submissions Submission[] // Связь, если эффект создан из заявки
 
   createdAt   DateTime @default(now())

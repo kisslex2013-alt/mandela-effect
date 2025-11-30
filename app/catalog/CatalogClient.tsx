@@ -40,6 +40,15 @@ export default function CatalogClient({
   // Debounce для поиска
   const debouncedSearch = useDebounce(searchQuery, 300);
 
+  // Отсортированные категории по алфавиту
+  const sortedCategories = useMemo(() => {
+    return [...categories].sort((a, b) => {
+      const catInfoA = getCategoryInfo(a);
+      const catInfoB = getCategoryInfo(b);
+      return catInfoA.name.localeCompare(catInfoB.name, 'ru');
+    });
+  }, [categories]);
+
   // Загрузка голосов (отдельная функция для переиспользования)
   const loadVotes = async () => {
     const visitorId = getVisitorId();
@@ -179,10 +188,10 @@ export default function CatalogClient({
   };
 
   const handleSelectAllCategories = () => {
-    if (selectedCategories.length === categories.length) {
+    if (selectedCategories.length === sortedCategories.length) {
       setSelectedCategories([]);
     } else {
-      setSelectedCategories([...categories]);
+      setSelectedCategories([...sortedCategories]);
     }
   };
 
@@ -298,7 +307,7 @@ export default function CatalogClient({
                         <span>📋</span>
                         <span>Все категории</span>
                       </span>
-                      {selectedCategories.length === categories.length && (
+                      {selectedCategories.length === sortedCategories.length && (
                         <svg className="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                         </svg>
@@ -307,7 +316,7 @@ export default function CatalogClient({
                     
                     <div className="border-t border-light/10 my-1" />
                     
-                    {categories.map((category) => {
+                    {sortedCategories.map((category) => {
                       const catInfo = getCategoryInfo(category);
                       const isSelected = selectedCategories.includes(category);
                       return (

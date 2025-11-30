@@ -99,7 +99,9 @@ export async function getEffects(params: GetEffectsParams = {}): Promise<EffectR
   } = params;
 
   // Формируем условия фильтрации
-  const where: Prisma.EffectWhereInput = {};
+  const where: Prisma.EffectWhereInput = {
+    isVisible: true, // Показываем только видимые эффекты
+  };
 
   // Поиск по названию и описанию (case insensitive)
   if (query && query.trim()) {
@@ -343,7 +345,15 @@ export async function getQuizEffects(limit: number = 10, visitorId?: string): Pr
     }
 
     // 2. Если есть visitorId, исключаем эффекты, на которые уже есть голоса
+    // Также исключаем скрытые эффекты
     let availableIds = allIds.map((e) => e.id);
+    
+    // Фильтруем только видимые эффекты
+    const visibleEffects = await prisma.effect.findMany({
+      where: { isVisible: true },
+      select: { id: true },
+    });
+    availableIds = visibleEffects.map((e) => e.id);
     
     if (visitorId && visitorId.length >= 10) {
       try {

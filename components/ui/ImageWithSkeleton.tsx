@@ -46,8 +46,10 @@ export default function ImageWithSkeleton({
   }, [src]);
 
   // Всегда возвращаем обертку с relative для правильной работы fill
+  const imageSrc = retryCount > 0 && src ? `${src}${src.includes('?') ? '&' : '?'}retry=${retryCount}` : src;
+
   return (
-    <div className="relative w-full h-full" style={fill ? {} : { width, height }}>
+    <div className={`relative overflow-hidden bg-darkCard w-full h-full ${className}`} style={fill ? {} : { width, height }}>
       {/* Если нет src, показываем плейсхолдер */}
       {!src ? (
         <div className="absolute inset-0 bg-dark/50 border border-light/10 rounded-lg flex items-center justify-center">
@@ -68,20 +70,40 @@ export default function ImageWithSkeleton({
         <>
           {/* Скелетон загрузки */}
           {isLoading && (
-            <div className="absolute inset-0 animate-pulse bg-light/10 rounded-lg" />
+            <div className="absolute inset-0 animate-pulse bg-white/5 z-20" />
           )}
 
-          {/* Изображение */}
+          {/* 1. Размытый фон (для красоты) */}
+          {imageSrc && (
+            <Image
+              key={`bg-${imageKeyRef.current}-${retryCount}`}
+              src={imageSrc}
+              alt=""
+              width={fill ? undefined : width}
+              height={fill ? undefined : height}
+              fill={fill}
+              sizes={fill ? "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" : undefined}
+              style={fill ? {} : { position: 'absolute', inset: 0 }}
+              className="object-cover blur-3xl scale-110 opacity-50 pointer-events-none"
+              aria-hidden="true"
+              onError={() => {
+                // Игнорируем ошибки фона
+              }}
+              unoptimized={typeof imageSrc === 'string' && imageSrc.startsWith('http')}
+            />
+          )}
+
+          {/* 2. Основная картинка */}
           <Image
             key={`${imageKeyRef.current}-${retryCount}`}
-            src={retryCount > 0 && src ? `${src}${src.includes('?') ? '&' : '?'}retry=${retryCount}` : src!}
+            src={imageSrc!}
             alt={alt}
             width={fill ? undefined : width}
             height={fill ? undefined : height}
             fill={fill}
             sizes={fill ? "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" : undefined}
             style={fill ? {} : { width: 'auto', height: 'auto' }}
-            className={`${className} transition-opacity duration-300 ${isLoading ? 'opacity-0' : 'opacity-100'} ${
+            className={`object-contain relative z-10 drop-shadow-2xl transition-opacity duration-500 ${isLoading ? 'opacity-0' : 'opacity-100'} ${
               objectFit === 'cover' ? 'object-cover' :
               objectFit === 'contain' ? 'object-contain' :
               objectFit === 'fill' ? 'object-fill' :
@@ -106,7 +128,7 @@ export default function ImageWithSkeleton({
               }
             }}
             priority={priority}
-            unoptimized={typeof src === 'string' && src.startsWith('http')}
+            unoptimized={typeof imageSrc === 'string' && imageSrc.startsWith('http')}
           />
         </>
       )}
