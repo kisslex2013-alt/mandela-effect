@@ -118,8 +118,6 @@ export default function AdminClient({ effects: initialEffects, submissions: init
     url: ''
   });
 
-  // Открытое выпадающее меню медиа
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   
   // Закрытие модального окна по ESC
   useEffect(() => {
@@ -131,30 +129,12 @@ export default function AdminClient({ effects: initialEffects, submissions: init
         if (manualImageState.isOpen) {
           setManualImageState({ ...manualImageState, isOpen: false });
         }
-        if (openMenuId) {
-          setOpenMenuId(null);
-        }
       }
     };
     
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
-  }, [imageModalUrl, manualImageState, openMenuId]);
-
-  // Закрытие выпадающего меню при клике вне его
-  useEffect(() => {
-    if (!openMenuId) return;
-
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (!target.closest('[data-media-menu]')) {
-        setOpenMenuId(null);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [openMenuId]);
+  }, [imageModalUrl, manualImageState]);
   
   // Категории - редактирование
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -1694,7 +1674,7 @@ export default function AdminClient({ effects: initialEffects, submissions: init
                   {categoryMap[category]?.name || category}
                   <span className="text-sm font-normal text-light/40 ml-2">({items.length})</span>
                 </h3>
-                <div className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                   {items.map((effect) => {
               const catInfo = categoryMap[effect.category] || { emoji: '❓', name: effect.category, color: 'bg-gray-500/20 text-gray-400 border-gray-500/30' };
               const totalVotes = effect.votesFor + effect.votesAgainst;
@@ -1712,257 +1692,226 @@ export default function AdminClient({ effects: initialEffects, submissions: init
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   onDoubleClick={() => handleEdit(effect)}
-                  className="bg-darkCard rounded-xl border border-light/10 hover:border-light/20 transition-all duration-200 relative cursor-pointer"
+                  className="bg-darkCard border border-light/10 rounded-xl overflow-hidden hover:border-primary/30 transition-all flex flex-col h-full relative group cursor-pointer"
                 >
-                  <div className="p-4 md:p-5">
-                    <div className="flex flex-col md:flex-row md:items-center gap-4">
-                      {/* Основная информация */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start gap-3">
-                          {/* Миниатюра картинки */}
-                          <div 
-                            className="flex-shrink-0 w-16 h-10 rounded-lg overflow-hidden border border-light/10 cursor-pointer hover:border-primary/50 transition-all"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (effect.imageUrl) setImageModalUrl(effect.imageUrl);
-                            }}
-                            title="Нажмите для увеличения"
-                          >
-                            <ImageWithSkeleton
-                              key={`${effect.id}-${effect.imageUrl || 'no-image'}-${effect.updatedAt || ''}`}
-                              src={effect.imageUrl}
-                              alt={effect.title}
-                              width={64}
-                              height={40}
-                              objectFit="cover"
-                            />
-                          </div>
-                          <span className="text-2xl flex-shrink-0">{catInfo.emoji}</span>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <h3 className="font-semibold text-light truncate">{effect.title}</h3>
-                              <span className={`px-2 py-0.5 text-xs rounded-full border ${catInfo.color}`}>
-                                {catInfo.name}
-                              </span>
-                            </div>
-                            <p className="text-sm text-light/50 line-clamp-1 mt-1">{effect.description}</p>
-                          </div>
+                  {/* Верх: Картинка */}
+                  <div 
+                    className="relative h-32 w-full cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (effect.imageUrl) setImageModalUrl(effect.imageUrl);
+                    }}
+                    title={effect.imageUrl ? "Нажмите для увеличения" : ""}
+                  >
+                    {effect.imageUrl ? (
+                      <>
+                        <ImageWithSkeleton
+                          key={`${effect.id}-${effect.imageUrl || 'no-image'}-${effect.updatedAt || ''}`}
+                          src={effect.imageUrl}
+                          alt={effect.title}
+                          fill
+                          className="object-cover"
+                        />
+                        {/* Бейдж категории поверх картинки */}
+                        <div className="absolute top-2 right-2 z-10">
+                          <span className={`px-2 py-1 text-xs rounded-full border backdrop-blur-sm ${catInfo.color}`}>
+                            {catInfo.name}
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="h-full w-full bg-gradient-to-br from-primary/20 via-secondary/20 to-primary/20 flex items-center justify-center">
+                        <span className="text-6xl opacity-50">{catInfo.emoji}</span>
+                        {/* Бейдж категории */}
+                        <div className="absolute top-2 right-2 z-10">
+                          <span className={`px-2 py-1 text-xs rounded-full border backdrop-blur-sm ${catInfo.color}`}>
+                            {catInfo.name}
+                          </span>
                         </div>
                       </div>
+                    )}
+                  </div>
 
-                      {/* Статистика голосов */}
-                      <div className="flex items-center gap-4 md:gap-6">
-                        {/* Мини-бар голосов */}
-                        <div className="hidden sm:block w-32">
-                          <div className="flex items-center justify-between text-xs text-light/50 mb-1">
-                            <span>{effect.votesFor}</span>
-                            <span>{effect.votesAgainst}</span>
-                          </div>
-                          <div className="h-2 bg-dark rounded-full overflow-hidden flex">
-                            <div
-                              className="h-full bg-primary transition-all"
-                              style={{ width: `${percentA}%` }}
-                            />
-                            <div
-                              className="h-full bg-secondary transition-all"
-                              style={{ width: `${100 - percentA}%` }}
-                            />
-                          </div>
-                          <div className="text-xs text-light/40 text-center mt-1">
-                            {totalVotes.toLocaleString('ru-RU')} голосов
-                          </div>
-                        </div>
+                  {/* Середина: Контент */}
+                  <div className="p-4 flex-1 flex flex-col">
+                    <h3 className="font-semibold text-light line-clamp-2 mb-2">{effect.title}</h3>
+                    <p className="text-sm text-light/60 line-clamp-2 mb-3 flex-1">{effect.description}</p>
+                    
+                    {/* Индикаторы заполненности */}
+                    <div className="flex items-center gap-1.5" title="Заполненность контента">
+                      <span
+                        className={`text-sm ${hasCS ? 'opacity-100' : 'opacity-30'}`}
+                        title={hasCS ? 'Текущее состояние ✓' : 'Текущее состояние ✗'}
+                      >
+                        👁️
+                      </span>
+                      <span
+                        className={`text-sm ${hasRes ? 'opacity-100' : 'opacity-30'}`}
+                        title={hasRes ? 'Остатки ✓' : 'Остатки ✗'}
+                      >
+                        🔍
+                      </span>
+                      <span
+                        className={`text-sm ${hasHist ? 'opacity-100' : 'opacity-30'}`}
+                        title={hasHist ? 'История ✓' : 'История ✗'}
+                      >
+                        📜
+                      </span>
+                      {completeness < 3 && (
+                        <span className="ml-auto text-xs text-amber-400">
+                          {completeness}/3
+                        </span>
+                      )}
+                    </div>
+                  </div>
 
-                        {/* Индикаторы заполненности */}
-                        <div className="flex items-center gap-1" title="Заполненность контента">
-                          <span
-                            className={`text-lg ${hasCS ? 'opacity-100' : 'opacity-30'}`}
-                            title={hasCS ? 'Текущее состояние ✓' : 'Текущее состояние ✗'}
-                          >
-                            👁️
-                          </span>
-                          <span
-                            className={`text-lg ${hasRes ? 'opacity-100' : 'opacity-30'}`}
-                            title={hasRes ? 'Остатки ✓' : 'Остатки ✗'}
-                          >
-                            🔍
-                          </span>
-                          <span
-                            className={`text-lg ${hasHist ? 'opacity-100' : 'opacity-30'}`}
-                            title={hasHist ? 'История ✓' : 'История ✗'}
-                          >
-                            📜
-                          </span>
-                          {completeness < 3 && (
-                            <span className="ml-1 text-xs text-amber-400">
-                              {completeness}/3
-                            </span>
+                  {/* Низ: Голоса и Действия */}
+                  <div className="p-4 pt-0 mt-auto">
+                    {/* Прогресс-бар голосов */}
+                    <div className="mb-3">
+                      <div className="h-1 bg-dark rounded-full overflow-hidden flex mb-1">
+                        <div
+                          className="h-full bg-primary transition-all"
+                          style={{ width: `${percentA}%` }}
+                        />
+                        <div
+                          className="h-full bg-secondary transition-all"
+                          style={{ width: `${100 - percentA}%` }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-light/40">
+                        <span>{effect.votesFor} / {effect.votesAgainst}</span>
+                        <span>{totalVotes.toLocaleString('ru-RU')} голосов</span>
+                      </div>
+                    </div>
+
+                    {/* Кнопки действий */}
+                    <div className="flex items-center justify-between mt-auto pt-4 gap-2">
+                      {/* Группа 1: AI Инструменты */}
+                      <div className="flex items-center gap-1 bg-white/5 p-1 rounded-lg">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleQuickGenerateData(effect);
+                          }}
+                          disabled={quickLoading?.id === effect.id && quickLoading?.type === 'data'}
+                          className="p-1.5 hover:bg-white/10 rounded text-blue-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          title="AI Данные"
+                        >
+                          {quickLoading?.id === effect.id && quickLoading?.type === 'data' ? (
+                            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                            </svg>
+                          ) : (
+                            '📝'
                           )}
-                        </div>
-
-                        {/* Кнопки действий */}
-                        <div className="flex items-center gap-2">
-                          {/* Кнопка Данные */}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleQuickGenerateData(effect);
-                            }}
-                            disabled={quickLoading?.id === effect.id && quickLoading?.type === 'data'}
-                            className="px-3 py-2 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                            title="Сгенерировать текст"
-                          >
-                            {quickLoading?.id === effect.id && quickLoading?.type === 'data' ? (
-                              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                              </svg>
-                            ) : (
-                              '📝'
-                            )}
-                          </button>
-
-                          {/* Выпадающее меню Медиа */}
-                          <div className="relative" data-media-menu>
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleQuickGenerateImage(effect);
+                          }}
+                          disabled={quickLoading?.id === effect.id && quickLoading?.type === 'image'}
+                          className="p-1.5 hover:bg-white/10 rounded text-orange-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          title="AI Картинка"
+                        >
+                          {quickLoading?.id === effect.id && quickLoading?.type === 'image' ? (
+                            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                            </svg>
+                          ) : (
+                            '🖼️'
+                          )}
+                        </button>
+                        {effect.imageUrl && (
+                          <>
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setOpenMenuId(openMenuId === effect.id ? null : effect.id);
+                                handleRestyleImage(effect);
                               }}
-                              className="px-3 py-2 bg-indigo-500/20 text-indigo-400 rounded-lg hover:bg-indigo-500/30 transition-colors text-sm font-medium flex items-center gap-1"
-                              title="Действия с медиа"
+                              disabled={quickLoading?.id === effect.id && quickLoading?.type === 'image'}
+                              className="p-1.5 hover:bg-white/10 rounded text-purple-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              title="AI Стилизация"
                             >
-                              📷 Медиа <span className="text-xs">▼</span>
+                              {quickLoading?.id === effect.id && quickLoading?.type === 'image' ? (
+                                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                </svg>
+                              ) : (
+                                '🎨'
+                              )}
                             </button>
-
-                            {openMenuId === effect.id && (
-                              <div className="absolute right-0 top-full mt-2 w-56 bg-darkCard border border-light/20 rounded-xl shadow-2xl p-2 z-[100] flex flex-col gap-1">
-                                {/* Генерация */}
-                                <div className="text-xs text-light/40 px-2 py-1">Генерация</div>
-                                <button
-                                  onClick={() => {
-                                    handleQuickGenerateImage(effect);
-                                    setOpenMenuId(null);
-                                  }}
-                                  disabled={quickLoading?.id === effect.id && quickLoading?.type === 'image'}
-                                  className="px-3 py-2 bg-orange-500/20 text-orange-400 rounded-lg hover:bg-orange-500/30 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed text-left flex items-center gap-2"
-                                >
-                                  {quickLoading?.id === effect.id && quickLoading?.type === 'image' ? (
-                                    <>
-                                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                                      </svg>
-                                      <span>Генерация...</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <span>🖼️</span>
-                                      <span>Сгенерировать</span>
-                                    </>
-                                  )}
-                                </button>
-
-                                {/* Редактирование - показывается только если есть картинка */}
-                                {effect.imageUrl && (
-                                  <>
-                                    <div className="text-xs text-light/40 px-2 py-1 mt-1">Редактирование</div>
-                                    <div className="flex gap-1">
-                                      <button
-                                        onClick={() => {
-                                          handleRestyleImage(effect);
-                                          setOpenMenuId(null);
-                                        }}
-                                        disabled={quickLoading?.id === effect.id && quickLoading?.type === 'image'}
-                                        className="flex-1 px-3 py-2 bg-pink-500/20 text-pink-400 rounded-lg hover:bg-pink-500/30 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
-                                      >
-                                        {quickLoading?.id === effect.id && quickLoading?.type === 'image' ? (
-                                          <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                                          </svg>
-                                        ) : (
-                                          <>
-                                            <span>🎨</span>
-                                            <span>Стиль</span>
-                                          </>
-                                        )}
-                                      </button>
-                                      <button
-                                        onClick={() => {
-                                          handleFitImage(effect);
-                                          setOpenMenuId(null);
-                                        }}
-                                        disabled={quickLoading?.id === effect.id && quickLoading?.type === 'image'}
-                                        className="flex-1 px-3 py-2 bg-purple-500/20 text-purple-400 rounded-lg hover:bg-purple-500/30 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
-                                      >
-                                        {quickLoading?.id === effect.id && quickLoading?.type === 'image' ? (
-                                          <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                                          </svg>
-                                        ) : (
-                                          <>
-                                            <span>📐</span>
-                                            <span>Формат</span>
-                                          </>
-                                        )}
-                                      </button>
-                                    </div>
-                                  </>
-                                )}
-
-                                {/* Источник */}
-                                <div className="text-xs text-light/40 px-2 py-1 mt-1">Источник</div>
-                                <div className="flex gap-1">
-                                  <button
-                                    onClick={() => {
-                                      handleManualImage(effect);
-                                      setOpenMenuId(null);
-                                    }}
-                                    className="flex-1 px-3 py-2 bg-purple-500/20 text-purple-400 rounded-lg hover:bg-purple-500/30 transition-colors text-sm font-medium flex items-center justify-center gap-1"
-                                  >
-                                    <span>🔗</span>
-                                    <span>Ссылка</span>
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      handleSearchImage(effect.title, 'google');
-                                      setOpenMenuId(null);
-                                    }}
-                                    className="px-3 py-2 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-lg hover:bg-blue-500/20 transition-colors text-sm font-bold"
-                                    title="Найти в Google Картинках"
-                                  >
-                                    G
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      handleSearchImage(effect.title, 'yandex');
-                                      setOpenMenuId(null);
-                                    }}
-                                    className="px-3 py-2 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg hover:bg-red-500/20 transition-colors text-sm font-bold"
-                                    title="Найти в Яндекс Картинках"
-                                  >
-                                    Я
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Основные действия */}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDelete(effect.id);
-                            }}
-                            className="px-3 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors text-sm"
-                            title="Удалить"
-                          >
-                            🗑️
-                          </button>
-                        </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleFitImage(effect);
+                              }}
+                              disabled={quickLoading?.id === effect.id && quickLoading?.type === 'image'}
+                              className="p-1.5 hover:bg-white/10 rounded text-pink-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              title="AI Формат"
+                            >
+                              {quickLoading?.id === effect.id && quickLoading?.type === 'image' ? (
+                                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                </svg>
+                              ) : (
+                                '📐'
+                              )}
+                            </button>
+                          </>
+                        )}
                       </div>
+
+                      {/* Группа 2: Источники */}
+                      <div className="flex items-center gap-1 bg-white/5 p-1 rounded-lg">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleManualImage(effect);
+                          }}
+                          className="p-1.5 hover:bg-white/10 rounded text-light/70 transition-colors"
+                          title="Вставить ссылку"
+                        >
+                          🔗
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSearchImage(effect.title, 'google');
+                          }}
+                          className="px-1.5 py-0.5 hover:bg-white/10 rounded text-blue-400 font-bold text-xs transition-colors"
+                          title="Google"
+                        >
+                          G
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSearchImage(effect.title, 'yandex');
+                          }}
+                          className="px-1.5 py-0.5 hover:bg-white/10 rounded text-red-400 font-bold text-xs transition-colors"
+                          title="Yandex"
+                        >
+                          Я
+                        </button>
+                      </div>
+
+                      {/* Группа 3: Удаление */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(effect.id);
+                        }}
+                        className="p-2 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors ml-auto"
+                        title="Удалить"
+                      >
+                        🗑️
+                      </button>
                     </div>
                   </div>
                 </motion.div>
