@@ -463,7 +463,12 @@ export default function SubmitPage() {
 
   return (
     <main id="main-content" className="min-h-screen bg-dark pt-24 pb-16 px-4" role="main">
-      <div className="max-w-2xl mx-auto">
+      <motion.div 
+        className="max-w-2xl mx-auto"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+      >
         {/* Заголовок */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary mb-2">
@@ -840,7 +845,7 @@ export default function SubmitPage() {
             Посмотреть каталог эффектов
           </Link>
         </div>
-      </div>
+      </motion.div>
     </main>
   );
 }

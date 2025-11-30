@@ -898,7 +898,7 @@ export default function MyMemoryPage() {
                 value={sortBy}
                 onChange={(val) => setSortBy(val as 'date' | 'name' | 'controversy')}
                 options={[
-                  { value: 'date', label: 'По дате голосования', emoji: '📅' },
+                  { value: 'date', label: 'По дате', emoji: '📅' },
                   { value: 'name', label: 'По названию', emoji: '🔤' },
                   { value: 'controversy', label: 'По спорности', emoji: '⚖️' },
                 ]}

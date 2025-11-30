@@ -257,6 +257,11 @@ export default function HomeClient() {
   const countParticipants = useCountUp(stats.totalParticipants, 800, stats.totalParticipants > 0);
   const countVotes = useCountUp(stats.totalVotes, 800, stats.totalVotes > 0);
 
+  // Скелетон для статистики
+  const StatSkeleton = () => (
+    <span className="inline-block h-8 w-24 bg-white/10 animate-pulse rounded" />
+  );
+
   return (
     <main id="main-content" className="min-h-screen" role="main">
       {/* Hero секция */}
@@ -299,7 +304,7 @@ export default function HomeClient() {
             <div className="flex items-center gap-2">
               <span className="text-2xl">🧠</span>
               <span className="font-semibold text-lg md:text-xl text-light/90">
-                {countEffects.toLocaleString('ru-RU')} эффектов
+                {loading ? <StatSkeleton /> : `${countEffects.toLocaleString('ru-RU')} эффектов`}
               </span>
             </div>
 
@@ -308,7 +313,7 @@ export default function HomeClient() {
             <div className="flex items-center gap-2">
               <span className="text-2xl">👥</span>
               <span className="font-semibold text-lg md:text-xl text-light/90">
-                {countParticipants.toLocaleString('ru-RU')} участников
+                {loading ? <StatSkeleton /> : `${countParticipants.toLocaleString('ru-RU')} участников`}
               </span>
             </div>
 
@@ -317,7 +322,7 @@ export default function HomeClient() {
             <div className="flex items-center gap-2">
               <span className="text-2xl">🗳️</span>
               <span className="font-semibold text-lg md:text-xl text-light/90">
-                {countVotes.toLocaleString('ru-RU')} голосов
+                {loading ? <StatSkeleton /> : `${countVotes.toLocaleString('ru-RU')} голосов`}
               </span>
             </div>
           </motion.div>
