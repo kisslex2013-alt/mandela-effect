@@ -95,7 +95,7 @@ export default function AdminClient({ effects: initialEffects, submissions: init
   const [recalculating, setRecalculating] = useState(false);
   
   // Быстрая генерация (для кнопок в списке)
-  const [quickLoading, setQuickLoading] = useState<{ id: string, type: 'data' | 'image' } | null>(null);
+  const [quickLoading, setQuickLoading] = useState<{ id: string, type: 'data' | 'image' | 'restyle' | 'fit' } | null>(null);
   
   // Модальное окно для увеличения картинки
   const [imageModalUrl, setImageModalUrl] = useState<string | null>(null);
