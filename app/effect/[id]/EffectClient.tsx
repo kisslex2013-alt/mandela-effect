@@ -11,20 +11,7 @@ import ImageWithSkeleton from '@/components/ui/ImageWithSkeleton';
 import { saveVote, getUserVote, migrateLocalVotes } from '@/app/actions/votes';
 import { getVisitorId, getLocalVotes, clearLocalVotes, saveLocalVote, needsMigration } from '@/lib/visitor';
 import type { EffectResult } from '@/app/actions/effects';
-
-// Маппинг категорий на эмодзи и названия
-const categoryMap: Record<string, { emoji: string; name: string }> = {
-  films: { emoji: '🎬', name: 'Фильмы/ТВ' },
-  brands: { emoji: '🏢', name: 'Бренды' },
-  music: { emoji: '🎵', name: 'Музыка' },
-  popculture: { emoji: '🎨', name: 'Поп-культура' },
-  childhood: { emoji: '🧸', name: 'Детство' },
-  people: { emoji: '👤', name: 'Люди' },
-  geography: { emoji: '🌍', name: 'География' },
-  history: { emoji: '📜', name: 'История' },
-  science: { emoji: '🔬', name: 'Наука' },
-  other: { emoji: '❓', name: 'Другое' },
-};
+import { getCategoryInfo } from '@/lib/constants';
 
 // Маппинг источников на URL (для старых данных с названиями вместо URL)
 const getSourceUrl = (source: string): string => {
@@ -110,7 +97,7 @@ export default function EffectClient({ effect: initialEffect, allEffects }: Effe
   const percentB = totalVotes > 0 ? (effect.votesAgainst / totalVotes) * 100 : 50;
 
   // Получаем информацию о категории
-  const catInfo = categoryMap[effect.category] || { emoji: '❓', name: effect.category };
+  const catInfo = getCategoryInfo(effect.category);
 
   // Принудительно кастим к any, чтобы проверить наличие данных
   const rawInterpretations = effect.interpretations as any;

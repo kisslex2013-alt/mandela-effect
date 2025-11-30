@@ -4,20 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Skeleton } from '@/components/Skeleton';
 import { getEffects, getStats } from '@/app/actions/effects';
-
-// Маппинг категорий
-const categoryMap: Record<string, { emoji: string; name: string }> = {
-  films: { emoji: '🎬', name: 'Фильмы/ТВ' },
-  brands: { emoji: '🏢', name: 'Бренды' },
-  music: { emoji: '🎵', name: 'Музыка' },
-  popculture: { emoji: '🎨', name: 'Поп-культура' },
-  childhood: { emoji: '🧸', name: 'Детство' },
-  people: { emoji: '👤', name: 'Люди' },
-  geography: { emoji: '🌍', name: 'География' },
-  history: { emoji: '📜', name: 'История' },
-  science: { emoji: '🔬', name: 'Наука' },
-  other: { emoji: '❓', name: 'Другое' },
-};
+import { getCategoryInfo } from '@/lib/constants';
 
 interface Effect {
   id: string;
@@ -119,7 +106,7 @@ export default function StatsPage() {
         
         // Преобразуем эффекты в нужный формат
         const allEffects: Effect[] = rawEffects.map((effect) => {
-          const catInfo = categoryMap[effect.category] || { emoji: '❓', name: 'Другое' };
+          const catInfo = getCategoryInfo(effect.category);
           return {
             id: effect.id,
             category: effect.category,

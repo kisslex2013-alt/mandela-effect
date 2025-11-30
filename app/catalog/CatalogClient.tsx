@@ -12,20 +12,7 @@ import EffectCard from '@/components/EffectCard';
 import { getEffects, getCategories, type EffectResult } from '@/app/actions/effects';
 import { getUserVotes } from '@/app/actions/votes';
 import { getVisitorId } from '@/lib/visitor';
-
-// Маппинг категорий на эмодзи и названия
-const categoryMap: Record<string, { emoji: string; name: string }> = {
-  films: { emoji: '🎬', name: 'Фильмы/ТВ' },
-  brands: { emoji: '🏢', name: 'Бренды' },
-  music: { emoji: '🎵', name: 'Музыка' },
-  popculture: { emoji: '🎨', name: 'Поп-культура' },
-  childhood: { emoji: '🧸', name: 'Детство' },
-  people: { emoji: '👤', name: 'Люди' },
-  geography: { emoji: '🌍', name: 'География' },
-  history: { emoji: '📜', name: 'История' },
-  science: { emoji: '🔬', name: 'Наука' },
-  other: { emoji: '❓', name: 'Другое' },
-};
+import { getCategoryInfo } from '@/lib/constants';
 
 interface CatalogClientProps {
   initialCategory?: string | null;
@@ -321,7 +308,7 @@ export default function CatalogClient({
                     <div className="border-t border-light/10 my-1" />
                     
                     {categories.map((category) => {
-                      const catInfo = categoryMap[category] || { emoji: '❓', name: category };
+                      const catInfo = getCategoryInfo(category);
                       const isSelected = selectedCategories.includes(category);
                       return (
                         <button
@@ -412,7 +399,7 @@ export default function CatalogClient({
                   effect.description.length > 100
                     ? `${effect.description.substring(0, 100)}...`
                     : effect.description;
-                const catInfo = categoryMap[effect.category] || { emoji: '❓', name: effect.category };
+                const catInfo = getCategoryInfo(effect.category);
 
                 return (
                   <motion.div

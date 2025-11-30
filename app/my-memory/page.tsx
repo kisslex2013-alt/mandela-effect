@@ -15,26 +15,13 @@ import ImageWithSkeleton from '@/components/ui/ImageWithSkeleton';
 import { getEffects, type EffectResult } from '@/app/actions/effects';
 import { getUserVotes as getUserVotesFromDB } from '@/app/actions/votes';
 import { getVisitorId } from '@/lib/visitor';
+import { getCategoryInfo } from '@/lib/constants';
 
 // Dynamic import только для DonutChart
 const DonutChart = dynamic(() => import('@/components/DonutChart').then(mod => ({ default: mod.DonutChart })), {
   loading: () => <Skeleton className="w-[200px] h-[200px] rounded-full" variant="circular" />,
   ssr: false,
 });
-
-// Маппинг категорий
-const categoryMap: Record<string, { emoji: string; name: string }> = {
-  films: { emoji: '🎬', name: 'Фильмы/ТВ' },
-  brands: { emoji: '🏢', name: 'Бренды' },
-  music: { emoji: '🎵', name: 'Музыка' },
-  popculture: { emoji: '🎨', name: 'Поп-культура' },
-  childhood: { emoji: '🧸', name: 'Детство' },
-  people: { emoji: '👤', name: 'Люди' },
-  geography: { emoji: '🌍', name: 'География' },
-  history: { emoji: '📜', name: 'История' },
-  science: { emoji: '🔬', name: 'Наука' },
-  other: { emoji: '❓', name: 'Другое' },
-};
 
 interface Vote {
   effectId: string; // Теперь string (cuid)
@@ -270,7 +257,7 @@ export default function MyMemoryPage() {
         const effectsMap = new Map<string, Effect>();
         allEffectsRaw.forEach((effect) => {
           const { variantA, variantB } = parseVariantsFromContent(effect.content);
-          const catInfo = categoryMap[effect.category] || { emoji: '❓', name: 'Другое' };
+          const catInfo = getCategoryInfo(effect.category);
           const totalVotes = effect.votesFor + effect.votesAgainst;
           const percentA = totalVotes > 0 ? Math.round((effect.votesFor / totalVotes) * 100 * 10) / 10 : 50;
           const percentB = totalVotes > 0 ? Math.round((effect.votesAgainst / totalVotes) * 100 * 10) / 10 : 50;

@@ -8,20 +8,7 @@ import { redirectToRandomEffect, getEffects, getStats, type EffectResult } from 
 import { HomeEmptyState, EffectCardSkeleton, ControversialSkeleton } from '@/components/EmptyState';
 import EffectCard from '@/components/EffectCard';
 import ImageWithSkeleton from '@/components/ui/ImageWithSkeleton';
-
-// Маппинг категорий на эмодзи
-const categoryEmojis: Record<string, string> = {
-  films: '🎬',
-  brands: '🏢',
-  music: '🎵',
-  popculture: '🎨',
-  childhood: '🧸',
-  people: '👤',
-  geography: '🌍',
-  history: '📜',
-  science: '🔬',
-  other: '❓',
-};
+import { getCategoryInfo } from '@/lib/constants';
 
 interface MostControversialEffect extends EffectResult {
   controversy: number;
@@ -382,7 +369,7 @@ export default function HomeClient() {
 
                 <div className="p-8">
                   <div className="flex items-center gap-3 mb-4">
-                    <span className="text-3xl">{categoryEmojis[mostControversial.category] || '❓'}</span>
+                    <span className="text-3xl">{getCategoryInfo(mostControversial.category).emoji}</span>
                     <h3 className="text-2xl md:text-3xl font-bold text-light">
                       {mostControversial.title}
                     </h3>
@@ -479,7 +466,7 @@ export default function HomeClient() {
                       title={effect.title}
                       description={effect.description}
                       category={effect.category}
-                      categoryEmoji={categoryEmojis[effect.category]}
+                      categoryEmoji={getCategoryInfo(effect.category).emoji}
                       imageUrl={effect.imageUrl}
                       votesFor={effect.votesFor}
                       votesAgainst={effect.votesAgainst}
@@ -527,7 +514,7 @@ export default function HomeClient() {
                     title={effect.title}
                     description={effect.description}
                     category={effect.category}
-                    categoryEmoji={categoryEmojis[effect.category]}
+                    categoryEmoji={getCategoryInfo(effect.category).emoji}
                     imageUrl={effect.imageUrl}
                   votesFor={effect.votesFor}
                   votesAgainst={effect.votesAgainst}

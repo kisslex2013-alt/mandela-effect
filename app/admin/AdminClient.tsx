@@ -6,12 +6,14 @@ import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { updateEffect, deleteEffect, logout, approveSubmission, rejectSubmission, createEffect } from '@/app/actions/admin';
 import { generateEffectData } from '@/app/actions/generate-content';
+import { findNewEffects } from '@/app/actions/find-new-effects';
 import { getCategories, createCategory, updateCategory, deleteCategory, type Category } from '@/app/actions/category';
 import { recalculateAllVoteCounters } from '@/app/actions/recalculate-votes';
 import CustomSelect, { type SelectOption } from '@/components/ui/CustomSelect';
 import EmojiPickerInput from '@/components/ui/EmojiPickerInput';
 import ImageWithSkeleton from '@/components/ui/ImageWithSkeleton';
 import toast from 'react-hot-toast';
+import { CATEGORY_MAP, getCategoryInfo } from '@/lib/constants';
 
 interface Effect {
   id: string;
@@ -58,25 +60,6 @@ interface AdminClientProps {
 // Типы вкладок
 type TabType = 'effects' | 'submissions' | 'categories';
 
-// Цвета для категорий (маппинг color -> tailwind классы)
-const colorMap: Record<string, string> = {
-  red: 'bg-red-500/20 text-red-400 border-red-500/30',
-  blue: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-  purple: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
-  pink: 'bg-pink-500/20 text-pink-400 border-pink-500/30',
-  yellow: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-  cyan: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
-  green: 'bg-green-500/20 text-green-400 border-green-500/30',
-  amber: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-  indigo: 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30',
-  rose: 'bg-rose-500/20 text-rose-400 border-rose-500/30',
-  gray: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
-};
-
-// Функция для получения цвета категории
-function getCategoryColor(color: string | null): string {
-  return colorMap[color || 'gray'] || colorMap.gray;
-}
 
 // Типы сортировки
 type SortType = 'newest' | 'popular' | 'alphabetical' | 'incomplete';
@@ -118,6 +101,12 @@ export default function AdminClient({ effects: initialEffects, submissions: init
     url: ''
   });
 
+  // Агент-Охотник (Finder)
+  const [isFinderOpen, setIsFinderOpen] = useState(false);
+  const [foundEffects, setFoundEffects] = useState<any[]>([]);
+  const [finderLoading, setFinderLoading] = useState(false);
+  const [selectedFound, setSelectedFound] = useState<Set<number>>(new Set());
+
   
   // Закрытие модального окна по ESC
   useEffect(() => {
@@ -129,12 +118,15 @@ export default function AdminClient({ effects: initialEffects, submissions: init
         if (manualImageState.isOpen) {
           setManualImageState({ ...manualImageState, isOpen: false });
         }
+        if (isFinderOpen && !finderLoading) {
+          setIsFinderOpen(false);
+        }
       }
     };
     
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
-  }, [imageModalUrl, manualImageState]);
+  }, [imageModalUrl, manualImageState, isFinderOpen, finderLoading]);
   
   // Категории - редактирование
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -209,18 +201,6 @@ export default function AdminClient({ effects: initialEffects, submissions: init
     return Array.from(cats).sort();
   }, [effects]);
 
-  // Маппинг категорий из БД (для отображения)
-  const categoryMap = useMemo(() => {
-    const map: Record<string, { emoji: string; name: string; color: string }> = {};
-    categories.forEach((cat) => {
-      map[cat.slug] = {
-        emoji: cat.emoji,
-        name: cat.name,
-        color: getCategoryColor(cat.color),
-      };
-    });
-    return map;
-  }, [categories]);
 
   // Опции для CustomSelect
   const categoryOptions: SelectOption[] = useMemo(() => {
@@ -292,14 +272,12 @@ export default function AdminClient({ effects: initialEffects, submissions: init
   const effectsByCategory = useMemo(() => {
     const groups: Record<string, Effect[]> = {};
 
-    // Получаем все слаги категорий и сортируем (other в конце)
-    const sortedCats = categories
-      .map(cat => cat.slug)
-      .sort((a, b) => {
-        if (a === 'other') return 1;
-        if (b === 'other') return -1;
-        return a.localeCompare(b, 'ru');
-      });
+    // Получаем все слаги категорий из константы и сортируем (other в конце)
+    const sortedCats = Object.keys(CATEGORY_MAP).sort((a, b) => {
+      if (a === 'other') return 1;
+      if (b === 'other') return -1;
+      return a.localeCompare(b, 'ru');
+    });
 
     sortedCats.forEach(cat => {
       const catEffects = filteredEffects.filter(e => e.category === cat);
@@ -309,13 +287,13 @@ export default function AdminClient({ effects: initialEffects, submissions: init
     });
 
     // Добавляем те, что не попали в категории (на всякий случай)
-    const otherEffects = filteredEffects.filter(e => !categoryMap[e.category]);
+    const otherEffects = filteredEffects.filter(e => !CATEGORY_MAP[e.category]);
     if (otherEffects.length > 0) {
       groups['other'] = [...(groups['other'] || []), ...otherEffects];
     }
 
     return groups;
-  }, [filteredEffects, categoryMap, categories]);
+  }, [filteredEffects]);
 
   // Открыть редактирование
   const handleEdit = (effect: Effect) => {
@@ -1148,6 +1126,62 @@ export default function AdminClient({ effects: initialEffects, submissions: init
     }
   };
 
+  // Агент-Охотник: Поиск новых эффектов
+  const handleFindNewEffects = async () => {
+    setFinderLoading(true);
+    setFoundEffects([]);
+    setSelectedFound(new Set());
+    
+    try {
+      // Получаем список существующих заголовков
+      const existingTitles = effects.map(e => e.title);
+      
+      toast.loading('Сканирую ноосферу...', { id: 'finder' });
+      
+      const result = await findNewEffects(existingTitles);
+      
+      if (result.success && result.effects) {
+        setFoundEffects(result.effects);
+        // По умолчанию выбираем все
+        setSelectedFound(new Set(result.effects.map((_, i) => i)));
+        toast.success(`Найдено ${result.effects.length} эффектов`, { id: 'finder' });
+      } else {
+        toast.error(result.error || 'Ошибка поиска', { id: 'finder' });
+      }
+    } catch (error: any) {
+      console.error('[handleFindNewEffects] Ошибка:', error);
+      toast.error(error.message || 'Произошла ошибка при поиске', { id: 'finder' });
+    } finally {
+      setFinderLoading(false);
+    }
+  };
+
+  // Добавление выбранных эффектов в массовую генерацию
+  const handleAddSelectedToBulk = () => {
+    const selected = Array.from(selectedFound)
+      .map(i => foundEffects[i])
+      .filter(Boolean);
+    
+    if (selected.length === 0) {
+      toast.error('Выберите хотя бы один эффект');
+      return;
+    }
+    
+    // Формируем JSON
+    const jsonString = JSON.stringify(selected, null, 2);
+    
+    // Устанавливаем в bulkInput
+    setBulkInput(jsonString);
+    
+    // Закрываем окно поиска
+    setIsFinderOpen(false);
+    
+    // Открываем окно массовой генерации
+    setIsBulkGenerating(true);
+    
+    toast.success(`Добавлено ${selected.length} эффектов в массовую генерацию`);
+  };
+
   // Массовая генерация эффектов через AI
   const handleBulkGenerate = async () => {
     // Умный парсинг JSON с очисткой от Markdown и форматирования
@@ -1495,6 +1529,16 @@ export default function AdminClient({ effects: initialEffects, submissions: init
               Массовая генерация
             </button>
             <button
+              onClick={() => {
+                setIsFinderOpen(true);
+                handleFindNewEffects();
+              }}
+              className="px-4 py-2 bg-cyan-500/20 text-cyan-400 rounded-lg hover:bg-cyan-500/30 transition-colors flex items-center gap-2"
+            >
+              <span>🕵️</span>
+              Найти новые
+            </button>
+            <button
               onClick={handleLogout}
               className="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors"
             >
@@ -1576,12 +1620,12 @@ export default function AdminClient({ effects: initialEffects, submissions: init
           <div className="bg-darkCard p-5 rounded-xl border border-light/10 hover:border-green-500/30 transition-colors">
             <div className="flex items-center gap-3 mb-2">
               <div className="w-10 h-10 rounded-lg bg-green-500/20 flex items-center justify-center">
-                <span className="text-xl">{categoryMap[stats.topCategory]?.emoji || '❓'}</span>
+                <span className="text-xl">{getCategoryInfo(stats.topCategory).emoji}</span>
               </div>
               <div className="text-3xl font-bold text-green-400">{stats.topCategoryCount}</div>
             </div>
             <div className="text-sm text-light/60">
-              Топ: {categoryMap[stats.topCategory]?.name || 'Другое'}
+              Топ: {getCategoryInfo(stats.topCategory).name}
             </div>
           </div>
           
@@ -1670,13 +1714,13 @@ export default function AdminClient({ effects: initialEffects, submissions: init
             Object.entries(effectsByCategory).map(([category, items]) => (
               <div key={category} className="mb-8">
                 <h3 className="text-xl font-bold text-light mb-4 flex items-center gap-2 border-b border-light/10 pb-2">
-                  <span>{categoryMap[category]?.emoji || '📂'}</span>
-                  {categoryMap[category]?.name || category}
+                  <span>{getCategoryInfo(category).emoji}</span>
+                  {getCategoryInfo(category).name}
                   <span className="text-sm font-normal text-light/40 ml-2">({items.length})</span>
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                   {items.map((effect) => {
-              const catInfo = categoryMap[effect.category] || { emoji: '❓', name: effect.category, color: 'bg-gray-500/20 text-gray-400 border-gray-500/30' };
+              const catInfo = getCategoryInfo(effect.category);
               const totalVotes = effect.votesFor + effect.votesAgainst;
               const percentA = totalVotes > 0 ? Math.round((effect.votesFor / totalVotes) * 100) : 50;
               
@@ -1936,11 +1980,7 @@ export default function AdminClient({ effects: initialEffects, submissions: init
               </div>
             ) : (
               submissions.map((submission) => {
-                const catInfo = categoryMap[submission.category] || {
-                  emoji: '❓',
-                  name: submission.category,
-                  color: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
-                };
+                const catInfo = getCategoryInfo(submission.category);
 
                 return (
                   <motion.div
@@ -2094,7 +2134,7 @@ export default function AdminClient({ effects: initialEffects, submissions: init
                         slug: <code className="bg-dark px-1 rounded">{category.slug}</code>
                         {category.color && (
                           <span className="ml-2">
-                            цвет: <span className={`px-2 py-0.5 rounded ${getCategoryColor(category.color)}`}>{category.color}</span>
+                            цвет: <span className={`px-2 py-0.5 rounded ${getCategoryInfo(category.slug).color}`}>{category.color}</span>
                           </span>
                         )}
                         <span className="ml-2">порядок: {category.sortOrder}</span>
@@ -3275,6 +3315,203 @@ export default function AdminClient({ effects: initialEffects, submissions: init
                 {!bulkRunning && (
                   <button
                     onClick={() => setIsBulkGenerating(false)}
+                    className="w-full mt-4 px-6 py-3 bg-light/10 text-light font-medium rounded-xl hover:bg-light/20 transition-colors"
+                  >
+                    Закрыть
+                  </button>
+                )}
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Модальное окно Агент-Охотник (Finder) */}
+        <AnimatePresence>
+          {isFinderOpen && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50 overflow-y-auto"
+              onClick={() => !finderLoading && setIsFinderOpen(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-darkCard p-6 md:p-8 rounded-2xl border border-light/10 max-w-6xl w-full my-8 max-h-[90vh] overflow-y-auto"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <h2 className="text-2xl font-bold text-light mb-4 flex items-center gap-3">
+                  <span>🕵️</span>
+                  Результаты поиска
+                </h2>
+
+                {/* Загрузка */}
+                {finderLoading && (
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <svg className="animate-spin h-12 w-12 text-cyan-400 mb-4" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    <p className="text-light/60 text-lg">Сканирую ноосферу...</p>
+                  </div>
+                )}
+
+                {/* Результаты */}
+                {!finderLoading && foundEffects.length > 0 && (
+                  <>
+                    <div className="mb-4 flex items-center justify-between">
+                      <p className="text-light/60">
+                        Найдено эффектов: <span className="text-cyan-400 font-semibold">{foundEffects.length}</span>
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            if (selectedFound.size === foundEffects.length) {
+                              setSelectedFound(new Set());
+                            } else {
+                              setSelectedFound(new Set(foundEffects.map((_, i) => i)));
+                            }
+                          }}
+                          className="px-3 py-1.5 text-sm bg-white/5 text-light/70 hover:bg-white/10 rounded-lg transition-colors"
+                        >
+                          {selectedFound.size === foundEffects.length ? 'Снять все' : 'Выбрать все'}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+                      {foundEffects.map((effect, index) => {
+                        const isSelected = selectedFound.has(index);
+                        const categoryInfo = getCategoryInfo(effect.category || 'other');
+                        
+                        return (
+                          <div
+                            key={index}
+                            className={`p-4 rounded-xl border transition-all ${
+                              isSelected
+                                ? 'bg-cyan-500/10 border-cyan-500/30'
+                                : 'bg-dark/50 border-light/10 hover:border-light/20'
+                            }`}
+                          >
+                            <div className="flex items-start gap-3">
+                              {/* Чекбокс */}
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={(e) => {
+                                  const newSelected = new Set(selectedFound);
+                                  if (e.target.checked) {
+                                    newSelected.add(index);
+                                  } else {
+                                    newSelected.delete(index);
+                                  }
+                                  setSelectedFound(newSelected);
+                                }}
+                                className="mt-1 w-4 h-4 rounded border-light/30 bg-dark text-cyan-400 focus:ring-cyan-400 focus:ring-2"
+                              />
+                              
+                              {/* Контент */}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-start justify-between gap-2 mb-2">
+                                  <div className="flex-1">
+                                    <h3 className="text-light font-semibold text-lg mb-1">
+                                      {effect.title}
+                                    </h3>
+                                    <p className="text-light/60 text-sm mb-2">
+                                      {effect.question}
+                                    </p>
+                                  </div>
+                                  <span className={`px-2 py-1 rounded-lg text-xs font-medium whitespace-nowrap ${categoryInfo.color}`}>
+                                    {categoryInfo.emoji} {categoryInfo.name}
+                                  </span>
+                                </div>
+                                
+                                {/* Варианты */}
+                                <div className="grid grid-cols-2 gap-2 mb-3">
+                                  <div className="p-2 bg-red-500/10 border border-red-500/20 rounded-lg">
+                                    <p className="text-xs text-red-400/60 mb-1">Вариант А (ложное)</p>
+                                    <p className="text-light text-sm">{effect.variantA}</p>
+                                  </div>
+                                  <div className="p-2 bg-green-500/10 border border-green-500/20 rounded-lg">
+                                    <p className="text-xs text-green-400/60 mb-1">Вариант Б (реальность)</p>
+                                    <p className="text-light text-sm">{effect.variantB}</p>
+                                  </div>
+                                </div>
+                                
+                                {/* Действия */}
+                                <div className="flex items-center gap-2">
+                                  {effect.sourceUrl && (
+                                    <a
+                                      href={effect.sourceUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="px-3 py-1.5 text-sm bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30 transition-colors flex items-center gap-1"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      🔗 Источник
+                                    </a>
+                                  )}
+                                  <button
+                                    onClick={() => {
+                                      const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(effect.title + ' Mandela effect')}`;
+                                      window.open(searchUrl, '_blank');
+                                    }}
+                                    className="px-3 py-1.5 text-sm bg-white/5 text-light/70 rounded-lg hover:bg-white/10 transition-colors flex items-center gap-1"
+                                    title="Поиск в Google"
+                                  >
+                                    🔍 Google
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Футер */}
+                    <div className="mt-6 pt-4 border-t border-light/10 flex items-center justify-between">
+                      <p className="text-light/60 text-sm">
+                        Выбрано: <span className="text-cyan-400 font-semibold">{selectedFound.size}</span> из {foundEffects.length}
+                      </p>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => setIsFinderOpen(false)}
+                          className="px-6 py-3 bg-light/10 text-light font-medium rounded-xl hover:bg-light/20 transition-colors"
+                        >
+                          Отмена
+                        </button>
+                        <button
+                          onClick={handleAddSelectedToBulk}
+                          disabled={selectedFound.size === 0}
+                          className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        >
+                          Добавить выбранные ({selectedFound.size})
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* Нет результатов */}
+                {!finderLoading && foundEffects.length === 0 && (
+                  <div className="text-center py-12">
+                    <p className="text-light/60 text-lg mb-4">Эффекты не найдены</p>
+                    <button
+                      onClick={handleFindNewEffects}
+                      className="px-6 py-3 bg-cyan-500/20 text-cyan-400 rounded-xl hover:bg-cyan-500/30 transition-colors"
+                    >
+                      Попробовать снова
+                    </button>
+                  </div>
+                )}
+
+                {/* Кнопка закрытия */}
+                {!finderLoading && (
+                  <button
+                    onClick={() => setIsFinderOpen(false)}
                     className="w-full mt-4 px-6 py-3 bg-light/10 text-light font-medium rounded-xl hover:bg-light/20 transition-colors"
                   >
                     Закрыть
