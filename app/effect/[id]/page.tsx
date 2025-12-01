@@ -1,23 +1,41 @@
-import { notFound } from 'next/navigation';
+import { Metadata } from 'next';
 import { getEffectById, getEffects } from '@/app/actions/effects';
 import EffectClient from './EffectClient';
+import { notFound } from 'next/navigation';
 
 interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-export default async function EffectPage({ params }: PageProps) {
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { id } = await params;
-  
-  // Загружаем эффект по ID
   const effect = await getEffectById(id);
   
+  if (!effect) {
+    return {
+      title: 'Эффект не найден',
+    };
+  }
+
+  return {
+    title: `${effect.title} | Эффект Манделы`,
+    description: effect.description,
+  };
+}
+
+export default async function EffectPage({ params }: PageProps) {
+  const { id } = await params;
+  const effect = await getEffectById(id);
+
   if (!effect) {
     notFound();
   }
 
-  // Загружаем все эффекты для навигации
-  const allEffects = await getEffects({ limit: 100 });
+  // Приведение типа interpretations к нужному формату
+  const serializedEffect = {
+    ...effect,
+    interpretations: effect.interpretations as Record<string, string> | null
+  };
 
-  return <EffectClient effect={effect} allEffects={allEffects} />;
+  return <EffectClient effect={serializedEffect} />;
 }
