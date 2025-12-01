@@ -38,7 +38,7 @@ export interface EffectResult {
   sourceLink?: string | null;
   scientificSource?: string | null;
   communitySource?: string | null;
-  currentState?: string | null;
+  currentState: string | null; // <-- Обязательное поле
   createdAt: string;
   updatedAt: string;
 }
@@ -61,6 +61,7 @@ interface PrismaEffect {
   historySource: string | null;
   yearDiscovered: number | null;
   similarEffectIds: string[];
+  currentState: string | null; // <-- Добавлено
   interpretations: Prisma.JsonValue;
   createdAt: Date;
   updatedAt: Date;
@@ -112,7 +113,8 @@ function serializeEffect(effect: PrismaEffect): EffectResult {
     sourceLink: sourceLink || null,
     scientificSource: scientificSource || null,
     communitySource: communitySource || null,
-    currentState: currentState || null,
+    // Используем currentState из БД, если есть, иначе из interpretations
+    currentState: effect.currentState || currentState || null,
     createdAt: effect.createdAt.toISOString(),
     updatedAt: effect.updatedAt.toISOString(),
   };
@@ -207,6 +209,7 @@ export async function getEffects(params: GetEffectsParams = {}): Promise<EffectR
         historySource: true,
         yearDiscovered: true,
         similarEffectIds: true,
+        currentState: true, // <-- Добавлено
         interpretations: true,
         createdAt: true,
         updatedAt: true,
@@ -267,7 +270,8 @@ export async function getEffectById(id: string): Promise<EffectResult | null> {
         historySource: true,
         yearDiscovered: true,
         similarEffectIds: true,
-        interpretations: true, // JSON поле, может содержать sourceLink, scientificSource, communitySource, currentState
+        currentState: true, // <-- Добавлено
+        interpretations: true, // JSON поле, может содержать sourceLink, scientificSource, communitySource
         createdAt: true,
         updatedAt: true,
       },
@@ -447,6 +451,7 @@ export async function getQuizEffects(limit: number = 10, visitorId?: string): Pr
         historySource: true,
         yearDiscovered: true,
         similarEffectIds: true,
+        currentState: true, // <-- Добавлено
         interpretations: true,
         createdAt: true,
         updatedAt: true,

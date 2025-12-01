@@ -35,6 +35,7 @@ model Effect {
   historySource    String?   // Ссылка для истории
   yearDiscovered   Int?
   similarEffectIds String[]  @default([]) // Массив ID похожих
+  currentState     String?   // Текущее состояние (факты)
   
   // Интерпретации (научные объяснения и версии сообщества)
   interpretations  Json?
