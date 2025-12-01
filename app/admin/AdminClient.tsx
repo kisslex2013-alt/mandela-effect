@@ -221,7 +221,7 @@ export default function AdminClient({ effects: initialEffects, submissions: init
     if (result.success) {
         setSubmissions(prev => prev.filter(s => s.id !== id));
         toast.success('Заявка отклонена');
-    } else toast.error('Ошибка отклонения');
+    } else toast.error(result.error || 'Ошибка');
   };
 
   // --- ЛОГИКА КАТЕГОРИЙ ---
@@ -240,14 +240,14 @@ export default function AdminClient({ effects: initialEffects, submissions: init
                 setCategories(prev => prev.map(c => c.id === editingCategory.id ? result.category! : c));
                 setEditingCategory(null);
                 toast.success('Категория обновлена');
-            } else toast.error(result.error);
+            } else toast.error(result.error || 'Ошибка');
         } else {
             const result = await createCategory({ ...categoryForm, color: categoryForm.color || null });
             if (result.success) {
                 setCategories(prev => [...prev, result.category!]);
                 setIsCreatingCategory(false);
                 toast.success('Категория создана');
-            } else toast.error(result.error);
+            } else toast.error(result.error || 'Ошибка');
         }
     } catch(e) { toast.error('Ошибка сохранения'); } finally { setLoading(false); }
   };
@@ -258,7 +258,7 @@ export default function AdminClient({ effects: initialEffects, submissions: init
     if(result.success) {
         setCategories(prev => prev.filter(c => c.id !== id));
         toast.success('Категория удалена');
-    } else toast.error(result.error);
+    } else toast.error(result.error || 'Ошибка');
   };
 
   const handleLogout = async () => { await logout(); router.refresh(); };
