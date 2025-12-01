@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import PageTransition from '@/components/PageTransition';
+import { Brain, FileText, Lightbulb, ChevronRight } from 'lucide-react';
 
 export default function AboutPage() {
   return (
@@ -23,7 +24,10 @@ export default function AboutPage() {
             </p>
 
             <div className="bg-darkCard rounded-2xl p-6 border border-light/10 my-8">
-              <h2 className="text-2xl font-bold text-light mb-4">🧠 Почему это происходит?</h2>
+              <h2 className="text-2xl font-bold text-light mb-4 flex items-center gap-2">
+                <Brain className="w-6 h-6 text-primary" />
+                Почему это происходит?
+              </h2>
               <ul className="space-y-3 text-light/70">
                 <li className="flex items-start gap-3">
                   <span className="text-primary">•</span>
@@ -41,7 +45,10 @@ export default function AboutPage() {
             </div>
 
             <div className="bg-darkCard rounded-2xl p-6 border border-light/10 my-8">
-              <h2 className="text-2xl font-bold text-light mb-4">📋 Известные примеры</h2>
+              <h2 className="text-2xl font-bold text-light mb-4 flex items-center gap-2">
+                <FileText className="w-6 h-6 text-secondary" />
+                Известные примеры
+              </h2>
               <ul className="space-y-3 text-light/70">
                 <li className="flex items-start gap-3">
                   <span className="text-secondary">•</span>
@@ -70,9 +77,7 @@ export default function AboutPage() {
               className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-primary to-secondary text-white rounded-xl font-bold hover:opacity-90 transition-opacity shadow-lg shadow-primary/30"
             >
               <span>Исследовать каталог</span>
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-              </svg>
+              <ChevronRight className="w-5 h-5" />
             </Link>
           </div>
         </div>

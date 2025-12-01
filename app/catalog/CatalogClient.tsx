@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import Loading from '@/components/Loading';
@@ -13,6 +14,8 @@ import { getEffects, getCategories, type EffectResult } from '@/app/actions/effe
 import { getUserVotes } from '@/app/actions/votes';
 import { getVisitorId } from '@/lib/visitor';
 import { getCategoryInfo } from '@/lib/constants';
+import { votesStore } from '@/lib/votes-store';
+import { Filter, SortAsc, Film, Music, Tag, User, Globe, Gamepad2, Baby, Ghost, HelpCircle, LayoutGrid, Search, X, Flame, Scale, Clock, AArrowUp, ChevronDown, Check } from 'lucide-react';
 
 interface CatalogClientProps {
   initialCategory?: string | null;
@@ -23,18 +26,45 @@ type SortOption = 'popularity' | 'controversy' | 'newest' | 'alphabetical';
 export default function CatalogClient({ 
   initialCategory = null
 }: CatalogClientProps) {
+  // Функция выбора иконки для категории
+  const getCategoryIcon = (slug: string, className = "w-5 h-5") => {
+    switch (slug) {
+      case 'films': return <Film className={className} />;
+      case 'music': return <Music className={className} />;
+      case 'brands': return <Tag className={className} />;
+      case 'people': return <User className={className} />;
+      case 'geography': return <Globe className={className} />;
+      case 'popculture': return <Gamepad2 className={className} />;
+      case 'childhood': return <Baby className={className} />;
+      case 'russian': return <Ghost className={className} />;
+      default: return <HelpCircle className={className} />;
+    }
+  };
+
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  
   const [allEffects, setAllEffects] = useState<EffectResult[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [votedEffectIds, setVotedEffectIds] = useState<string[]>([]);
   
-  // Фильтры
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategories, setSelectedCategories] = useState<string[]>(
-    initialCategory ? [initialCategory] : []
+  // Фильтры - инициализация из URL параметров
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(() => {
+    const urlCategory = searchParams.get('category');
+    if (urlCategory) {
+      return urlCategory.split(',').filter(Boolean);
+    }
+    return initialCategory ? [initialCategory] : [];
+  });
+  const [sortBy, setSortBy] = useState<SortOption>(
+    (searchParams.get('sort') as SortOption) || 'popularity'
   );
-  const [sortBy, setSortBy] = useState<SortOption>('popularity');
-  const [onlyUnvoted, setOnlyUnvoted] = useState(false);
+  const [onlyUnvoted, setOnlyUnvoted] = useState(
+    searchParams.get('unvoted') === 'true'
+  );
   const [isCategoriesOpen, setIsCategoriesOpen] = useState(false);
 
   // Debounce для поиска
@@ -66,18 +96,13 @@ export default function CatalogClient({
       }
     }
 
-    // 2. Добавляем голоса из localStorage (fallback)
-    if (typeof window !== 'undefined') {
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith('voted_effect_')) {
-          const id = key.replace('voted_effect_', '');
-          if (!votedIds.includes(id)) {
-            votedIds.push(id);
-          }
-        }
+    // 2. Добавляем голоса из votesStore (fallback)
+    const localVotes = votesStore.get();
+    Object.keys(localVotes).forEach((effectId) => {
+      if (!votedIds.includes(effectId)) {
+        votedIds.push(effectId);
       }
-    }
+    });
 
     return votedIds;
   };
@@ -113,10 +138,10 @@ export default function CatalogClient({
       setVotedEffectIds(votedIds);
     };
     
-    window.addEventListener('voteUpdated', handleVoteUpdate);
+    window.addEventListener('votes-updated', handleVoteUpdate);
 
     return () => {
-      window.removeEventListener('voteUpdated', handleVoteUpdate);
+      window.removeEventListener('votes-updated', handleVoteUpdate);
     };
   }, []);
 
@@ -195,6 +220,21 @@ export default function CatalogClient({
     }
   };
 
+  // Синхронизация фильтров с URL
+  useEffect(() => {
+    if (loading) return; // Не обновляем URL, пока идет первая загрузка
+
+    const params = new URLSearchParams();
+    
+    if (searchQuery) params.set('q', searchQuery);
+    if (selectedCategories.length > 0) params.set('category', selectedCategories.join(','));
+    if (sortBy !== 'popularity') params.set('sort', sortBy);
+    if (onlyUnvoted) params.set('unvoted', 'true');
+
+    const newUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname;
+    router.replace(newUrl, { scroll: false });
+  }, [searchQuery, selectedCategories, sortBy, onlyUnvoted, loading, pathname, router]);
+
   // Закрытие dropdown при клике вне
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -236,14 +276,20 @@ export default function CatalogClient({
           <div className="relative">
             <input
               type="text"
-              placeholder="🔍 Поиск по названию или вопросу..."
+              placeholder="Поиск по названию или вопросу..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-4 py-3 pl-12 bg-dark rounded-lg text-light placeholder:text-light/40 focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full px-4 py-3 pl-12 bg-dark rounded-lg text-light placeholder:text-light/40 focus:outline-none focus:ring-2 focus:ring-primary border border-light/10"
             />
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl">
-              🔍
-            </span>
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-light/40" />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-light/40 hover:text-light transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -263,7 +309,7 @@ export default function CatalogClient({
                 onClick={() => setIsCategoriesOpen(!isCategoriesOpen)}
               >
                 <span className="flex items-center gap-2">
-                  <span>🏷️</span>
+                  <Filter className="w-5 h-5" />
                   <span>
                     Категории{' '}
                     {selectedCategories.length > 0 && (
@@ -271,14 +317,9 @@ export default function CatalogClient({
                     )}
                   </span>
                 </span>
-                <svg
+                <ChevronDown
                   className={`w-5 h-5 text-light/40 transition-transform duration-200 ${isCategoriesOpen ? 'rotate-180' : ''}`}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
+                />
               </button>
               <AnimatePresence>
                 {isCategoriesOpen && (
@@ -304,13 +345,11 @@ export default function CatalogClient({
                       `}
                     >
                       <span className="flex items-center gap-2">
-                        <span>📋</span>
+                        <LayoutGrid className="w-4 h-4" />
                         <span>Все категории</span>
                       </span>
                       {selectedCategories.length === sortedCategories.length && (
-                        <svg className="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
+                        <Check className="w-4 h-4 text-primary" />
                       )}
                     </button>
                     
@@ -334,13 +373,11 @@ export default function CatalogClient({
                           `}
                         >
                           <span className="flex items-center gap-2">
-                            <span className="text-lg">{catInfo.emoji}</span>
+                            {getCategoryIcon(category, "w-5 h-5")}
                             <span>{catInfo.name}</span>
                           </span>
                           {isSelected && (
-                            <svg className="w-4 h-4 text-primary" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                            </svg>
+                            <Check className="w-4 h-4 text-primary" />
                           )}
                         </button>
                       );
@@ -355,10 +392,10 @@ export default function CatalogClient({
               value={sortBy}
               onChange={(val) => setSortBy(val as SortOption)}
               options={[
-                { value: 'popularity', label: 'По популярности', emoji: '🔥' },
-                { value: 'controversy', label: 'По спорности', emoji: '⚖️' },
-                { value: 'newest', label: 'По новизне', emoji: '⏰' },
-                { value: 'alphabetical', label: 'По алфавиту', emoji: '🔤' },
+                { value: 'popularity', label: 'По популярности', icon: <Flame className="w-4 h-4" /> },
+                { value: 'controversy', label: 'По спорности', icon: <Scale className="w-4 h-4" /> },
+                { value: 'newest', label: 'По новизне', icon: <Clock className="w-4 h-4" /> },
+                { value: 'alphabetical', label: 'По алфавиту', icon: <AArrowUp className="w-4 h-4" /> },
               ]}
               placeholder="Сортировка"
             />
@@ -384,9 +421,9 @@ export default function CatalogClient({
         {loading ? (
           <Loading text="Загружаем эффекты..." size="lg" />
         ) : filteredAndSortedEffects.length === 0 ? (
-          <div className="bg-darkCard p-8 rounded-xl">
+          <div className="bg-darkCard p-8 rounded-xl border border-light/10">
             <EmptyState
-              icon="🔍"
+              icon={<Search className="w-12 h-12 text-light/40" />}
               title="Эффектов не найдено"
               description="Попробуй выбрать другую категорию или сбросить фильтры"
             />
@@ -437,8 +474,7 @@ export default function CatalogClient({
                       id={effect.id}
                       title={effect.title}
                       description={questionPreview}
-                      category={catInfo.name}
-                      categoryEmoji={catInfo.emoji}
+                      category={effect.category}
                       imageUrl={effect.imageUrl}
                       votesFor={effect.votesFor}
                       votesAgainst={effect.votesAgainst}

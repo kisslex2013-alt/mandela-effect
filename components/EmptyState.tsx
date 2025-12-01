@@ -2,9 +2,10 @@
 
 import Link from 'next/link';
 import { motion } from 'framer-motion';
+import { ReactNode } from 'react';
 
 interface EmptyStateProps {
-  icon?: string;
+  icon?: string | ReactNode;
   title: string;
   description: string;
   actionText?: string;
@@ -32,7 +33,13 @@ export default function EmptyState({
       transition={{ duration: 0.5 }}
       className="bg-darkCard p-8 md:p-12 rounded-2xl border border-light/10 text-center"
     >
-      <div className="text-6xl mb-6">{icon}</div>
+      <div className="flex justify-center mb-6">
+        {typeof icon === 'string' ? (
+          <span className="text-6xl">{icon}</span>
+        ) : (
+          icon
+        )}
+      </div>
       
       <h3 className="text-2xl font-bold text-light mb-3">{title}</h3>
       

@@ -112,3 +112,17 @@ model UserProfile {
   
   @@index([email])
 }
+
+// Результаты генерации цифрового ID Хроно-Путешественника
+model IdentityResult {
+  id          String   @id @default(cuid())
+  syncRate    Int      // Процент синхронизации с текущей реальностью (0-100)
+  archetype   String   // Заголовок (например: "Сквозной Дрифтер")
+  description String   // Уникальное описание от AI
+  stats       Json?    // Хранение статистики по категориям { "films": 80, "brands": 20 }
+  createdAt   DateTime @default(now())
+  
+  // Опциональная связь, если пользователь авторизован
+  userId      String?
+  // user User? @relation... (пока не добавляем связь жестко, чтобы не ломать текущую User модель если она есть)
+}

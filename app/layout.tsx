@@ -6,6 +6,7 @@ import Footer from "@/components/Footer";
 import ScrollToTop from "@/components/ScrollToTop";
 import { Toaster } from "react-hot-toast";
 import { Analytics } from "@vercel/analytics/react";
+import SoundToggle from "@/components/ui/SoundToggle";
 
 const inter = Inter({
   subsets: ["latin", "cyrillic"],
@@ -93,6 +94,7 @@ export default function RootLayout({
         {children}
         <Footer />
         <ScrollToTop />
+        <SoundToggle />
         <Analytics />
       </body>
     </html>

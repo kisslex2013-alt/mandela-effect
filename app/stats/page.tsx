@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Skeleton } from '@/components/Skeleton';
 import { getEffects, getStats } from '@/app/actions/effects';
 import { getCategoryInfo } from '@/lib/constants';
+import { Brain, Users, MessageSquare, Flame, Trophy, Activity, BarChart3, AlertTriangle, CheckCircle } from 'lucide-react';
 
 interface Effect {
   id: string;
@@ -64,13 +65,13 @@ function StatCard({
   value,
   label,
 }: {
-  icon: string;
+  icon: React.ReactNode;
   value: number;
   label: string;
 }) {
   return (
-    <div className="bg-darkCard p-6 rounded-xl text-center">
-      <div className="text-4xl mb-2">{icon}</div>
+    <div className="bg-darkCard p-6 rounded-xl text-center border border-light/10">
+      <div className="flex justify-center mb-2">{icon}</div>
       <div className="text-4xl font-bold text-light mb-2">
         <AnimatedNumber value={value} />
       </div>
@@ -241,8 +242,10 @@ export default function StatsPage() {
     return (
       <main className="min-h-screen bg-dark py-16 px-4">
         <div className="max-w-6xl mx-auto">
-          <div className="bg-darkCard p-8 rounded-xl text-center">
-            <div className="text-6xl mb-4">⚠️</div>
+          <div className="bg-darkCard p-8 rounded-xl text-center border border-light/10">
+            <div className="flex justify-center mb-4">
+              <AlertTriangle className="w-16 h-16 text-yellow-400" />
+            </div>
             <h2 className="text-2xl font-bold text-light mb-2">Ошибка загрузки статистики</h2>
             <p className="text-light/70 mb-6">{error}</p>
             <button
@@ -272,10 +275,10 @@ export default function StatsPage() {
 
         {/* Общие цифры */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
-          <StatCard icon="🧠" value={stats.totalEffects} label="Эффектов" />
-          <StatCard icon="👥" value={stats.estimatedParticipants} label="Участников" />
-          <StatCard icon="🗳️" value={stats.totalVotes} label="Голосов" />
-          <StatCard icon="🔥" value={stats.controversialCount} label="Спорных" />
+          <StatCard icon={<Brain className="w-10 h-10 text-primary" />} value={stats.totalEffects} label="Эффектов" />
+          <StatCard icon={<Users className="w-10 h-10 text-secondary" />} value={stats.estimatedParticipants} label="Участников" />
+          <StatCard icon={<MessageSquare className="w-10 h-10 text-amber-400" />} value={stats.totalVotes} label="Голосов" />
+          <StatCard icon={<Flame className="w-10 h-10 text-red-400" />} value={stats.controversialCount} label="Спорных" />
         </div>
 
         {/* Топ-5 самых спорных */}
@@ -298,13 +301,15 @@ export default function StatsPage() {
                   className="block bg-dark/50 p-4 rounded-lg hover:bg-dark/70 transition-colors"
                 >
                   <div className="flex items-start gap-3 mb-2">
-                    <span className="text-2xl">{index === 0 ? '1️⃣' : index === 1 ? '2️⃣' : index === 2 ? '3️⃣' : index === 3 ? '4️⃣' : '5️⃣'}</span>
+                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                      <span className="text-sm font-bold text-primary">{index + 1}</span>
+                    </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="text-lg font-semibold text-light">{effect.title}</h3>
                         {isVeryControversial && (
-                          <span className="px-2 py-1 bg-secondary/20 text-secondary rounded-full text-xs font-semibold">
-                            🔥 Очень спорный
+                          <span className="px-2 py-1 bg-secondary/20 text-secondary rounded-full text-xs font-semibold flex items-center gap-1">
+                            <Flame className="w-3 h-3" /> Очень спорный
                           </span>
                         )}
                       </div>
@@ -345,7 +350,9 @@ export default function StatsPage() {
                   className="block bg-dark/50 p-4 rounded-lg hover:bg-dark/70 transition-colors"
                 >
                   <div className="flex items-start gap-3 mb-2">
-                    <span className="text-2xl">{index === 0 ? '1️⃣' : index === 1 ? '2️⃣' : index === 2 ? '3️⃣' : index === 3 ? '4️⃣' : '5️⃣'}</span>
+                    <div className="w-8 h-8 rounded-full bg-secondary/20 flex items-center justify-center flex-shrink-0">
+                      <Trophy className="w-4 h-4 text-secondary" />
+                    </div>
                     <div className="flex-1">
                       <h3 className="text-lg font-semibold text-light mb-1">{effect.title}</h3>
                       <p className="text-sm text-light/60 mb-2">

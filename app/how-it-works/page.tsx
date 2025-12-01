@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import PageTransition from '@/components/PageTransition';
+import { Vote, BarChart3, Sparkles, TrendingUp, Brain, Search, BookOpen, MessageSquare, Sparkles as SparklesIcon } from 'lucide-react';
 
 export default function HowItWorksPage() {
   return (
@@ -18,7 +19,7 @@ export default function HowItWorksPage() {
             {/* Шаг 1 */}
             <div className="bg-darkCard p-6 rounded-2xl border border-light/10 hover:border-light/20 transition-colors">
               <div className="w-14 h-14 rounded-xl bg-primary/20 flex items-center justify-center mb-4">
-                <span className="text-3xl">🗳️</span>
+                <Vote className="w-7 h-7 text-primary" />
               </div>
               <div className="text-sm font-bold text-primary mb-2">Шаг 01</div>
               <h3 className="text-xl font-bold mb-3 text-light">Голосуйте</h3>
@@ -30,7 +31,7 @@ export default function HowItWorksPage() {
             {/* Шаг 2 */}
             <div className="bg-darkCard p-6 rounded-2xl border border-light/10 hover:border-light/20 transition-colors">
               <div className="w-14 h-14 rounded-xl bg-purple-500/20 flex items-center justify-center mb-4">
-                <span className="text-3xl">📊</span>
+                <BarChart3 className="w-7 h-7 text-purple-400" />
               </div>
               <div className="text-sm font-bold text-purple-400 mb-2">Шаг 02</div>
               <h3 className="text-xl font-bold mb-3 text-light">Изучайте</h3>
@@ -42,7 +43,7 @@ export default function HowItWorksPage() {
             {/* Шаг 3 */}
             <div className="bg-darkCard p-6 rounded-2xl border border-light/10 hover:border-light/20 transition-colors">
               <div className="w-14 h-14 rounded-xl bg-secondary/20 flex items-center justify-center mb-4">
-                <span className="text-3xl">✨</span>
+                <Sparkles className="w-7 h-7 text-secondary" />
               </div>
               <div className="text-sm font-bold text-secondary mb-2">Шаг 03</div>
               <h3 className="text-xl font-bold mb-3 text-light">Предлагайте</h3>
@@ -59,7 +60,7 @@ export default function HowItWorksPage() {
             <div className="grid md:grid-cols-2 gap-6">
               <div className="bg-dark/50 rounded-xl p-5 border border-light/10">
                 <div className="flex items-center gap-3 mb-2">
-                  <span className="text-2xl">📈</span>
+                  <TrendingUp className="w-5 h-5 text-primary" />
                   <h3 className="text-lg font-semibold text-light">Общая статистика</h3>
                 </div>
                 <p className="text-light/60 text-sm">
@@ -69,7 +70,7 @@ export default function HowItWorksPage() {
 
               <div className="bg-dark/50 rounded-xl p-5 border border-light/10">
                 <div className="flex items-center gap-3 mb-2">
-                  <span className="text-2xl">🧠</span>
+                  <Brain className="w-5 h-5 text-secondary" />
                   <h3 className="text-lg font-semibold text-light">Моя память</h3>
                 </div>
                 <p className="text-light/60 text-sm">
@@ -79,7 +80,7 @@ export default function HowItWorksPage() {
 
               <div className="bg-dark/50 rounded-xl p-5 border border-light/10">
                 <div className="flex items-center gap-3 mb-2">
-                  <span className="text-2xl">🔍</span>
+                  <Search className="w-5 h-5 text-primary" />
                   <h3 className="text-lg font-semibold text-light">Поиск и фильтры</h3>
                 </div>
                 <p className="text-light/60 text-sm">
@@ -89,7 +90,7 @@ export default function HowItWorksPage() {
 
               <div className="bg-dark/50 rounded-xl p-5 border border-light/10">
                 <div className="flex items-center gap-3 mb-2">
-                  <span className="text-2xl">📚</span>
+                  <BookOpen className="w-5 h-5 text-secondary" />
                   <h3 className="text-lg font-semibold text-light">Подробная информация</h3>
                 </div>
                 <p className="text-light/60 text-sm">
@@ -109,13 +110,15 @@ export default function HowItWorksPage() {
                 href="/catalog"
                 className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-gradient-to-r from-primary to-secondary text-white font-semibold rounded-xl hover:opacity-90 transition-opacity shadow-lg shadow-primary/30"
               >
-                <span>🗳️ Начать голосовать</span>
+                <Vote className="w-5 h-5" />
+                <span>Начать голосовать</span>
               </Link>
               <Link
                 href="/submit"
                 className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-light/10 text-light font-semibold rounded-xl hover:bg-light/20 transition-colors border border-light/20"
               >
-                <span>✨ Предложить эффект</span>
+                <SparklesIcon className="w-5 h-5" />
+                <span>Предложить эффект</span>
               </Link>
             </div>
           </div>

@@ -8,6 +8,7 @@ import confetti from 'canvas-confetti';
 import { submitEffect, getSubmitCategories } from '@/app/actions/submission';
 import { generateEffectData } from '@/app/actions/generate-content';
 import CustomSelect, { type SelectOption } from '@/components/ui/CustomSelect';
+import { Send, Link as LinkIcon, Mail, MessageSquare, FileText, Sparkles, Brain, Link2, Users, Lightbulb, ChevronRight, List, CheckCircle } from 'lucide-react';
 
 interface Category {
   category: string;
@@ -484,7 +485,9 @@ export default function SubmitPage() {
             animate={{ opacity: 1, y: 0 }}
             className="bg-green-500/20 border border-green-500/50 rounded-xl p-6 mb-8 text-center"
           >
-            <div className="text-4xl mb-2">✅</div>
+            <div className="flex justify-center mb-2">
+              <CheckCircle className="w-12 h-12 text-green-400" />
+            </div>
             <h3 className="text-xl font-semibold text-light mb-2">
               Спасибо! Эффект отправлен на модерацию
             </h3>
@@ -595,8 +598,9 @@ export default function SubmitPage() {
             {/* Кнопка AI заполнения */}
             <div className="p-4 bg-gradient-to-r from-purple-500/10 to-blue-500/10 border border-purple-500/30 rounded-xl">
               <div className="flex flex-col md:flex-row items-center gap-4">
-                <div className="text-light/80 text-sm text-center md:text-left flex-1">
-                  <span className="font-medium">💡 Подсказка:</span> Заполните название, вопрос и варианты, затем нажмите кнопку — AI заполнит остальные поля (историю, факты, ссылки)
+                <div className="text-light/80 text-sm text-center md:text-left flex-1 flex items-center gap-2">
+                  <Lightbulb className="w-4 h-4 text-yellow-400 flex-shrink-0" />
+                  <span><span className="font-medium">Подсказка:</span> Заполните название, вопрос и варианты, затем нажмите кнопку — AI заполнит остальные поля (историю, факты, ссылки)</span>
                 </div>
                 <button
                   type="button"
@@ -614,7 +618,7 @@ export default function SubmitPage() {
                     </>
                   ) : (
                     <>
-                      <span>✨</span>
+                      <Sparkles className="w-4 h-4" />
                       Заполнить через AI
                     </>
                   )}
@@ -640,7 +644,8 @@ export default function SubmitPage() {
 
             {/* Ссылка на источник */}
             <div>
-              <label htmlFor="sourceLink" className="block text-sm font-semibold mb-2 text-light">
+              <label htmlFor="sourceLink" className="block text-sm font-semibold mb-2 text-light flex items-center gap-2">
+                <LinkIcon className="w-4 h-4" />
                 Ссылка на источник
               </label>
               <input
@@ -670,7 +675,7 @@ export default function SubmitPage() {
                 className="w-full flex items-center justify-between p-4 bg-darkCard hover:bg-darkCard/80 transition-colors"
               >
                 <div className="flex items-center gap-2">
-                  <span className="text-xl">🧠</span>
+                  <Brain className="w-5 h-5 text-primary" />
                   <span className="font-medium text-light">Добавить интерпретации (необязательно)</span>
                 </div>
                 <motion.svg
@@ -693,8 +698,9 @@ export default function SubmitPage() {
                 >
                   {/* Научное объяснение */}
                   <div>
-                    <label className="block text-sm font-semibold mb-2 text-light">
-                      🔬 Научное объяснение
+                    <label className="block text-sm font-semibold mb-2 text-light flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-blue-400" />
+                      Научное объяснение
                     </label>
                     <textarea
                       value={interpretations.scientific}
@@ -709,8 +715,9 @@ export default function SubmitPage() {
 
                   {/* Ссылка на научный источник */}
                   <div>
-                    <label className="block text-sm font-semibold mb-2 text-light">
-                      🔗 Ссылка на научный источник
+                    <label className="block text-sm font-semibold mb-2 text-light flex items-center gap-2">
+                      <Link2 className="w-4 h-4 text-blue-400" />
+                      Ссылка на научный источник
                     </label>
                     <input
                       type="url"
@@ -730,8 +737,9 @@ export default function SubmitPage() {
 
                   {/* Версия сообщества */}
                   <div>
-                    <label className="block text-sm font-semibold mb-2 text-light">
-                      👥 Версия сообщества
+                    <label className="block text-sm font-semibold mb-2 text-light flex items-center gap-2">
+                      <Users className="w-4 h-4 text-orange-400" />
+                      Версия сообщества
                     </label>
                     <textarea
                       value={interpretations.community}
@@ -746,8 +754,9 @@ export default function SubmitPage() {
 
                   {/* Ссылка на источник сообщества */}
                   <div>
-                    <label className="block text-sm font-semibold mb-2 text-light">
-                      🔗 Ссылка на источник сообщества
+                    <label className="block text-sm font-semibold mb-2 text-light flex items-center gap-2">
+                      <Link2 className="w-4 h-4 text-orange-400" />
+                      Ссылка на источник сообщества
                     </label>
                     <input
                       type="url"
@@ -770,7 +779,8 @@ export default function SubmitPage() {
 
             {/* Email */}
             <div>
-              <label htmlFor="email" className="block text-sm font-semibold mb-2 text-light">
+              <label htmlFor="email" className="block text-sm font-semibold mb-2 text-light flex items-center gap-2">
+                <Mail className="w-4 h-4" />
                 Ваш email
               </label>
               <input
@@ -820,7 +830,7 @@ export default function SubmitPage() {
                 </>
               ) : (
                 <>
-                  <span>📤</span>
+                  <Send className="w-5 h-5" />
                   Отправить на модерацию
                 </>
               )}
@@ -834,14 +844,7 @@ export default function SubmitPage() {
             href="/catalog"
             className="inline-flex items-center gap-2 text-primary hover:text-secondary transition-colors"
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 6h16M4 10h16M4 14h16M4 18h16"
-              />
-            </svg>
+            <List className="w-5 h-5" />
             Посмотреть каталог эффектов
           </Link>
         </div>

@@ -34,6 +34,11 @@ export interface EffectResult {
   yearDiscovered: number | null;
   similarEffectIds: string[];
   interpretations: Prisma.JsonValue;
+  // Дополнительные поля, извлекаемые из interpretations или null
+  sourceLink?: string | null;
+  scientificSource?: string | null;
+  communitySource?: string | null;
+  currentState?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -65,11 +70,36 @@ interface PrismaEffect {
 function serializeEffect(effect: PrismaEffect): EffectResult {
   // Безопасная сериализация interpretations (может быть null или любым JSON значением)
   let safeInterpretations: Prisma.JsonValue = null;
+  let sourceLink: string | null = null;
+  let scientificSource: string | null = null;
+  let communitySource: string | null = null;
+  let currentState: string | null = null;
+
   try {
     // Если interpretations не null, проверяем что это валидный JSON
     if (effect.interpretations !== null && effect.interpretations !== undefined) {
       // Если это уже сериализуемый объект, оставляем как есть
       safeInterpretations = effect.interpretations;
+      
+      // Извлекаем дополнительные поля из interpretations, если они там есть
+      if (typeof safeInterpretations === 'object' && safeInterpretations !== null && !Array.isArray(safeInterpretations)) {
+        const interpretations = safeInterpretations as Record<string, any>;
+        
+        // Извлекаем поля, если они есть в interpretations
+        // Проверяем на наличие и что это строки
+        if (interpretations.sourceLink && typeof interpretations.sourceLink === 'string') {
+          sourceLink = interpretations.sourceLink;
+        }
+        if (interpretations.scientificSource && typeof interpretations.scientificSource === 'string') {
+          scientificSource = interpretations.scientificSource;
+        }
+        if (interpretations.communitySource && typeof interpretations.communitySource === 'string') {
+          communitySource = interpretations.communitySource;
+        }
+        if (interpretations.currentState && typeof interpretations.currentState === 'string') {
+          currentState = interpretations.currentState;
+        }
+      }
     }
   } catch (error) {
     console.warn('[serializeEffect] Ошибка при обработке interpretations:', error);
@@ -79,6 +109,10 @@ function serializeEffect(effect: PrismaEffect): EffectResult {
   return {
     ...effect,
     interpretations: safeInterpretations,
+    sourceLink: sourceLink || null,
+    scientificSource: scientificSource || null,
+    communitySource: communitySource || null,
+    currentState: currentState || null,
     createdAt: effect.createdAt.toISOString(),
     updatedAt: effect.updatedAt.toISOString(),
   };
@@ -212,6 +246,8 @@ export async function getEffects(params: GetEffectsParams = {}): Promise<EffectR
  */
 export async function getEffectById(id: string): Promise<EffectResult | null> {
   try {
+    // Запрашиваем все поля модели Effect (включая interpretations)
+    // interpretations может содержать sourceLink, scientificSource, communitySource, currentState
     const effect = await prisma.effect.findUnique({
       where: { id },
       select: {
@@ -231,13 +267,18 @@ export async function getEffectById(id: string): Promise<EffectResult | null> {
         historySource: true,
         yearDiscovered: true,
         similarEffectIds: true,
-        interpretations: true,
+        interpretations: true, // JSON поле, может содержать sourceLink, scientificSource, communitySource, currentState
         createdAt: true,
         updatedAt: true,
       },
     });
 
-    return effect ? serializeEffect(effect) : null;
+    if (!effect) {
+      return null;
+    }
+
+    // Сериализуем эффект (извлекает дополнительные поля из interpretations)
+    return serializeEffect(effect);
   } catch (error) {
     console.error('Ошибка при получении эффекта:', error);
     throw new Error('Не удалось загрузить эффект');
@@ -453,5 +494,84 @@ export async function redirectToRandomEffect(): Promise<never> {
 
   // Редирект на страницу эффекта
   redirect(`/effect/${randomId}`);
+}
+
+/**
+ * Получить эффекты по массиву ID
+ * Используется для генерации "Паспорта Реальности" на клиенте
+ */
+export async function getEffectsByIds(ids: string[]): Promise<{ success: boolean; data?: Array<{ id: string; title: string; category: string; votesFor: number; votesAgainst: number }>; error?: string }> {
+  try {
+    if (!ids || ids.length === 0) {
+      return { success: true, data: [] };
+    }
+
+    const effects = await prisma.effect.findMany({
+      where: {
+        id: { in: ids },
+      },
+      select: {
+        id: true,
+        title: true,
+        category: true,
+        votesFor: true,      // <--- Добавлено
+        votesAgainst: true,  // <--- Добавлено
+        // Нам не нужен весь контент, только метаданные для AI
+      },
+    });
+
+    return { success: true, data: effects };
+  } catch (error) {
+    console.error('Error fetching effects by ids:', error);
+    return { success: false, error: 'Failed to fetch effects' };
+  }
+}
+
+/**
+ * Получить список всех ID активных эффектов, отсортированных по дате создания
+ * Используется для навигации "Следующий/Случайный непройденный"
+ */
+export async function getAllEffectIds(): Promise<{ success: boolean; data?: Array<{ id: string }>; error?: string }> {
+  try {
+    const effects = await prisma.effect.findMany({
+      where: { isVisible: true },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true },
+    });
+
+    return { success: true, data: effects };
+  } catch (error) {
+    console.error('Error fetching all effect ids:', error);
+    return { success: false, error: 'Failed to fetch effect ids' };
+  }
+}
+
+/**
+ * Получить похожие эффекты из той же категории
+ * Используется для блока "Похожие эффекты" на странице эффекта
+ */
+export async function getRelatedEffects(category: string, currentId: string): Promise<{ success: boolean; data?: Array<{ id: string; title: string; imageUrl: string | null; category: string }>; error?: string }> {
+  try {
+    const effects = await prisma.effect.findMany({
+      where: {
+        category,
+        id: { not: currentId },
+        isVisible: true,
+      },
+      take: 4,
+      orderBy: { createdAt: 'desc' }, // Или views: 'desc'
+      select: {
+        id: true,
+        title: true,
+        imageUrl: true,
+        category: true,
+      }
+    });
+
+    return { success: true, data: effects };
+  } catch (error) {
+    console.error('Error fetching related effects:', error);
+    return { success: false, error: 'Failed to fetch related' };
+  }
 }
 
