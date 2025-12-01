@@ -26,7 +26,7 @@ export default function QuizClient() {
     const loadQuiz = async () => {
       try {
         const visitorId = getVisitorId();
-        const data = await getQuizEffects(10, visitorId);
+        const data = await getQuizEffects(10, visitorId || undefined);
         setEffects(data);
       } catch (e) {
         console.error(e);
