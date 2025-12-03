@@ -6,11 +6,16 @@ import { generateIdentity, getIdentityResult, type IdentityResultData, type User
 import { getEffectsByIds } from '@/app/actions/effects';
 import { votesStore } from '@/lib/votes-store';
 import Link from 'next/link';
-import QRCode from 'react-qr-code';
+import dynamic from 'next/dynamic';
+
+const QRCode = dynamic(() => import('react-qr-code').then(mod => mod.default), {
+  ssr: false,
+});
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer,  } from 'recharts';
 import toast from 'react-hot-toast';
-import { Save, Share2, Archive, X, LogIn, Mail, Sparkles } from 'lucide-react';
+import { Save, Share2, Archive, X, LogIn, Mail, Sparkles, Download, Copy, Loader2, Globe, Send, Instagram, MessageCircle, Brain } from 'lucide-react';
 import { generateRealityID, generateArchetype, generateDescription, getThoughtOfDay } from '@/lib/identity-engine';
+import { getVisitorId } from '@/lib/visitor';
 import GlitchTitle from '@/components/ui/GlitchTitle';
 
 const IdentitySkeleton = () => (
@@ -69,6 +74,8 @@ export default function IdentityClient() {
   const [archetypeTitle, setArchetypeTitle] = useState('');
   const [description, setDescription] = useState('');
   const [thought, setThought] = useState('');
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
 
   const voteCount = votedEffects.length;
 
@@ -164,7 +171,7 @@ export default function IdentityClient() {
 
     setRadarData(groupStats);
 
-    // Генерация данных архетипа
+      // Генерация данных архетипа
     if (totalVotes > 0) {
       // Используем syncRate из result, если он есть, иначе рассчитываем из голосов
       const matchPercentage = result?.syncRate ?? Math.round((totalMandelaCount / totalVotes) * 100);
@@ -176,18 +183,27 @@ export default function IdentityClient() {
           )[0]
         : 'other';
 
+      // Получаем visitorId и создаем seed
+      const vid = getVisitorId();
+      const seed = (vid || 'anonymous') + voteCount.toString();
+
       // Генерируем данные
       setRealityID(generateRealityID());
-      setArchetypeTitle(generateArchetype(matchPercentage, topCategory));
-      setDescription(generateDescription(matchPercentage, topCategory));
-      setThought(getThoughtOfDay(matchPercentage, topCategory));
+      setArchetypeTitle(generateArchetype(matchPercentage, topCategory, seed));
+      setDescription(generateDescription(matchPercentage, topCategory, seed));
+      setThought(getThoughtOfDay(matchPercentage, topCategory, seed));
     } else if (result) {
       // Если есть result, но нет голосов, используем данные из result
       const matchPercentage = result.syncRate || 50;
+      
+      // Получаем visitorId и создаем seed
+      const vid = getVisitorId();
+      const seed = (vid || 'anonymous') + voteCount.toString();
+      
       setRealityID(generateRealityID());
-      setArchetypeTitle(generateArchetype(matchPercentage, 'other'));
-      setDescription(generateDescription(matchPercentage, 'other'));
-      setThought(getThoughtOfDay(matchPercentage, 'other'));
+      setArchetypeTitle(generateArchetype(matchPercentage, 'other', seed));
+      setDescription(generateDescription(matchPercentage, 'other', seed));
+      setThought(getThoughtOfDay(matchPercentage, 'other', seed));
     }
   }, [votedEffects, result]);
 
@@ -286,25 +302,39 @@ export default function IdentityClient() {
     }
   };
 
-  const handleShare = async () => {
-    if (!result) return;
+  const handleDownloadImage = async () => {
+    const element = document.getElementById('identity-card-node');
+    if (!element) return;
 
-    const url = `${window.location.origin}/share/${result.id}`;
-    
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'Мой Паспорт Реальности',
-          text: `Я — ${archetypeTitle || result.archetype}. А ты из какой вселенной?`,
-          url: url,
-        });
-      } catch (err) {
-        console.log('Share canceled');
-      }
-    } else {
-      navigator.clipboard.writeText(url);
-      toast.success('Ссылка скопирована!');
+    setIsGeneratingImage(true);
+    try {
+      // Динамический импорт для Next.js
+      const html2canvas = (await import('html2canvas')).default;
+      
+      const canvas = await html2canvas(element, {
+        backgroundColor: '#111',
+        scale: 2,
+      });
+      
+      const link = document.createElement('a');
+      link.download = `mandela-identity-${Date.now()}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+      
+      toast.success('Карточка сохранена!');
+    } catch (e) {
+      console.error(e);
+      toast.error('Не удалось создать картинку');
+    } finally {
+      setIsGeneratingImage(false);
     }
+  };
+
+  const handleCopyLink = () => {
+    if (!result) return;
+    const url = `${window.location.origin}/share/${result.id}`;
+    navigator.clipboard.writeText(url);
+    toast.success('Ссылка скопирована');
   };
 
   if (loading) return <IdentitySkeleton />;
@@ -331,42 +361,34 @@ export default function IdentityClient() {
         <GlitchTitle text="МОЯ ПАМЯТЬ" />
       </div>
 
-      {/* ПЛАШКА ЛОГИНА */}
-      <motion.div 
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-8 p-4 rounded-xl border border-yellow-500/20 bg-yellow-500/5 backdrop-blur-sm flex flex-col md:flex-row items-center justify-between gap-4"
-      >
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-yellow-500/20 rounded-lg text-yellow-400">
-            <Save className="w-5 h-5" />
-          </div>
-          <div>
-            <h3 className="font-bold text-yellow-200 text-sm">Гостевой режим</h3>
-            <p className="text-xs text-yellow-200/60">Данные хранятся локально. Войдите, чтобы синхронизировать.</p>
-          </div>
-        </div>
-        <button 
-          onClick={() => setShowLoginModal(true)}
-          className="px-4 py-2 bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 text-xs font-bold rounded-lg transition-colors border border-yellow-500/20"
-        >
-          ВОЙТИ В СИСТЕМУ
-        </button>
-      </motion.div>
-
       {/* Состояние: Результат (ПАСПОРТ) */}
       {result ? (
         <div className="w-full fade-in-section is-visible">
-          <div className="flex justify-between items-center mb-8">
-            <h1 className="text-3xl font-bold text-white">
-              ID Хроно-Путешественника
-            </h1>
-            <button onClick={resetIdentity} className="px-3 py-1 bg-red-500/10 border border-red-500/50 text-red-400 rounded hover:bg-red-500/20 transition-all text-xs font-mono uppercase tracking-wider">
-              [СБРОСИТЬ ID]
-            </button>
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
+            <div className="flex items-center gap-4">
+              <h1 className="text-2xl md:text-3xl font-bold text-white">
+                ID Хроно-Путешественника
+              </h1>
+              
+              {/* Компактный бейдж гостя (заглушка на будущий функционал) */}
+              <button 
+                onClick={() => setShowLoginModal(true)}
+                className="flex items-center gap-2 px-3 py-1.5 bg-yellow-500/10 border border-yellow-500/30 rounded-full text-yellow-500 hover:bg-yellow-500/20 transition-all group"
+                title="Нажмите, чтобы войти и сохранить прогресс"
+              >
+                <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
+                <span className="text-xs font-mono font-bold uppercase tracking-wider">Гость</span>
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button onClick={resetIdentity} className="px-3 py-1 bg-red-500/10 border border-red-500/50 text-red-400 rounded hover:bg-red-500/20 transition-all text-xs font-mono uppercase tracking-wider">
+                [СБРОСИТЬ ID]
+              </button>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 bg-darkCard/80 border border-light/10 rounded-3xl p-8 relative overflow-hidden mb-12">
+          <div id="identity-card-node" className="grid grid-cols-1 lg:grid-cols-3 gap-8 bg-darkCard/80 border border-light/10 rounded-3xl p-8 relative overflow-hidden mb-12">
             {/* Декоративные уголки */}
             <div className="absolute top-0 left-0 w-4 h-4 border-l-2 border-t-2 border-primary/50 rounded-tl-lg" />
             <div className="absolute top-0 right-0 w-4 h-4 border-r-2 border-t-2 border-primary/50 rounded-tr-lg" />
@@ -374,19 +396,64 @@ export default function IdentityClient() {
             <div className="absolute bottom-0 right-0 w-4 h-4 border-r-2 border-b-2 border-primary/50 rounded-br-lg" />
 
             {/* Левая колонка: Текст */}
-            <div className="lg:col-span-1 space-y-4">
+            <div className="lg:col-span-1 flex flex-col space-y-4">
               <div className="text-light/40 text-xs font-mono mb-2">АРХЕТИП ЛИЧНОСТИ</div>
-              <h2 className="text-4xl md:text-5xl font-black text-white mb-6 leading-tight glitch-text" data-text={archetypeTitle || result.archetype}>{archetypeTitle || result.archetype}</h2>
+              <h2 className="text-3xl md:text-4xl font-black text-white mb-4 leading-tight tracking-tighter glitch-text" data-text={archetypeTitle || result.archetype}>{archetypeTitle || result.archetype}</h2>
               <div className="bg-light/5 rounded-xl p-4 border border-light/5">
                 <p className="text-light/80 italic leading-relaxed">"{description || result.description}"</p>
               </div>
-              <div className="w-full flex items-end justify-between gap-4 pt-4">
-                <div className="flex-1">
-                  <div className="text-xs text-light/30 mb-1">МЫСЛЬ ДНЯ</div>
-                  <blockquote className="text-xs text-light/60 border-l-2 border-primary pl-2">{thought || result.quote}</blockquote>
+              
+              <div className="mt-auto space-y-6">
+                {/* Мысль дня */}
+                <div>
+                  <div className="text-light/40 text-[10px] uppercase tracking-widest mb-2">МЫСЛЬ ДНЯ</div>
+                  <div className="border-l-2 border-blue-500 pl-4 py-1">
+                    <p className="text-sm text-light/80 italic leading-relaxed">
+                      "{thought || result.quote}"
+                    </p>
+                  </div>
                 </div>
-                <div className="bg-white p-2 rounded-lg shrink-0">
-                  <QRCode value={`${typeof window !== 'undefined' ? window.location.origin : ''}/share/${result.id}`} size={64} />
+
+                {/* QR Код (Внизу) */}
+                <div className="pt-6">
+                  <div className="text-light/30 text-[10px] uppercase tracking-[0.3em] mb-3 flex items-center gap-2">
+                    <span className="w-1 h-1 bg-cyan-500 rounded-full animate-ping" />
+                    ACCESS_KEY
+                  </div>
+                  
+                  <div className="relative group cursor-pointer w-fit">
+                    {/* Декоративная рамка */}
+                    <div className="absolute -inset-2 border border-white/10 rounded-xl bg-white/5 backdrop-blur-sm group-hover:border-cyan-500/30 transition-colors" />
+                    
+                    {/* Сам QR код */}
+                    <div className="relative bg-dark p-2 rounded-lg border border-white/5 group-hover:animate-pulse">
+                      <div className="[&_svg_path]:fill-cyan-400 [&_svg_rect]:fill-transparent">
+                        <QRCode 
+                          value={`${typeof window !== 'undefined' ? window.location.origin : ''}/share/${result.id}`}
+                          size={100}
+                          level="H"
+                          bgColor="transparent"
+                          fgColor="#22d3ee"
+                          style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+                          viewBox="0 0 256 256"
+                        />
+                      </div>
+                      
+                      {/* Иконка в центре (поверх) */}
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div className="w-8 h-8 bg-dark rounded-full flex items-center justify-center border border-cyan-500/50 shadow-[0_0_15px_rgba(34,211,238,0.5)]">
+                          <Brain className="w-4 h-4 text-cyan-400" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Глитч-эффект при наведении */}
+                    <div className="absolute inset-0 bg-cyan-500/20 opacity-0 group-hover:opacity-100 transition-opacity mix-blend-overlay rounded-lg pointer-events-none" />
+                  </div>
+                  
+                  <div className="text-[9px] text-light/20 mt-2 font-mono">
+                    SCAN TO SYNC TIMELINE
+                  </div>
                 </div>
               </div>
             </div>
@@ -394,10 +461,10 @@ export default function IdentityClient() {
             {/* Центральная колонка: График */}
             <div className="lg:col-span-1 flex flex-col items-center relative">
               {/* 1. Проценты (Перенесено) */}
-              <div className="text-center w-full mb-4">
+              <div className="text-center w-full mb-2 mt-6">
                 <div className="flex items-baseline justify-center gap-2 mb-2">
                   <span className={`text-6xl font-black tracking-tighter ${result.syncRate > 50 ? 'text-green-400' : 'text-purple-400'}`}>{result.syncRate}%</span>
-                  <span className="text-light/60 text-sm uppercase tracking-widest pb-2">синхронизации</span>
+                  <span className="text-light/60 text-sm uppercase tracking-widest pb-2">ИНДЕКС СДВИГА</span>
                 </div>
                 <div className="h-2 bg-dark/50 rounded-full mt-2 overflow-hidden w-full max-w-[200px] mx-auto">
                   <motion.div 
@@ -411,12 +478,12 @@ export default function IdentityClient() {
               </div>
 
               {/* 2. График */}
-              <div className="flex-1 w-full flex items-center justify-center relative min-h-[300px]">
+              <div className="flex-1 w-full flex items-center justify-center relative min-h-[300px] -mt-16">
                 {/* Фоновое свечение */}
                 <div className="absolute inset-0 bg-primary/5 blur-3xl rounded-full" />
-                <div className="w-full h-64 relative z-10 -mt-8">
+                <div className="w-full h-64 relative z-10">
                   <ResponsiveContainer width="100%" height="100%">
-                    <RadarChart cx="50%" cy="50%" outerRadius="75%" data={radarData}>
+                    <RadarChart cx="50%" cy="50%" outerRadius="75%" data={radarData.length > 0 ? radarData : AXIS_GROUPS.map(group => ({ subject: group.label, A: 0, fullMark: 100 }))}>
                       <defs>
                         <linearGradient id="radarGradient" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="#8884d8" stopOpacity={0.8}/>
@@ -559,7 +626,7 @@ export default function IdentityClient() {
 
           <div className="flex justify-center gap-4 mb-16">
              <Link href="/catalog" className="px-6 py-3 bg-white/5 hover:bg-white/10 rounded-xl text-light transition-colors border border-light/5">← В каталог</Link>
-             <button onClick={handleShare} className="px-6 py-3 bg-primary hover:bg-primary/90 text-white rounded-xl transition-colors font-bold shadow-lg shadow-primary/20 flex items-center gap-2">
+             <button onClick={() => setIsShareModalOpen(true)} className="px-6 py-3 bg-primary hover:bg-primary/90 text-white rounded-xl transition-colors font-bold shadow-lg shadow-primary/20 flex items-center gap-2">
                 <Share2 className="w-4 h-4" /> Поделиться результатом
              </button>
           </div>
@@ -703,6 +770,99 @@ export default function IdentityClient() {
                 </p>
               </div>
 
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* МОДАЛКА ШЕРИНГА */}
+      <AnimatePresence>
+        {isShareModalOpen && (
+          <div 
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" 
+            onClick={() => setIsShareModalOpen(false)}
+          >
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }} 
+              animate={{ scale: 1, opacity: 1 }} 
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-darkCard border border-light/10 rounded-2xl p-6 max-w-md w-full relative shadow-2xl"
+              onClick={e => e.stopPropagation()}
+            >
+              <button onClick={() => setIsShareModalOpen(false)} className="absolute top-4 right-4 text-light/40 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+              
+              <h3 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
+                <Share2 className="w-5 h-5 text-primary" /> Поделиться профилем
+              </h3>
+              <p className="text-sm text-light/50 mb-6">Расскажи другим, из какой ты реальности.</p>
+
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                {/* Telegram */}
+                <button 
+                  onClick={() => {
+                    const url = result ? `${window.location.origin}/share/${result.id}` : window.location.href;
+                    window.open(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent('Мой архетип в Эффекте Манделы: ' + (archetypeTitle || result?.archetype || ''))}`, '_blank');
+                  }} 
+                  className="p-3 bg-[#229ED9]/10 hover:bg-[#229ED9]/20 text-[#229ED9] rounded-xl flex flex-col items-center gap-2 transition-colors font-medium text-sm border border-[#229ED9]/20"
+                >
+                  <Send className="w-6 h-6" /> Telegram
+                </button>
+                
+                {/* VKontakte */}
+                <button 
+                  onClick={() => {
+                    const url = result ? `${window.location.origin}/share/${result.id}` : window.location.href;
+                    window.open(`https://vk.com/share.php?url=${encodeURIComponent(url)}`, '_blank');
+                  }} 
+                  className="p-3 bg-[#0077FF]/10 hover:bg-[#0077FF]/20 text-[#0077FF] rounded-xl flex flex-col items-center gap-2 transition-colors font-medium text-sm border border-[#0077FF]/20"
+                >
+                  <Globe className="w-6 h-6" /> VKontakte
+                </button>
+
+                {/* WhatsApp */}
+                <button 
+                  onClick={() => {
+                    const url = result ? `${window.location.origin}/share/${result.id}` : window.location.href;
+                    window.open(`https://wa.me/?text=${encodeURIComponent('Мой архетип: ' + (archetypeTitle || result?.archetype || '') + ' ' + url)}`, '_blank');
+                  }} 
+                  className="p-3 bg-[#25D366]/10 hover:bg-[#25D366]/20 text-[#25D366] rounded-xl flex flex-col items-center gap-2 transition-colors font-medium text-sm border border-[#25D366]/20"
+                >
+                  <MessageCircle className="w-6 h-6" /> WhatsApp
+                </button>
+
+                {/* Instagram */}
+                <button 
+                  onClick={() => {
+                    const url = result ? `${window.location.origin}/share/${result.id}` : window.location.href;
+                    navigator.clipboard.writeText(url);
+                    toast.success('Ссылка скопирована для Instagram');
+                    window.open('https://instagram.com', '_blank');
+                  }} 
+                  className="p-3 bg-[#E1306C]/10 hover:bg-[#E1306C]/20 text-[#E1306C] rounded-xl flex flex-col items-center gap-2 transition-colors font-medium text-sm border border-[#E1306C]/20"
+                >
+                  <Instagram className="w-6 h-6" /> Instagram
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                <button 
+                  onClick={handleDownloadImage} 
+                  disabled={isGeneratingImage} 
+                  className="w-full p-3 bg-white/5 hover:bg-white/10 rounded-xl flex items-center justify-center gap-2 text-light transition-colors border border-light/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isGeneratingImage ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                  <span>Скачать карточку</span>
+                </button>
+                <button 
+                  onClick={handleCopyLink} 
+                  className="w-full p-3 bg-white/5 hover:bg-white/10 rounded-xl flex items-center justify-center gap-2 text-light transition-colors border border-light/10"
+                >
+                  <Copy className="w-4 h-4" />
+                  <span>Скопировать ссылку</span>
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

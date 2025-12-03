@@ -1,6 +1,16 @@
 import { ADJECTIVES, NOUNS, DESCRIPTION_TEMPLATES, QUOTES } from './identity-data';
 import { CATEGORY_MAP } from './constants';
 
+// Превращает строку (seed) в числовой индекс от 0 до max-1
+function getSeededIndex(seed: string, max: number): number {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = ((hash << 5) - hash) + seed.charCodeAt(i);
+    hash |= 0; // Convert to 32bit integer
+  }
+  return Math.abs(hash) % max;
+}
+
 export function generateRealityID(): string {
   if (typeof window === 'undefined') return 'Earth-616';
   
@@ -14,10 +24,11 @@ export function generateRealityID(): string {
   return `Dimension ${platformCode}-${width}-${sector}`;
 }
 
-export function generateArchetype(matchPercentage: number, topCategorySlug: string) {
+export function generateArchetype(matchPercentage: number, topCategorySlug: string, seed: string) {
   // 1. Прилагательное
   const adjGroup = ADJECTIVES.find(a => matchPercentage >= a.min && matchPercentage <= a.max) || ADJECTIVES[2];
-  const adj = adjGroup.words[Math.floor(Math.random() * adjGroup.words.length)];
+  // Используем seed + 'adj' для уникальности
+  const adj = adjGroup.words[getSeededIndex(seed + 'adj', adjGroup.words.length)];
 
   // 2. Существительное
   // Маппинг наших категорий на ключи в NOUNS
@@ -29,13 +40,16 @@ export function generateArchetype(matchPercentage: number, topCategorySlug: stri
   else if (['tech', 'science', 'space'].includes(topCategorySlug)) nounKey = 'tech';
 
   const nounList = NOUNS[nounKey] || NOUNS['other'];
-  const noun = nounList[Math.floor(Math.random() * nounList.length)];
+  // Используем seed + 'noun'
+  const noun = nounList[getSeededIndex(seed + 'noun', nounList.length)];
 
   return `${adj} ${noun}`;
 }
 
-export function generateDescription(matchPercentage: number, topCategorySlug: string) {
-  const intro = DESCRIPTION_TEMPLATES.intros[Math.floor(Math.random() * DESCRIPTION_TEMPLATES.intros.length)](matchPercentage);
+export function generateDescription(matchPercentage: number, topCategorySlug: string, seed: string) {
+  // Используем seed + 'intro' для выбора вступления
+  const introIndex = getSeededIndex(seed + 'intro', DESCRIPTION_TEMPLATES.intros.length);
+  const intro = DESCRIPTION_TEMPLATES.intros[introIndex](matchPercentage);
   
   // Деталь по категории
   let detailKey = 'other';
@@ -47,12 +61,13 @@ export function generateDescription(matchPercentage: number, topCategorySlug: st
   
   const detail = (DESCRIPTION_TEMPLATES.details as any)[detailKey] || DESCRIPTION_TEMPLATES.details.other;
   
-  const verdict = DESCRIPTION_TEMPLATES.verdicts[Math.floor(Math.random() * DESCRIPTION_TEMPLATES.verdicts.length)];
+  // Используем seed + 'verdict' для выбора вердикта
+  const verdict = DESCRIPTION_TEMPLATES.verdicts[getSeededIndex(seed + 'verdict', DESCRIPTION_TEMPLATES.verdicts.length)];
 
   return `${intro} ${detail} ${verdict}`;
 }
 
-export function getThoughtOfDay(matchPercentage: number, topCategorySlug: string) {
+export function getThoughtOfDay(matchPercentage: number, topCategorySlug: string, seed: string) {
   // Простая логика подбора тегов
   const tags = ['general'];
   if (matchPercentage > 70) tags.push('high_mandela', 'paranoia');
@@ -64,6 +79,7 @@ export function getThoughtOfDay(matchPercentage: number, topCategorySlug: string
   const relevantQuotes = QUOTES.filter(q => q.tags.some(t => tags.includes(t)));
   const pool = relevantQuotes.length > 0 ? relevantQuotes : QUOTES;
   
-  return pool[Math.floor(Math.random() * pool.length)].text;
+  // Используем seed + 'quote' для выбора цитаты
+  return pool[getSeededIndex(seed + 'quote', pool.length)].text;
 }
 
