@@ -327,7 +327,7 @@ export default function StatsClient({ effects, totalParticipants, totalVotes }: 
                                       fill="#fff" 
                                       fontSize={11} 
                                       fontWeight="bold"
-                                      formatter={(val: number) => `${val}%`} 
+                                      formatter={(val: any) => `${val}%`} 
                                     />
                                 </Bar>
                             </BarChart>
