@@ -319,3 +319,202 @@ export default async function StatsPage() {
     </div>
   );
 }
+
+
+----
+ПРОМПТ ДЛЯ CURSOR:
+
+code
+Markdown
+Полностью перепиши файл `app/page.tsx` (корневая страница).
+Он должен загружать данные из Prisma и передавать их в `HomeClient`.
+
+**Задачи:**
+1. Запроси эффекты (сортировка по популярности: сумма голосов).
+2. Запроси категории.
+3. Передай их в `<HomeClient />`.
+4. Добавь `export const revalidate = 0;`, чтобы данные не кешировались навечно.
+
+**Код:**
+
+```tsx
+import { Metadata } from 'next';
+import { prisma } from '@/lib/prisma';
+import HomeClient from './HomeClient';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+export const metadata: Metadata = {
+  title: 'Эффект Манделы | Главная',
+  description: 'Исследуй коллективные ложные воспоминания. Голосуй и проверяй свою реальность.',
+};
+
+async function getData() {
+  try {
+    const [effects, categories] = await Promise.all([
+      prisma.effect.findMany({
+        where: { isVisible: true },
+        // Сортируем потом в JS, так как Prisma не умеет сортировать по сумме полей легко
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          category: true,
+          imageUrl: true,
+          votesFor: true,
+          votesAgainst: true,
+          createdAt: true,
+        },
+      }),
+      prisma.category.findMany({
+        orderBy: { sortOrder: 'asc' },
+        include: {
+          _count: {
+            select: { effects: true },
+          },
+        },
+      }),
+    ]);
+
+    // Сортировка по популярности (всего голосов)
+    const sortedEffects = effects.sort((a, b) => {
+      const totalA = a.votesFor + a.votesAgainst;
+      const totalB = b.votesFor + b.votesAgainst;
+      return totalB - totalA;
+    });
+
+    // Сериализация дат
+    const serializedEffects = sortedEffects.map(e => ({
+      ...e,
+      createdAt: e.createdAt.toISOString(),
+    }));
+
+    return { effects: serializedEffects, categories };
+  } catch (error) {
+    console.error('Error fetching home data:', error);
+    return { effects: [], categories: [] };
+  }
+}
+
+export default async function Home() {
+  const { effects, categories } = await getData();
+
+  return (
+    <HomeClient 
+      initialEffects={effects} 
+      topCategories={categories} 
+    />
+  );
+}
+code
+Code
+### ШАГ 2: Обновление Клиента (`app/HomeClient.tsx`)
+
+Исправим вечные скелетоны и сделаем кнопки навигации еще компактнее.
+
+**ПРОМПТ ДЛЯ CURSOR:**
+
+```markdown
+Обнови `app/HomeClient.tsx`.
+
+**Исправления:**
+1. **Вечные скелетоны:**
+   - Если `initialEffects` пустой массив, показывай текст "База данных пуста" вместо бесконечных скелетонов.
+   - Логика: `trendingEffects.length > 0 ? (...) : ( <HomeEmptyState /> )`. (Если HomeEmptyState нет, просто div с текстом).
+
+2. **Кнопки быстрого доступа:**
+   - Сделай их еще компактнее по высоте.
+   - Уменьши паддинги: `p-3`.
+   - Иконку и текст поставь плотнее.
+
+**Вот обновленный фрагмент JSX для кнопок (замени секцию grid c кнопками):**
+
+```tsx
+            {/* QUICK ACTIONS (SUPER COMPACT) */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <button onClick={() => redirectToRandomEffect()} className="group relative px-4 py-3 bg-darkCard border border-light/10 rounded-xl hover:border-purple-500/50 transition-all overflow-hidden flex items-center gap-3 shadow-lg">
+                    <div className="absolute top-0 right-0 p-8 bg-purple-500/10 blur-2xl rounded-full -mr-4 -mt-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <div className="p-2 bg-white/5 rounded-lg group-hover:bg-purple-500/20 transition-colors shrink-0">
+                        <Shuffle className="w-5 h-5 text-purple-400" />
+                    </div>
+                    <div className="text-left flex-1">
+                        <h3 className="font-bold text-white text-sm leading-tight">Случайный сбой</h3>
+                        <p className="text-[10px] text-light/50">Испытай удачу</p>
+                    </div>
+                </button>
+
+                <Link href="/quiz" className="group relative px-4 py-3 bg-darkCard border border-light/10 rounded-xl hover:border-cyan-500/50 transition-all overflow-hidden flex items-center gap-3 shadow-lg">
+                    <div className="absolute top-0 right-0 p-8 bg-cyan-500/10 blur-2xl rounded-full -mr-4 -mt-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <div className="p-2 bg-white/5 rounded-lg group-hover:bg-cyan-500/20 transition-colors shrink-0">
+                        <BrainCircuit className="w-5 h-5 text-cyan-400" />
+                    </div>
+                    <div className="text-left flex-1">
+                        <h3 className="font-bold text-white text-sm leading-tight">Тест памяти</h3>
+                        <p className="text-[10px] text-light/50">Проверка реальности</p>
+                    </div>
+                </Link>
+
+                <Link href="/catalog" className="group relative px-4 py-3 bg-darkCard border border-light/10 rounded-xl hover:border-green-500/50 transition-all overflow-hidden flex items-center gap-3 shadow-lg">
+                    <div className="absolute top-0 right-0 p-8 bg-green-500/10 blur-2xl rounded-full -mr-4 -mt-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <div className="p-2 bg-white/5 rounded-lg group-hover:bg-green-500/20 transition-colors shrink-0">
+                        <Database className="w-5 h-5 text-green-400" />
+                    </div>
+                    <div className="text-left flex-1">
+                        <h3 className="font-bold text-white text-sm leading-tight">Полный архив</h3>
+                        <p className="text-[10px] text-light/50">Вся база данных</p>
+                    </div>
+                </Link>
+            </div>
+Обновленный фрагмент для списков эффектов (замени секции Trending и New):
+
+code
+Tsx
+{/* 3. TRENDING */}
+        <section>
+            <div className="flex items-end justify-between mb-6">
+                <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                    <Flame className="w-6 h-6 text-orange-500" /> В тренде
+                </h2>
+                <Link href="/catalog?sort=popular" className="hidden md:flex text-xs font-bold text-light/40 hover:text-white transition-colors items-center gap-1">
+                    ПОКАЗАТЬ ВСЕ <ArrowRight className="w-3 h-3" />
+                </Link>
+            </div>
+            
+            {trendingEffects.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {trendingEffects.map((effect, i) => (
+                        <EffectCard key={effect.id} {...effect} badge={`#${i + 1}`} priority={i < 3} hasVoted={votedEffectIds.includes(effect.id)} showProgress={votedEffectIds.includes(effect.id)} />
+                    ))}
+                </div>
+            ) : (
+                <div className="text-center py-12 border border-dashed border-light/10 rounded-2xl bg-white/5">
+                    <p className="text-light/40">Данные загружаются или отсутствуют...</p>
+                </div>
+            )}
+        </section>
+
+        {/* 4. NEW DISCOVERIES */}
+        <section className="pt-8 border-t border-light/5">
+             <div className="flex items-center justify-center mb-8">
+                 <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                     <SparklesIcon className="w-6 h-6 text-yellow-400" /> Новые обнаружения
+                 </h2>
+             </div>
+             
+             {newEffects.length > 0 ? (
+                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                    {newEffects.map((effect) => (
+                        <EffectCard key={effect.id} {...effect} badge="Новое" hasVoted={votedEffectIds.includes(effect.id)} />
+                    ))}
+                 </div>
+             ) : (
+                 <div className="text-center py-12 text-light/30">База данных пуста или недоступна</div>
+             )}
+
+             <div className="text-center">
+                 <Link href="/catalog?sort=newest" className="inline-flex items-center gap-2 px-6 py-3 bg-white/5 hover:bg-white/10 rounded-xl text-light transition-colors text-sm font-medium">
+                     Смотреть все поступления <ArrowRight className="w-4 h-4" />
+                 </Link>
+             </div>
+        </section>

@@ -9,7 +9,24 @@ import Link from 'next/link';
 import QRCode from 'react-qr-code';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer,  } from 'recharts';
 import toast from 'react-hot-toast';
-import { Save, Share2, Archive, X, LogIn, Mail } from 'lucide-react';
+import { Save, Share2, Archive, X, LogIn, Mail, Sparkles } from 'lucide-react';
+import { generateRealityID, generateArchetype, generateDescription, getThoughtOfDay } from '@/lib/identity-engine';
+import GlitchTitle from '@/components/ui/GlitchTitle';
+
+const IdentitySkeleton = () => (
+  <div className="min-h-screen bg-dark py-12 px-4 flex flex-col items-center">
+    <div className="max-w-4xl w-full space-y-8">
+      <div className="h-8 w-64 bg-white/5 rounded animate-pulse" />
+      <div className="bg-darkCard/30 border border-light/5 rounded-3xl h-[500px] w-full animate-pulse relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full animate-[shimmer_1.5s_infinite]" />
+      </div>
+      <div className="flex justify-center gap-4">
+        <div className="h-12 w-32 bg-white/5 rounded-xl animate-pulse" />
+        <div className="h-12 w-32 bg-white/5 rounded-xl animate-pulse" />
+      </div>
+    </div>
+  </div>
+);
 
 interface VotedEffect {
   id: string;
@@ -18,6 +35,17 @@ interface VotedEffect {
   userChoice: 'A' | 'B';
 }
 
+const REQUIRED_VOTES = 10;
+
+// Конфигурация осей графика
+const AXIS_GROUPS = [
+  { label: 'СССР / РФ', keys: ['russian'] },
+  { label: 'Медиа', keys: ['films', 'music', 'popculture', 'tv', 'games'] },
+  { label: 'Бренды', keys: ['brands', 'food', 'shopping', 'cars'] },
+  { label: 'Память', keys: ['childhood', 'people'] },
+  { label: 'Мир', keys: ['geography', 'history', 'science', 'tech', 'space'] }
+];
+
 export default function IdentityClient() {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -25,6 +53,22 @@ export default function IdentityClient() {
   const [votedEffects, setVotedEffects] = useState<VotedEffect[]>([]);
   const [radarData, setRadarData] = useState<any[]>([]);
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [sessionTime, setSessionTime] = useState(0);
+  const [systemInfo, setSystemInfo] = useState({
+    os: 'DETECTING...',
+    cores: '0',
+    memory: 'Unknown',
+    resolution: '0x0',
+    browser: 'Unknown',
+    connection: 'OFFLINE',
+    battery: 'AC_POWER',
+    ping: '0ms',
+    reactionTime: (0.4 + Math.random() * 0.8).toFixed(3) + 's'
+  });
+  const [realityID, setRealityID] = useState('Земля-1218');
+  const [archetypeTitle, setArchetypeTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [thought, setThought] = useState('');
 
   const voteCount = votedEffects.length;
 
@@ -53,7 +97,6 @@ export default function IdentityClient() {
         const res = await getIdentityResult(savedId);
         if (res.success && res.data) {
           setResult(res.data as IdentityResultData);
-          prepareRadarData(res.data.stats);
         }
       }
     } catch (e) {
@@ -70,16 +113,140 @@ export default function IdentityClient() {
     return () => window.removeEventListener('votes-updated', handleVotesUpdate);
   }, [loadData]);
 
-  const prepareRadarData = (stats: any) => {
-    const baseVal = stats.syncRate || 50;
-    setRadarData([
-      { subject: 'Кино', A: Math.min(100, Math.max(20, baseVal + Math.random() * 30 - 15)), fullMark: 100 },
-      { subject: 'Бренды', A: Math.min(100, Math.max(20, 100 - baseVal)), fullMark: 100 },
-      { subject: 'История', A: Math.min(100, Math.max(20, baseVal - 10)), fullMark: 100 },
-      { subject: 'География', A: Math.min(100, Math.max(20, 100 - baseVal + 10)), fullMark: 100 },
-      { subject: 'Техно', A: Math.min(100, Math.max(20, baseVal)), fullMark: 100 },
-    ]);
-  };
+  // Пересчет данных графика на основе реальных голосов
+  useEffect(() => {
+    if (votedEffects.length === 0) {
+      // Если нет голосов, показываем нулевые значения
+      setRadarData(
+        AXIS_GROUPS.map(group => ({
+          subject: group.label,
+          A: 0,
+          fullMark: 100
+        }))
+      );
+      return;
+    }
+
+    // Подсчет "мандельности" по группам
+    let totalMandelaCount = 0;
+    let totalVotes = 0;
+    const categoryCounts: Record<string, number> = {};
+
+    const groupStats = AXIS_GROUPS.map(group => {
+      let mandelaCount = 0;
+      let totalCount = 0;
+
+      votedEffects.forEach(effect => {
+        // Проверяем, относится ли категория эффекта к этой группе
+        if (group.keys.includes(effect.category.toLowerCase())) {
+          totalCount++;
+          totalVotes++;
+          // Если пользователь выбрал вариант A (Мандела), увеличиваем счетчик
+          if (effect.userChoice === 'A') {
+            mandelaCount++;
+            totalMandelaCount++;
+          }
+          // Подсчитываем категории для определения топовой
+          const cat = effect.category.toLowerCase();
+          categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+        }
+      });
+
+      // Вычисляем процент "мандельности" (0-100)
+      const percentage = totalCount > 0 ? Math.round((mandelaCount / totalCount) * 100) : 0;
+      
+      return {
+        subject: group.label,
+        A: Math.max(0, Math.min(100, percentage)), // Ограничиваем диапазон 0-100
+        fullMark: 100
+      };
+    });
+
+    setRadarData(groupStats);
+
+    // Генерация данных архетипа
+    if (totalVotes > 0) {
+      // Используем syncRate из result, если он есть, иначе рассчитываем из голосов
+      const matchPercentage = result?.syncRate ?? Math.round((totalMandelaCount / totalVotes) * 100);
+      
+      // Находим топовую категорию
+      const topCategory = Object.keys(categoryCounts).length > 0 
+        ? Object.entries(categoryCounts).reduce((a, b) => 
+            categoryCounts[a[0]] > categoryCounts[b[0]] ? a : b
+          )[0]
+        : 'other';
+
+      // Генерируем данные
+      setRealityID(generateRealityID());
+      setArchetypeTitle(generateArchetype(matchPercentage, topCategory));
+      setDescription(generateDescription(matchPercentage, topCategory));
+      setThought(getThoughtOfDay(matchPercentage, topCategory));
+    } else if (result) {
+      // Если есть result, но нет голосов, используем данные из result
+      const matchPercentage = result.syncRate || 50;
+      setRealityID(generateRealityID());
+      setArchetypeTitle(generateArchetype(matchPercentage, 'other'));
+      setDescription(generateDescription(matchPercentage, 'other'));
+      setThought(getThoughtOfDay(matchPercentage, 'other'));
+    }
+  }, [votedEffects, result]);
+
+  // Эффект для сбора данных о браузере
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const nav = navigator as any;
+    
+    // 1. ОС и Браузер
+    const platform = nav.platform || 'Unknown OS';
+    const userAgent = nav.userAgent;
+    const browserName = userAgent.includes('Chrome') ? 'Chrome_Engine' : 
+                        userAgent.includes('Firefox') ? 'Quantum_Core' : 
+                        userAgent.includes('Safari') ? 'Webkit_Node' : 'Unknown_Agent';
+
+    // 2. Железо
+    const cores = nav.hardwareConcurrency ? `${nav.hardwareConcurrency} THREADS` : '4 THREADS';
+    const ram = nav.deviceMemory ? `~${nav.deviceMemory} GB` : 'ALLOCATED';
+    const res = `${window.screen.width}x${window.screen.height}`;
+
+    // 3. Сеть (примерная)
+    const conn = nav.connection ? (nav.connection.effectiveType || '4g').toUpperCase() : 'SECURE_LINK';
+
+    // 4. Батарея (асинхронно)
+    let batLevel = 'EXTERNAL_PWR';
+    if (nav.getBattery) {
+        nav.getBattery().then((b: any) => {
+            const level = Math.round(b.level * 100);
+            setSystemInfo(prev => ({...prev, battery: `${level}% [${b.charging ? 'CHARGING' : 'DRAINING'}]`}));
+        }).catch(() => {});
+    }
+
+    // 5. Пинг (симуляция живого соединения)
+    const interval = setInterval(() => {
+        const ping = Math.floor(Math.random() * 40) + 15;
+        setSystemInfo(prev => ({...prev, ping: `${ping}ms`}));
+    }, 2000);
+
+    // 6. Таймер сессии
+    const timer = setInterval(() => setSessionTime(t => t + 1), 1000);
+
+    setSystemInfo({
+        os: platform.toUpperCase().replace(/ /g, '_'),
+        cores,
+        memory: ram,
+        resolution: res,
+        browser: browserName.toUpperCase(),
+        connection: `${conn}_ENCRYPTED`,
+        battery: batLevel,
+        ping: '24ms',
+        reactionTime: (0.4 + Math.random() * 0.8).toFixed(3) + 's'
+    });
+
+    return () => {
+      clearInterval(interval);
+      clearInterval(timer);
+    };
+  }, []);
 
   const handleGenerate = async () => {
     setGenerating(true);
@@ -98,7 +265,6 @@ export default function IdentityClient() {
       if (res.success && res.data) {
         setResult(res.data);
         localStorage.setItem('identity_id', res.data.id);
-        prepareRadarData(res.data.stats);
         toast.success('Личность синхронизирована!');
       } else {
         toast.error(res.error || 'Ошибка генерации');
@@ -129,7 +295,7 @@ export default function IdentityClient() {
       try {
         await navigator.share({
           title: 'Мой Паспорт Реальности',
-          text: `Я — ${result.archetype}. А ты из какой вселенной?`,
+          text: `Я — ${archetypeTitle || result.archetype}. А ты из какой вселенной?`,
           url: url,
         });
       } catch (err) {
@@ -141,35 +307,58 @@ export default function IdentityClient() {
     }
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center text-cyan-400 animate-pulse">Инициализация протокола...</div>;
+  if (loading) return <IdentitySkeleton />;
 
-  const isReady = voteCount >= 10;
+  const isReady = voteCount >= REQUIRED_VOTES;
 
   return (
-    <div className="min-h-screen bg-dark py-8 px-4 flex flex-col items-center">
-      
+    <div className="min-h-screen bg-dark pt-32 pb-8 px-4 flex flex-col items-center relative">
+      {/* Фоновая сетка и цветовые пятна */}
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]" />
+        <div className="absolute top-0 left-0 w-96 h-96 bg-purple-500/10 rounded-full blur-[128px] opacity-30" />
+        <div className="absolute bottom-0 right-0 w-96 h-96 bg-blue-500/10 rounded-full blur-[128px] opacity-30" />
+      </div>
+
+      <motion.div 
+        initial={{ opacity: 0, y: 30 }} 
+        animate={{ opacity: 1, y: 0 }} 
+        transition={{ duration: 0.5 }}
+        className="max-w-4xl w-full relative z-10"
+      >
+      {/* Заголовок страницы */}
+      <div className="text-center mb-8">
+        <GlitchTitle text="МОЯ ПАМЯТЬ" />
+      </div>
+
       {/* ПЛАШКА ЛОГИНА */}
-      <div className="w-full max-w-4xl mb-6 bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 backdrop-blur-sm">
+      <motion.div 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="mb-8 p-4 rounded-xl border border-yellow-500/20 bg-yellow-500/5 backdrop-blur-sm flex flex-col md:flex-row items-center justify-between gap-4"
+      >
         <div className="flex items-center gap-3">
-          <Save className="w-6 h-6 text-yellow-300 shrink-0" />
+          <div className="p-2 bg-yellow-500/20 rounded-lg text-yellow-400">
+            <Save className="w-5 h-5" />
+          </div>
           <div>
-            <h4 className="text-yellow-200 font-bold text-sm">Временная сессия</h4>
-            <p className="text-yellow-200/60 text-xs">Ваш ID и история хранятся только в этом браузере. Войдите, чтобы сохранить их навсегда.</p>
+            <h3 className="font-bold text-yellow-200 text-sm">Гостевой режим</h3>
+            <p className="text-xs text-yellow-200/60">Данные хранятся локально. Войдите, чтобы синхронизировать.</p>
           </div>
         </div>
         <button 
           onClick={() => setShowLoginModal(true)}
-          className="px-4 py-2 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 rounded-lg text-sm font-medium transition-colors whitespace-nowrap"
+          className="px-4 py-2 bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 text-xs font-bold rounded-lg transition-colors border border-yellow-500/20"
         >
-          Войти в систему
+          ВОЙТИ В СИСТЕМУ
         </button>
-      </div>
+      </motion.div>
 
       {/* Состояние: Результат (ПАСПОРТ) */}
       {result ? (
-        <div className="max-w-4xl w-full fade-in-section is-visible">
+        <div className="w-full fade-in-section is-visible">
           <div className="flex justify-between items-center mb-8">
-            <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-purple-500">
+            <h1 className="text-3xl font-bold text-white">
               ID Хроно-Путешественника
             </h1>
             <button onClick={resetIdentity} className="px-3 py-1 bg-red-500/10 border border-red-500/50 text-red-400 rounded hover:bg-red-500/20 transition-all text-xs font-mono uppercase tracking-wider">
@@ -177,33 +366,55 @@ export default function IdentityClient() {
             </button>
           </div>
 
-          <div className="bg-darkCard/50 backdrop-blur-xl border border-light/10 rounded-3xl overflow-hidden relative shadow-2xl shadow-purple-900/20 mb-12">
-            <div className="absolute inset-0 opacity-5 pointer-events-none bg-[url('https://grainy-gradients.vercel.app/noise.svg')]"></div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2">
-              <div className="p-8 border-b md:border-b-0 md:border-r border-light/10 relative">
-                 <div className={`absolute top-4 right-4 border-4 transform rotate-12 px-3 py-1 font-black text-xl opacity-80 tracking-widest ${result.syncRate > 80 ? 'border-green-500 text-green-500' : 'border-red-500 text-red-500'}`}>
-                   {result.syncRate > 80 ? 'VERIFIED' : 'ANOMALY'}
-                 </div>
-                 <div className="text-light/40 text-xs font-mono mb-2">АРХЕТИП ЛИЧНОСТИ</div>
-                 <h2 className="text-4xl md:text-5xl font-black text-white mb-6 leading-tight glitch-text" data-text={result.archetype}>{result.archetype}</h2>
-                 <div className="mb-8">
-                   <div className="flex items-end gap-2 mb-2">
-                     <span className={`text-6xl font-bold ${result.syncRate > 50 ? 'text-green-400' : 'text-purple-400'}`}>{result.syncRate}%</span>
-                     <span className="text-light/60 pb-2">синхронизации</span>
-                   </div>
-                   <div className="w-full bg-dark/50 h-2 rounded-full overflow-hidden">
-                     <div className={`h-full ${result.syncRate > 50 ? 'bg-green-400' : 'bg-purple-400'}`} style={{ width: `${result.syncRate}%` }} />
-                   </div>
-                   <p className="text-xs text-light/40 mt-2 font-mono">Текущая реальность: Земля-1218</p>
-                 </div>
-                 <div className="bg-light/5 rounded-xl p-4 border border-light/5">
-                   <p className="text-light/80 italic leading-relaxed">"{result.description}"</p>
-                 </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 bg-darkCard/80 border border-light/10 rounded-3xl p-8 relative overflow-hidden mb-12">
+            {/* Декоративные уголки */}
+            <div className="absolute top-0 left-0 w-4 h-4 border-l-2 border-t-2 border-primary/50 rounded-tl-lg" />
+            <div className="absolute top-0 right-0 w-4 h-4 border-r-2 border-t-2 border-primary/50 rounded-tr-lg" />
+            <div className="absolute bottom-0 left-0 w-4 h-4 border-l-2 border-b-2 border-primary/50 rounded-bl-lg" />
+            <div className="absolute bottom-0 right-0 w-4 h-4 border-r-2 border-b-2 border-primary/50 rounded-br-lg" />
+
+            {/* Левая колонка: Текст */}
+            <div className="lg:col-span-1 space-y-4">
+              <div className="text-light/40 text-xs font-mono mb-2">АРХЕТИП ЛИЧНОСТИ</div>
+              <h2 className="text-4xl md:text-5xl font-black text-white mb-6 leading-tight glitch-text" data-text={archetypeTitle || result.archetype}>{archetypeTitle || result.archetype}</h2>
+              <div className="bg-light/5 rounded-xl p-4 border border-light/5">
+                <p className="text-light/80 italic leading-relaxed">"{description || result.description}"</p>
+              </div>
+              <div className="w-full flex items-end justify-between gap-4 pt-4">
+                <div className="flex-1">
+                  <div className="text-xs text-light/30 mb-1">МЫСЛЬ ДНЯ</div>
+                  <blockquote className="text-xs text-light/60 border-l-2 border-primary pl-2">{thought || result.quote}</blockquote>
+                </div>
+                <div className="bg-white p-2 rounded-lg shrink-0">
+                  <QRCode value={`${typeof window !== 'undefined' ? window.location.origin : ''}/share/${result.id}`} size={64} />
+                </div>
+              </div>
+            </div>
+
+            {/* Центральная колонка: График */}
+            <div className="lg:col-span-1 flex flex-col items-center relative">
+              {/* 1. Проценты (Перенесено) */}
+              <div className="text-center w-full mb-4">
+                <div className="flex items-baseline justify-center gap-2 mb-2">
+                  <span className={`text-6xl font-black tracking-tighter ${result.syncRate > 50 ? 'text-green-400' : 'text-purple-400'}`}>{result.syncRate}%</span>
+                  <span className="text-light/60 text-sm uppercase tracking-widest pb-2">синхронизации</span>
+                </div>
+                <div className="h-2 bg-dark/50 rounded-full mt-2 overflow-hidden w-full max-w-[200px] mx-auto">
+                  <motion.div 
+                    className={`h-full ${result.syncRate > 50 ? 'bg-green-400' : 'bg-purple-400'}`}
+                    initial={{ width: 0 }}
+                    animate={{ width: `${result.syncRate}%` }}
+                    transition={{ duration: 1 }}
+                  />
+                </div>
+                <p className="text-xs text-light/40 mt-2 font-mono">Текущая реальность: {realityID}</p>
               </div>
 
-              <div className="p-8 flex flex-col items-center justify-center bg-black/20 relative overflow-hidden">
-                <div className="w-full h-64 relative z-10">
+              {/* 2. График */}
+              <div className="flex-1 w-full flex items-center justify-center relative min-h-[300px]">
+                {/* Фоновое свечение */}
+                <div className="absolute inset-0 bg-primary/5 blur-3xl rounded-full" />
+                <div className="w-full h-64 relative z-10 -mt-8">
                   <ResponsiveContainer width="100%" height="100%">
                     <RadarChart cx="50%" cy="50%" outerRadius="75%" data={radarData}>
                       <defs>
@@ -223,15 +434,125 @@ export default function IdentityClient() {
                     </RadarChart>
                   </ResponsiveContainer>
                 </div>
-                <div className="w-full flex items-end justify-between mt-auto gap-4">
-                  <div className="flex-1">
-                    <div className="text-xs text-light/30 mb-1">МЫСЛЬ ДНЯ</div>
-                    <blockquote className="text-xs text-light/60 border-l-2 border-primary pl-2">{result.quote}</blockquote>
+              </div>
+
+              {/* 3. Штамп (Цифровой стиль) */}
+              {result.syncRate <= 80 && (
+                <div className="absolute bottom-16 -right-2 transform -rotate-12 z-20 pointer-events-none">
+                  <div className="border border-red-500/80 bg-red-500/10 px-6 py-2 backdrop-blur-md shadow-[0_0_20px_rgba(239,68,68,0.4)] flex items-center gap-2 animate-pulse">
+                    <div className="w-2 h-2 bg-red-500 rounded-full animate-ping" />
+                    <span className="font-mono font-bold text-red-500 tracking-[0.25em] text-lg">
+                      ANOMALY_DETECTED
+                    </span>
                   </div>
-                  <div className="bg-white p-2 rounded-lg shrink-0">
-                    <QRCode value={`${typeof window !== 'undefined' ? window.location.origin : ''}/share/${result.id}`} size={64} />
-                  </div>
+                  {/* Декоративные линии штампа */}
+                  <div className="absolute -top-1 -left-1 w-3 h-3 border-l border-t border-red-500" />
+                  <div className="absolute -bottom-1 -right-1 w-3 h-3 border-r border-b border-red-500" />
                 </div>
+              )}
+              {result.syncRate > 80 && (
+                <div className="absolute bottom-16 -right-2 transform -rotate-12 z-20 pointer-events-none">
+                  <div className="border border-green-500/80 bg-green-500/10 px-6 py-2 backdrop-blur-md shadow-[0_0_20px_rgba(34,197,94,0.4)] flex items-center gap-2">
+                    <div className="w-2 h-2 bg-green-500 rounded-full" />
+                    <span className="font-mono font-bold text-green-500 tracking-[0.25em] text-lg">
+                      VERIFIED
+                    </span>
+                  </div>
+                  {/* Декоративные линии штампа */}
+                  <div className="absolute -top-1 -left-1 w-3 h-3 border-l border-t border-green-500" />
+                  <div className="absolute -bottom-1 -right-1 w-3 h-3 border-r border-b border-green-500" />
+                </div>
+              )}
+            </div>
+
+            {/* Правая колонка: Реальные данные */}
+            <div className="lg:col-span-1 bg-black/20 rounded-xl p-6 border border-white/5 font-mono text-xs flex flex-col justify-between h-full min-h-[300px]">
+              
+              <div>
+                  <div className="text-light/40 mb-4 border-b border-white/5 pb-2 flex justify-between items-center">
+                     <span>СИСТЕМНЫЕ_МЕТРИКИ</span>
+                     <span className="text-green-500 animate-pulse">● LIVE</span>
+                  </div>
+                  
+                  {/* Блок 1: Хост */}
+                  <div className="space-y-3 mb-6">
+                     <div className="flex justify-between">
+                        <span className="text-light/50">СРЕДА_ОБИТАНИЯ:</span>
+                        <span className="text-primary font-bold">{systemInfo.os}</span>
+                     </div>
+                     <div className="flex justify-between">
+                        <span className="text-light/50">АГЕНТ_ДОСТУПА:</span>
+                        <span className="text-light">{systemInfo.browser}</span>
+                     </div>
+                     <div className="flex justify-between">
+                        <span className="text-light/50">РАЗРЕШЕНИЕ_СЕТЧАТКИ:</span>
+                        <span className="text-light">{systemInfo.resolution}</span>
+                     </div>
+                  </div>
+
+                  <div className="h-px bg-white/5 my-4" />
+
+                  {/* Блок 2: Ресурсы */}
+                  <div className="space-y-3 mb-6">
+                     <div className="flex justify-between">
+                        <span className="text-light/50">МОЩНОСТЬ_УЗЛА:</span>
+                        <span className="text-yellow-400">{systemInfo.cores}</span>
+                     </div>
+                     <div className="flex justify-between">
+                        <span className="text-light/50">ОБЪЕМ_КЭША:</span>
+                        <span className="text-yellow-400">{systemInfo.memory}</span>
+                     </div>
+                     <div className="flex justify-between">
+                        <span className="text-light/50">ЭНЕРГИЯ_МОДУЛЯ:</span>
+                        <span className={systemInfo.battery.includes('CHARGING') ? 'text-green-400' : 'text-orange-400'}>
+                            {systemInfo.battery}
+                        </span>
+                     </div>
+                  </div>
+
+                  <div className="h-px bg-white/5 my-4" />
+
+                  {/* Блок 3: Сеть */}
+                  <div className="space-y-3 mb-6">
+                     <div className="flex justify-between">
+                        <span className="text-light/50">ТИП_СВЯЗИ:</span>
+                        <span className="text-blue-400">{systemInfo.connection}</span>
+                     </div>
+                     <div className="flex justify-between">
+                        <span className="text-light/50">ЗАДЕРЖКА_СИГНАЛА:</span>
+                        <span className="text-green-400 font-bold">{systemInfo.ping}</span>
+                     </div>
+                  </div>
+
+                  <div className="h-px bg-white/5 my-4" />
+
+                  {/* Блок 4: Биометрия (Новый) */}
+                  <div className="space-y-3">
+                     <div className="text-light/40 mb-2 text-[10px] uppercase tracking-widest">БИОМЕТРИЯ_СЕССИИ</div>
+                     
+                     <div className="flex justify-between">
+                        <span className="text-light/50">ВРЕМЯ_СЕССИИ:</span>
+                        <span className="text-white font-mono">
+                          {new Date(sessionTime * 1000).toISOString().substr(14, 5)}
+                        </span>
+                     </div>
+                     <div className="flex justify-between">
+                        <span className="text-light/50">СКОРОСТЬ_РЕАКЦИИ:</span>
+                        <span className="text-purple-400">~{systemInfo.reactionTime || 'CALCULATING...'}</span>
+                     </div>
+                     <div className="flex justify-between">
+                        <span className="text-light/50">КОГНИТИВНАЯ_НАГРУЗКА:</span>
+                        <span className="text-blue-400 animate-pulse">АКТИВНА</span>
+                     </div>
+                  </div>
+              </div>
+              
+              {/* Логи в самом низу */}
+              <div className="mt-6 pt-4 border-t border-white/10 space-y-1 opacity-70 text-[10px]">
+                 <div className="text-light/30 mb-1">ЖУРНАЛ_СИНХРОНИЗАЦИИ:</div>
+                 <div className="text-green-500/70">{'>'} Анализ паттернов... OK</div>
+                 <div className="text-green-500/70">{'>'} Сборка профиля... OK</div>
+                 <div className="text-blue-400/70 animate-pulse">{'>'} Рендер интерфейса...</div>
               </div>
             </div>
           </div>
@@ -244,36 +565,57 @@ export default function IdentityClient() {
           </div>
         </div>
       ) : (
-        /* Состояние: КАЛИБРОВКА (без изменений) */
-        <div className="max-w-2xl w-full text-center mb-12">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-darkCard border border-light/10 p-12 rounded-3xl relative overflow-hidden shadow-2xl">
-            <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r opacity-50 ${isReady ? 'from-green-400 via-cyan-500 to-green-400' : 'from-transparent via-purple-500 to-transparent'}`}></div>
-            <div className="text-6xl mb-6 transform transition-transform hover:scale-110 duration-500">{isReady ? '✨' : '🧬'}</div>
-            <h1 className="text-3xl font-bold text-white mb-2">Инициализация Личности</h1>
-            <p className="text-light/60 mb-8 min-h-[3rem]">{isReady ? "Анализ завершен. Данные собраны. Система готова к построению вашего профиля реальности." : "Системе недостаточно данных для определения вашего происхождения в Мультивселенной. Необходимо проанализировать минимум 10 воспоминаний."}</p>
-            <div className="mb-8 max-w-sm mx-auto">
-              <div className="flex justify-between text-sm mb-2">
-                <span className={isReady ? "text-green-400 font-bold" : "text-cyan-400"}>{isReady ? "Готовность 100%" : "Сбор данных..."}</span>
-                <span className="text-light">{voteCount} / 10</span>
-              </div>
-              <div className="h-4 bg-dark rounded-full overflow-hidden border border-light/10 relative">
-                <div className={`h-full transition-all duration-1000 ${isReady ? 'bg-gradient-to-r from-green-500 to-emerald-400' : 'bg-gradient-to-r from-cyan-500 to-blue-600'}`} style={{ width: `${Math.min((voteCount / 10) * 100, 100)}%` }} />
-              </div>
+        /* Состояние: КАЛИБРОВКА */
+        <div className="max-w-2xl mx-auto bg-darkCard/50 backdrop-blur-xl border border-white/10 rounded-3xl p-8 relative overflow-hidden text-center">
+          {/* Декоративные сканеры */}
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-primary to-transparent opacity-50" />
+          
+          <div className="mb-6 relative inline-block">
+            <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center animate-pulse">
+              <Sparkles className="w-10 h-10 text-primary" />
             </div>
-            {isReady ? (
-              <button onClick={handleGenerate} disabled={generating} className="w-full py-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-xl rounded-xl shadow-lg shadow-cyan-500/20 transition-all transform hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:scale-100 flex items-center justify-center gap-2">
-                {generating ? <span className="animate-pulse">Синхронизация...</span> : <>Синхронизировать Личность ⚡</>}
-              </button>
-            ) : (
-              <Link href="/catalog" className="inline-block w-full py-4 bg-white/5 hover:bg-white/10 text-light font-medium rounded-xl transition-colors border border-light/5 hover:border-light/20">Перейти в каталог (осталось: {10 - voteCount})</Link>
-            )}
-          </motion.div>
+            {/* Вращающееся кольцо */}
+            <div className="absolute inset-0 border-2 border-dashed border-primary/30 rounded-full animate-spin-slow" />
+          </div>
+
+          <h2 className="text-3xl font-black text-white mb-2">СИНХРОНИЗАЦИЯ</h2>
+          <p className="text-light/50 mb-8 max-w-md mx-auto">
+            Системе нужно больше данных. Проанализировано {voteCount} из {REQUIRED_VOTES} необходимых паттернов.
+          </p>
+
+          {/* Прогресс бар в стиле терминала */}
+          <div className="mb-8">
+            <div className="flex justify-between text-xs font-mono text-primary mb-2">
+              <span>LOADING_DATA...</span>
+              <span>{(voteCount / REQUIRED_VOTES * 100).toFixed(0)}%</span>
+            </div>
+            <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+              <motion.div 
+                className="h-full bg-gradient-to-r from-primary to-cyan-400"
+                initial={{ width: 0 }}
+                animate={{ width: `${(voteCount / REQUIRED_VOTES) * 100}%` }}
+                transition={{ duration: 1 }}
+              />
+            </div>
+          </div>
+
+          {isReady ? (
+            <button onClick={handleGenerate} disabled={generating} className="btn-glitch px-8 py-4 bg-primary text-white font-bold rounded-xl shadow-[0_0_20px_rgba(59,130,246,0.4)] disabled:opacity-50 disabled:cursor-not-allowed">
+              {generating ? <span className="animate-pulse">Синхронизация...</span> : <>Синхронизировать Личность ⚡</>}
+            </button>
+          ) : (
+            <Link href="/catalog" className="inline-block">
+              <div className="btn-glitch px-8 py-4 bg-primary text-white font-bold rounded-xl shadow-[0_0_20px_rgba(59,130,246,0.4)]">
+                Продолжить сканирование ⚡
+              </div>
+            </Link>
+          )}
         </div>
       )}
 
       {/* АРХИВ НАБЛЮДЕНИЙ */}
       {votedEffects.length > 0 && (
-        <div className="max-w-4xl w-full mt-8">
+        <div className="w-full mt-8">
           <div className="flex items-center gap-2 mb-6 opacity-60">
             <Archive className="w-5 h-5" />
             <h3 className="text-lg font-bold text-light tracking-wide uppercase">Архив Наблюдений</h3>
@@ -298,32 +640,74 @@ export default function IdentityClient() {
       {/* МОДАЛКА ЛОГИНА */}
       <AnimatePresence>
         {showLoginModal && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowLoginModal(false)}>
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-darkCard w-full max-w-md rounded-2xl border border-light/10 shadow-2xl p-8 relative" onClick={e => e.stopPropagation()}>
-              <button onClick={() => setShowLoginModal(false)} className="absolute top-4 right-4 text-light/40 hover:text-light"><X className="w-5 h-5" /></button>
-              <div className="text-center mb-8">
-                <div className="w-16 h-16 bg-gradient-to-tr from-primary to-purple-500 rounded-full flex items-center justify-center mx-auto mb-4 text-white">
-                  <LogIn className="w-8 h-8" />
+          <div 
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+            onClick={() => setShowLoginModal(false)}
+          >
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-darkCard border border-light/10 rounded-2xl p-8 max-w-sm w-full relative shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button 
+                onClick={() => setShowLoginModal(false)}
+                className="absolute top-4 right-4 text-light/40 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+                  🔐
                 </div>
-                <h2 className="text-2xl font-bold text-white mb-2">Авторизация</h2>
-                <p className="text-light/60">Сохраните свой паспорт реальности и историю голосований навсегда.</p>
+                <h3 className="text-xl font-bold text-white mb-2">Вход в Сингулярность</h3>
+                <p className="text-sm text-light/50">
+                  Сохраните свой прогресс и историю голосования навсегда.
+                </p>
               </div>
+
               <div className="space-y-3">
-                <button onClick={() => toast('Скоро будет доступно!')} className="w-full py-3 bg-white text-black font-bold rounded-xl hover:bg-gray-100 transition-colors flex items-center justify-center gap-2">
-                  <svg className="w-5 h-5" viewBox="0 0 24 24"><path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" /><path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" /><path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.84z" /><path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" /></svg>
-                  Войти через Google
+                {/* Yandex */}
+                <button 
+                  onClick={() => toast('Вход через Яндекс в разработке 🚧', { icon: '🛠️' })}
+                  className="w-full py-3 px-4 bg-white/5 hover:bg-white/10 border border-light/10 rounded-xl flex items-center gap-3 transition-all group"
+                >
+                  <span className="text-red-500 font-bold group-hover:scale-110 transition-transform">Я</span>
+                  <span className="text-sm font-medium text-light">Войти через Яндекс</span>
                 </button>
-                <button onClick={() => toast('Скоро будет доступно!')} className="w-full py-3 bg-[#FC3F1D] text-white font-bold rounded-xl hover:bg-[#E63515] transition-colors flex items-center justify-center gap-2">
-                  <span className="font-serif">Я</span> Войти через Яндекс
+
+                {/* Google */}
+                <button 
+                  onClick={() => toast('Вход через Google в разработке 🚧', { icon: '🛠️' })}
+                  className="w-full py-3 px-4 bg-white/5 hover:bg-white/10 border border-light/10 rounded-xl flex items-center gap-3 transition-all group"
+                >
+                  <span className="text-blue-500 font-bold group-hover:scale-110 transition-transform">G</span>
+                  <span className="text-sm font-medium text-light">Войти через Google</span>
                 </button>
-                <button onClick={() => toast('Скоро будет доступно!')} className="w-full py-3 bg-white/5 text-light font-bold rounded-xl hover:bg-white/10 transition-colors border border-light/10 flex items-center justify-center gap-2">
-                  <Mail className="w-5 h-5" /> Войти через Email
+
+                {/* Email */}
+                <button 
+                  onClick={() => toast('Вход через почту в разработке 🚧', { icon: '🛠️' })}
+                  className="w-full py-3 px-4 bg-white/5 hover:bg-white/10 border border-light/10 rounded-xl flex items-center gap-3 transition-all group"
+                >
+                  <span className="text-light/50 group-hover:text-white transition-colors">✉️</span>
+                  <span className="text-sm font-medium text-light">Войти через Email</span>
                 </button>
               </div>
+
+              <div className="mt-6 pt-4 border-t border-light/5 text-center">
+                <p className="text-xs text-light/30">
+                  Функционал личных кабинетов находится на стадии бета-тестирования.
+                </p>
+              </div>
+
             </motion.div>
-          </motion.div>
+          </div>
         )}
       </AnimatePresence>
+      </motion.div>
     </div>
   );
 }

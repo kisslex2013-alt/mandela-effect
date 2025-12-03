@@ -1,9 +1,42 @@
 'use server';
 
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
 import prisma from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
-import { cookies } from 'next/headers';
+
+const COOKIE_NAME = 'admin_session';
+// В продакшене лучше использовать длинный секрет, здесь для примера
+const SESSION_SECRET = process.env.ADMIN_PASSWORD || 'default-secret-key'; 
+
+export async function login(formData: FormData) {
+  const password = formData.get('password') as string;
+  const envPassword = process.env.ADMIN_PASSWORD;
+
+  if (!envPassword) {
+    return { success: false, error: 'Ошибка конфигурации: ADMIN_PASSWORD не задан.' };
+  }
+
+  if (password === envPassword) {
+    const cookieStore = await cookies();
+    cookieStore.set(COOKIE_NAME, 'true', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 60 * 60 * 24 * 7,
+      path: '/',
+    });
+    return { success: true };
+  }
+
+  return { success: false, error: 'Неверный пароль' };
+}
+
+export async function logout() {
+  const cookieStore = await cookies();
+  cookieStore.delete(COOKIE_NAME);
+  redirect('/');
+}
 
 // Типы
 interface EffectData {
@@ -237,19 +270,6 @@ export async function checkAdminSession(): Promise<boolean> {
 }
 
 /**
- * Выход из админ-панели
- */
-export async function logout(): Promise<{ success: boolean }> {
-  try {
-    const cookieStore = await cookies();
-    cookieStore.delete('admin_session');
-    return { success: true };
-  } catch {
-    return { success: false };
-  }
-}
-
-/**
  * Данные для создания эффекта при одобрении заявки
  */
 interface ApproveEffectData {
@@ -397,4 +417,3 @@ export async function rejectSubmission(
     return { success: false, error: `Не удалось отклонить заявку: ${errorMessage}` };
   }
 }
-

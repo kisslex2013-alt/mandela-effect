@@ -248,7 +248,7 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
   const safeImageUrl = effect.imageUrl ? effect.imageUrl.replace(/'/g, '%27') : null;
 
   return (
-    <div className="min-h-screen bg-dark pb-20 pt-8">
+    <div className="min-h-screen bg-dark pb-20 pt-32">
       <div className="max-w-6xl mx-auto px-4">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
           
@@ -276,7 +276,7 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
                 {/* Навигация */}
                 <div className="bg-darkCard border border-light/10 rounded-xl p-2 flex items-center justify-between gap-2 shadow-lg mb-8">
                     <Link href={prevId ? `/effect/${prevId}` : '#'} className={`flex-1 py-3 rounded-lg bg-white/5 hover:bg-white/10 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${!prevId ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                        <ArrowLeftIcon /> <span className="hidden sm:inline">Пред.</span>
+                        <ArrowLeftIcon /> <span className="hidden sm:inline">Предыдущий</span>
                     </Link>
                     <button onClick={handleRandomUnvoted} disabled={!hasUnvoted} className={`flex-1 py-3 rounded-lg bg-white/5 hover:bg-white/10 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${!hasUnvoted ? 'opacity-50 cursor-not-allowed grayscale' : ''}`} title={!hasUnvoted ? "Вы прошли все эффекты!" : "Случайный непройденный"} onMouseEnter={() => { if (!hasUnvoted) toast('Вы прошли все доступные эффекты!', { icon: '🎉' }); }}>
                         <ShuffleIcon /> <span className="hidden sm:inline">Случайный</span>

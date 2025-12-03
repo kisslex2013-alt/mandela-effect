@@ -580,3 +580,108 @@ export async function getRelatedEffects(category: string, currentId: string): Pr
   }
 }
 
+/**
+ * Получить данные для каталога (эффекты и категории)
+ * Используется в app/catalog/page.tsx
+ */
+export async function getCatalogData() {
+  try {
+    const [effects, categories] = await Promise.all([
+      prisma.effect.findMany({
+        where: { isVisible: true },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          category: true,
+          imageUrl: true,
+          votesFor: true,
+          votesAgainst: true,
+          createdAt: true,
+          residue: true,
+          history: true,
+        },
+      }),
+      prisma.category.findMany({
+        orderBy: { sortOrder: 'asc' },
+      }),
+    ]);
+
+    // Сериализация дат для передачи на клиент
+    const serializedEffects = effects.map(effect => ({
+      ...effect,
+      createdAt: effect.createdAt.toISOString(),
+    }));
+
+    return { 
+      success: true, 
+      data: { 
+        effects: serializedEffects, 
+        categories 
+      } 
+    };
+  } catch (error) {
+    console.error('Error fetching catalog data:', error);
+    return { success: false, error: 'Failed to fetch catalog data' };
+  }
+}
+
+/**
+ * Получить данные для главной страницы (тренды, новые эффекты, категории, статистика)
+ * Используется в app/page.tsx
+ */
+export async function getHomeData() {
+  try {
+    const [effects, categories, totalVotesDb, uniqueVisitors] = await Promise.all([
+      // 1. Получаем все эффекты (чтобы отсортировать их по популярности в JS)
+      prisma.effect.findMany({
+        where: { isVisible: true },
+        select: {
+          id: true, title: true, description: true, category: true,
+          imageUrl: true, votesFor: true, votesAgainst: true, createdAt: true
+        }
+      }),
+      // 2. Категории
+      prisma.category.findMany({
+        orderBy: { sortOrder: 'asc' },
+      }),
+      // 3. Точная статистика
+      prisma.vote.count(), // Всего голосов
+      prisma.vote.groupBy({ by: ['visitorId'] }).then(res => res.length) // Участников
+    ]);
+
+    // Сортировка для Трендов (сумма голосов)
+    const trending = [...effects]
+      .sort((a, b) => (b.votesFor + b.votesAgainst) - (a.votesFor + a.votesAgainst))
+      .slice(0, 3)
+      .map(e => ({ ...e, createdAt: e.createdAt.toISOString() }));
+
+    // Сортировка для Новых (дата)
+    const newEffects = [...effects]
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .slice(0, 6)
+      .map(e => ({ ...e, createdAt: e.createdAt.toISOString() }));
+
+    // Статистика
+    const stats = {
+      totalEffects: effects.length,
+      totalVotes: totalVotesDb,
+      totalParticipants: uniqueVisitors
+    };
+
+    return {
+      success: true,
+      data: {
+        trending,
+        newEffects,
+        categories,
+        stats
+      }
+    };
+  } catch (error) {
+    console.error('Error fetching home data:', error);
+    return { success: false, error: 'Failed' };
+  }
+}
+

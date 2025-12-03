@@ -17,6 +17,27 @@ export default async function AdminPage() {
   // Загружаем все эффекты из базы данных
   const effects = await prisma.effect.findMany({
     orderBy: { createdAt: 'desc' },
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      content: true,
+      category: true,
+      imageUrl: true,
+      videoUrl: true,
+      votesFor: true,
+      votesAgainst: true,
+      views: true,
+      residue: true,
+      residueSource: true,
+      history: true,
+      historySource: true,
+      yearDiscovered: true,
+      interpretations: true,
+      isVisible: true,
+      createdAt: true,
+      updatedAt: true,
+    },
   });
 
   // Загружаем заявки (только PENDING для модерации)
@@ -48,6 +69,7 @@ export default async function AdminPage() {
     historySource: effect.historySource,
     yearDiscovered: effect.yearDiscovered,
     interpretations: effect.interpretations as Record<string, string> | null,
+    isVisible: effect.isVisible,
     createdAt: effect.createdAt.toISOString(),
     updatedAt: effect.updatedAt.toISOString(),
   }));

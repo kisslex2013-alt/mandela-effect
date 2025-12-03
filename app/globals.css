@@ -123,23 +123,52 @@ input[type="submit"] {
   animation: fadeIn 0.3s ease-out;
 }
 
-/* Улучшенный scrollbar */
+/* Анимация появления баров (GPU-accelerated) */
+@keyframes barSlideIn {
+  from {
+    opacity: 0;
+    transform: scaleX(0);
+    transform-origin: left center;
+  }
+  to {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+}
+
+.bar-animate {
+  animation: barSlideIn 0.5s ease-out forwards;
+  will-change: transform, opacity;
+}
+
+/* Staggered delay для баров */
+.bar-animate-delay-0 { animation-delay: 0.4s; }
+.bar-animate-delay-1 { animation-delay: 0.5s; }
+.bar-animate-delay-2 { animation-delay: 0.6s; }
+.bar-animate-delay-3 { animation-delay: 0.7s; }
+.bar-animate-delay-4 { animation-delay: 0.8s; }
+.bar-animate-delay-5 { animation-delay: 0.9s; }
+.bar-animate-delay-6 { animation-delay: 1.0s; }
+
+/* Tech Scrollbar */
 ::-webkit-scrollbar {
-  width: 12px;
+  width: 6px; /* Тонкий */
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(10, 10, 10, 0.5);
+  background: #050505; /* Почти черный */
 }
 
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #3B82F6 0%, #F97316 100%);
-  border-radius: 6px;
-  border: 2px solid rgba(10, 10, 10, 0.5);
+  background: #333; /* Темный в покое */
+  border-radius: 0px; /* Квадратные края (техно-стиль) */
+  border: 1px solid transparent;
+  background-clip: content-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #60A5FA 0%, #FB923C 100%);
+  background: #3b82f6; /* Синий неон при наведении */
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.5); /* Свечение */
 }
 
 /* Плавные transitions для всех интерактивных элементов */
@@ -367,4 +396,28 @@ textarea {
   60% { clip: rect(55px, 9999px, 11px, 0); }
   80% { clip: rect(21px, 9999px, 92px, 0); }
   100% { clip: rect(31px, 9999px, 14px, 0); }
+}
+
+/* Shimmer animation for skeleton loaders */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Slow spin animation for decorative elements */
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 8s linear infinite;
 }

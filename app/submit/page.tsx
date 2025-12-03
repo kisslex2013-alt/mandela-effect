@@ -8,7 +8,8 @@ import confetti from 'canvas-confetti';
 import { submitEffect, getSubmitCategories } from '@/app/actions/submission';
 import { generateEffectData } from '@/app/actions/generate-content';
 import CustomSelect, { type SelectOption } from '@/components/ui/CustomSelect';
-import { Send, Link as LinkIcon, Mail, MessageSquare, FileText, Sparkles, Brain, Link2, Users, Lightbulb, ChevronRight, List, CheckCircle } from 'lucide-react';
+import GlitchTitle from '@/components/ui/GlitchTitle';
+import { Send, Link as LinkIcon, Mail, MessageSquare, FileText, Sparkles, Brain, Link2, Users, Lightbulb, ChevronRight, List, CheckCircle, Film, Music, Tag, User, Globe, Gamepad2, Baby, Ghost, HelpCircle } from 'lucide-react';
 
 interface Category {
   category: string;
@@ -89,12 +90,29 @@ export default function SubmitPage() {
     };
   }, []);
 
+  // Функция для получения иконки категории (как в каталоге)
+  const getCategoryIcon = (slug: string) => {
+    const props = { className: "w-4 h-4 shrink-0" };
+    switch (slug) {
+      case 'films': return <Film {...props} />;
+      case 'music': return <Music {...props} />;
+      case 'brands': return <Tag {...props} />;
+      case 'people': return <User {...props} />;
+      case 'geography': return <Globe {...props} />;
+      case 'popculture': return <Gamepad2 {...props} />;
+      case 'childhood': return <Baby {...props} />;
+      case 'russian': return <Ghost {...props} />;
+      default: return <HelpCircle {...props} />;
+    }
+  };
+
   // Опции для CustomSelect
   const categoryOptions: SelectOption[] = useMemo(() => {
     return categories.map((cat) => ({
       value: cat.category,
       label: cat.name,
-      emoji: cat.emoji,
+      icon: getCategoryIcon(cat.category),
+      emoji: cat.emoji, // Оставляем для совместимости
     }));
   }, [categories]);
 
@@ -463,19 +481,23 @@ export default function SubmitPage() {
   };
 
   return (
-    <main id="main-content" className="min-h-screen bg-dark pt-24 pb-16 px-4" role="main">
+    <main id="main-content" className="min-h-screen bg-dark relative pt-32 pb-16 px-4 overflow-hidden" role="main">
+      {/* Фоновая сетка */}
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]" />
+        <div className="absolute top-0 left-0 w-full h-96 bg-gradient-to-b from-blue-900/10 to-transparent blur-3xl opacity-30" />
+      </div>
+
       <motion.div 
-        className="max-w-2xl mx-auto"
+        className="max-w-2xl mx-auto relative z-10"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
         {/* Заголовок */}
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary mb-2">
-            Предложить новый эффект
-          </h1>
-          <p className="text-lg text-light/60">Помоги расширить коллекцию эффектов Манделы</p>
+          <GlitchTitle text="ДОБАВИТЬ ЭФФЕКТ" />
+          <p className="text-lg text-light/60 mt-4">Помоги расширить коллекцию эффектов Манделы</p>
         </div>
 
         {/* Сообщение об успехе */}
@@ -806,7 +828,7 @@ export default function SubmitPage() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full px-6 py-4 bg-gradient-to-r from-primary to-secondary text-white font-semibold rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="btn-glitch w-full px-6 py-4 bg-primary text-white font-bold rounded-xl shadow-[0_0_20px_rgba(59,130,246,0.4)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {isSubmitting ? (
                 <>
