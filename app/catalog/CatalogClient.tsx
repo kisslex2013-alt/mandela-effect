@@ -31,6 +31,8 @@ interface Effect {
   createdAt: string;
   residue?: string | null;
   history?: string | null;
+  commentsCount?: number;
+  commentsWithMediaCount?: number;
 }
 
 interface CatalogClientProps {
