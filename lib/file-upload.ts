@@ -150,21 +150,23 @@ export async function saveUploadedFile(file: File): Promise<UploadResult> {
       } catch (supabaseError) {
         console.error('[FILE-UPLOAD] Исключение при загрузке в Supabase:', supabaseError);
         // В продакшене не используем fallback
-        if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
+        const isProduction = process.env.VERCEL || process.env.NODE_ENV === 'production';
+        if (isProduction) {
           return {
             success: false,
             error: supabaseError instanceof Error ? supabaseError.message : 'Ошибка загрузки в Supabase Storage',
           };
         }
         // Fallback только в dev режиме
-        if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+        if (!process.env.VERCEL) {
           console.log('[FILE-UPLOAD] Fallback на локальное хранилище...');
         }
       }
     }
 
     // Fallback: используем локальную файловую систему (ТОЛЬКО в dev, НЕ в продакшене)
-    if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+    const isProductionEnv = process.env.VERCEL || process.env.NODE_ENV === 'production';
+    if (!isProductionEnv) {
       const { writeFile, mkdir } = await import('fs/promises');
       const { join } = await import('path');
       const { existsSync } = await import('fs');
