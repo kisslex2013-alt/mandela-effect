@@ -348,7 +348,7 @@ export function validateFileType(url: string, expectedType: 'image' | 'video' | 
     const extension = pathname.substring(pathname.lastIndexOf('.'));
     
     // Проверяем расширение
-    const allowedExts = ALLOWED_EXTENSIONS[expectedType];
+    const allowedExts = ALLOWED_EXTENSIONS[expectedType] as readonly string[];
     if (extension && allowedExts.includes(extension)) {
       return true;
     }
