@@ -12,7 +12,7 @@ const nextConfig: NextConfig = {
   // Настройки Server Actions для стабильности
   experimental: {
     serverActions: {
-      bodySizeLimit: '2mb',
+      bodySizeLimit: '10mb', // Увеличено для загрузки изображений до 10MB
       // Увеличиваем таймаут для AI генерации
       allowedOrigins: ['localhost:3000'],
     },

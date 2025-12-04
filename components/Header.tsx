@@ -11,6 +11,11 @@ export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  // Скрываем Header на странице админки
+  if (pathname?.startsWith('/admin')) {
+    return null;
+  }
+
   // Отслеживаем скролл для микро-эффектов (опционально)
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 20);

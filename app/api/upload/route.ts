@@ -13,6 +13,10 @@ async function checkAdminAuth(): Promise<boolean> {
   return session?.value === 'authenticated';
 }
 
+// Конфигурация для больших файлов
+export const maxDuration = 60; // 60 секунд для загрузки больших файлов
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/upload - Загрузка изображения
  */
@@ -31,7 +35,25 @@ export async function POST(request: NextRequest) {
     }
 
     // Получение файла из FormData
-    const formData = await request.formData();
+    let formData: FormData;
+    try {
+      formData = await request.formData();
+    } catch (error) {
+      console.error('[UPLOAD] Ошибка парсинга FormData:', error);
+      // Возможно, файл слишком большой
+      const contentLength = request.headers.get('content-length');
+      if (contentLength && parseInt(contentLength) > 10 * 1024 * 1024) {
+        return NextResponse.json(
+          { success: false, error: 'Файл слишком большой. Максимальный размер: 10MB' },
+          { status: 413 }
+        );
+      }
+      return NextResponse.json(
+        { success: false, error: 'Ошибка при получении файла. Проверьте размер файла (максимум 10MB)' },
+        { status: 400 }
+      );
+    }
+    
     const file = formData.get('file') as File | null;
 
     if (!file) {

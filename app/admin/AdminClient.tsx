@@ -8,6 +8,8 @@ import { updateEffect, deleteEffect, logout, approveSubmission, rejectSubmission
 import { moderateComment } from '@/app/actions/comments';
 import { generateEffectData, generateEffectImage, restyleImage, fitImageToFormat } from '@/app/actions/generate-content';
 import { findNewEffects } from '@/app/actions/find-new-effects';
+import { extractImageFromGeminiChat } from '@/app/actions/gemini-extract';
+import { isGeminiChatUrl } from '@/lib/gemini-utils';
 import { getCategories, createCategory, updateCategory, deleteCategory, type Category } from '@/app/actions/category';
 import CustomSelect, { type SelectOption } from '@/components/ui/CustomSelect';
 import ImageWithSkeleton from '@/components/ui/ImageWithSkeleton';
@@ -296,21 +298,38 @@ export default function AdminClient({ effects: initialEffects, submissions: init
     }
     
     try {
-      // Определяем тип источника
+      let finalUrl = url;
       let sourceType: 'YANDEX' | 'GOOGLE' | 'URL' | 'UPLOAD' | undefined = undefined;
       let sourceValue: string | undefined = undefined;
       
       if (mode === 'link') {
-        // Определяем источник по URL
-        if (url.includes('yandex.ru') || url.includes('yandex.com')) {
-          sourceType = 'YANDEX';
-          sourceValue = url;
-        } else if (url.includes('google.com') || url.includes('google.ru')) {
-          sourceType = 'GOOGLE';
-          sourceValue = url;
+        // Проверяем, является ли это ссылкой на Gemini чат
+        if (isGeminiChatUrl(url)) {
+          toast.loading('Извлечение изображения из Gemini чата...', { id: 'gemini-extract' });
+          
+          const extractResult = await extractImageFromGeminiChat(url);
+          
+          if (extractResult.success && extractResult.imageUrl) {
+            finalUrl = extractResult.imageUrl;
+            sourceType = 'URL'; // Используем URL, так как это прямая ссылка на изображение
+            sourceValue = url; // Сохраняем оригинальную ссылку на чат
+            toast.success('Изображение извлечено из Gemini чата', { id: 'gemini-extract' });
+          } else {
+            toast.error(extractResult.error || 'Не удалось извлечь изображение из Gemini чата', { id: 'gemini-extract' });
+            return;
+          }
         } else {
-          sourceType = 'URL';
-          sourceValue = url;
+          // Обычная обработка ссылок
+          if (url.includes('yandex.ru') || url.includes('yandex.com')) {
+            sourceType = 'YANDEX';
+            sourceValue = url;
+          } else if (url.includes('google.com') || url.includes('google.ru')) {
+            sourceType = 'GOOGLE';
+            sourceValue = url;
+          } else {
+            sourceType = 'URL';
+            sourceValue = url;
+          }
         }
       } else {
         // Для загрузки файла sourceType будет установлен после загрузки
@@ -318,7 +337,7 @@ export default function AdminClient({ effects: initialEffects, submissions: init
       }
       
       const result = await updateEffect(effect.id, { 
-        imageUrl: url || undefined,
+        imageUrl: finalUrl || undefined,
         imageSourceType: sourceType,
         imageSourceValue: sourceValue,
       });
@@ -326,7 +345,7 @@ export default function AdminClient({ effects: initialEffects, submissions: init
       if (result.success) {
         setEffects(prev => prev.map(e => e.id === effect.id ? { 
           ...e, 
-          imageUrl: url || e.imageUrl,
+          imageUrl: finalUrl || e.imageUrl,
           imageSourceType: sourceType,
           imageSourceValue: sourceValue,
         } : e));

@@ -64,6 +64,8 @@ export const MEDIA_WHITELIST = {
     'docs.google.com',
     'photos.google.com',
     'storage.googleapis.com',
+    'gemini.google.com', // Gemini чаты и изображения
+    'generativelanguage.googleapis.com', // Gemini API CDN для изображений
     
     // Другие популярные сервисы
     'flickr.com',
