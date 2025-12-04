@@ -10,6 +10,10 @@ export const metadata: Metadata = {
 };
 
 async function getData() {
+  // Все данные берутся из одного источника (БД) для согласованности:
+  // - effects: массив всех видимых эффектов с их голосами
+  // - totalVotes: общее количество записей в таблице vote (используется для расчета индекса сдвига)
+  // - totalParticipants: количество уникальных visitorId (используется для отображения участников)
   const [effects, totalVotes, uniqueVisitors] = await Promise.all([
     prisma.effect.findMany({
       where: { isVisible: true },

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { updateEffect, deleteEffect, logout, approveSubmission, rejectSubmission, createEffect } from '@/app/actions/admin';
+import { moderateComment } from '@/app/actions/comments';
 import { generateEffectData, generateEffectImage, restyleImage, fitImageToFormat } from '@/app/actions/generate-content';
 import { findNewEffects } from '@/app/actions/find-new-effects';
 import { getCategories, createCategory, updateCategory, deleteCategory, type Category } from '@/app/actions/category';
@@ -17,7 +18,7 @@ import {
   Edit, Trash2, Eye, EyeOff, Check, X, Save, ArrowLeft, 
   ScrollText, BrainCircuit, Wand2, Loader2, Link as LinkIcon, 
   Zap, ScanSearch, FileText, Image as ImageIcon, Palette, LayoutTemplate,
-  CheckSquare, Square, Maximize2, ListChecks,
+  CheckSquare, Square, Maximize2, ListChecks, MessageSquare,
   // Категории
   Film, Music, Tag, User, Globe, Gamepad2, Baby, Ghost, HelpCircle,
   Atom, FlaskConical, BookOpen, Library, Landmark, History, Hourglass, 
@@ -91,13 +92,34 @@ interface Submission {
   interpretations: Record<string, string> | null; status: string; createdAt: string;
 }
 
-interface AdminClientProps {
-  effects: Effect[]; submissions: Submission[]; categories: Category[];
+interface Comment {
+  id: string;
+  effectId: string;
+  effectTitle: string;
+  visitorId: string;
+  type: 'WITNESS' | 'ARCHAEOLOGIST' | 'THEORIST';
+  text: string;
+  imageUrl: string | null;
+  videoUrl: string | null;
+  audioUrl: string | null;
+  theoryType: string | null;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  likes: number;
+  reports: number;
+  createdAt: string;
+  moderatedAt: string | null;
 }
 
-type TabType = 'effects' | 'submissions' | 'categories';
+interface AdminClientProps {
+  effects: Effect[]; 
+  submissions: Submission[]; 
+  categories: Category[];
+  comments: Comment[];
+}
 
-export default function AdminClient({ effects: initialEffects, submissions: initialSubmissions, categories: initialCategories }: AdminClientProps) {
+type TabType = 'effects' | 'submissions' | 'categories' | 'comments';
+
+export default function AdminClient({ effects: initialEffects, submissions: initialSubmissions, categories: initialCategories, comments: initialComments }: AdminClientProps) {
   const router = useRouter();
   const [isMounted, setIsMounted] = useState(false);
   useEffect(() => { setIsMounted(true); }, []);
@@ -105,6 +127,7 @@ export default function AdminClient({ effects: initialEffects, submissions: init
   const [effects, setEffects] = useState<Effect[]>(initialEffects);
   const [submissions, setSubmissions] = useState<Submission[]>(initialSubmissions);
   const [categories, setCategories] = useState<Category[]>(initialCategories);
+  const [comments, setComments] = useState<Comment[]>(initialComments);
   
   const [activeTab, setActiveTab] = useState<TabType>('effects');
   const [searchQuery, setSearchQuery] = useState('');
@@ -430,6 +453,41 @@ export default function AdminClient({ effects: initialEffects, submissions: init
     }
   };
 
+  const handleApproveComment = async (commentId: string) => {
+    setLoading(true);
+    try {
+      const result = await moderateComment(commentId, 'APPROVED');
+      if (result.success) {
+        setComments(prev => prev.filter(c => c.id !== commentId));
+        toast.success('Комментарий одобрен');
+        router.refresh();
+      } else {
+        toast.error(result.error || 'Ошибка');
+      }
+    } catch (error) {
+      toast.error('Ошибка при одобрении');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRejectComment = async (commentId: string) => {
+    setLoading(true);
+    try {
+      const result = await moderateComment(commentId, 'REJECTED');
+      if (result.success) {
+        setComments(prev => prev.filter(c => c.id !== commentId));
+        toast.success('Комментарий отклонен');
+      } else {
+        toast.error(result.error || 'Ошибка');
+      }
+    } catch (error) {
+      toast.error('Ошибка при отклонении');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (!isMounted) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>;
 
   return (
@@ -449,6 +507,7 @@ export default function AdminClient({ effects: initialEffects, submissions: init
         <div className="flex gap-2 mb-6 border-b border-light/10 pb-1 overflow-x-auto items-center">
           <button onClick={() => setActiveTab('effects')} className={`flex items-center gap-2 px-6 py-3 rounded-t-lg transition-colors whitespace-nowrap ${activeTab === 'effects' ? 'bg-primary/10 text-primary border-b-2 border-primary' : 'text-light/60 hover:text-light hover:bg-white/5'}`}><LayoutGrid className="w-4 h-4" /> Эффекты <span className="text-xs bg-white/10 px-2 py-0.5 rounded-full ml-1">{effects.length}</span></button>
           <button onClick={() => setActiveTab('submissions')} className={`flex items-center gap-2 px-6 py-3 rounded-t-lg transition-colors whitespace-nowrap ${activeTab === 'submissions' ? 'bg-primary/10 text-primary border-b-2 border-primary' : 'text-light/60 hover:text-light hover:bg-white/5'}`}><Inbox className="w-4 h-4" /> Заявки <span className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full ml-1">{submissions.length}</span></button>
+          <button onClick={() => setActiveTab('comments')} className={`flex items-center gap-2 px-6 py-3 rounded-t-lg transition-colors whitespace-nowrap ${activeTab === 'comments' ? 'bg-primary/10 text-primary border-b-2 border-primary' : 'text-light/60 hover:text-light hover:bg-white/5'}`}><MessageSquare className="w-4 h-4" /> Комментарии <span className="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-full ml-1">{comments.length}</span></button>
           <button onClick={() => setActiveTab('categories')} className={`flex items-center gap-2 px-6 py-3 rounded-t-lg transition-colors whitespace-nowrap ${activeTab === 'categories' ? 'bg-primary/10 text-primary border-b-2 border-primary' : 'text-light/60 hover:text-light hover:bg-white/5'}`}><Tags className="w-4 h-4" /> Категории <span className="text-xs bg-white/10 px-2 py-0.5 rounded-full ml-1">{categories.length}</span></button>
           <div className="ml-auto px-3 py-1 bg-white/5 rounded text-xs text-light/40">Скрыто: <span className="text-red-400 font-bold">{hiddenCount}</span></div>
         </div>
@@ -525,6 +584,144 @@ export default function AdminClient({ effects: initialEffects, submissions: init
                         </div>
                     </div>
                 ))}
+            </div>
+        )}
+
+        {activeTab === 'comments' && (
+            <div className="space-y-4">
+                {comments.length === 0 ? (
+                    <div className="text-center py-20 text-light/40">Нет комментариев на модерацию</div>
+                ) : (
+                    comments.map(comment => (
+                        <div key={comment.id} className="bg-darkCard border border-light/10 rounded-xl p-6">
+                            {/* Заголовок с информацией */}
+                            <div className="flex items-start justify-between mb-4">
+                                <div className="flex-1">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                                            comment.type === 'WITNESS' ? 'bg-blue-500/20 text-blue-400' :
+                                            comment.type === 'ARCHAEOLOGIST' ? 'bg-purple-500/20 text-purple-400' :
+                                            'bg-pink-500/20 text-pink-400'
+                                        }`}>
+                                            {comment.type === 'WITNESS' ? '👁️ Свидетель' :
+                                             comment.type === 'ARCHAEOLOGIST' ? '🔍 Археолог' :
+                                             '🧠 Теоретик'}
+                                        </span>
+                                        {comment.theoryType && (
+                                            <span className="px-2 py-1 rounded text-xs bg-white/5 text-light/60">
+                                                {comment.theoryType}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <Link 
+                                        href={`/effect/${comment.effectId}`}
+                                        className="text-sm text-primary hover:underline"
+                                        target="_blank"
+                                    >
+                                        {comment.effectTitle || `Эффект #${comment.effectId.slice(0, 8)}`}
+                                    </Link>
+                                </div>
+                                <span className="text-xs text-light/40">
+                                    {new Date(comment.createdAt).toLocaleString('ru-RU')}
+                                </span>
+                            </div>
+
+                            {/* Текст комментария */}
+                            <p className="text-sm text-light/70 mb-4 whitespace-pre-wrap">
+                                {comment.text}
+                            </p>
+
+                            {/* Медиа (если есть) */}
+                            {(comment.imageUrl || comment.videoUrl || comment.audioUrl) && (
+                                <div className="mb-4 space-y-2">
+                                    {comment.imageUrl && (
+                                        <div>
+                                            <p className="text-xs text-light/40 mb-1">Изображение:</p>
+                                            <a 
+                                                href={comment.imageUrl} 
+                                                target="_blank" 
+                                                rel="noopener noreferrer"
+                                                className="text-xs text-blue-400 hover:underline break-all block mb-2"
+                                            >
+                                                {comment.imageUrl}
+                                            </a>
+                                            <img 
+                                                src={comment.imageUrl} 
+                                                alt="Превью" 
+                                                className="max-w-xs rounded border border-white/10"
+                                                onError={(e) => {
+                                                    e.currentTarget.style.display = 'none';
+                                                }}
+                                            />
+                                        </div>
+                                    )}
+                                    {comment.videoUrl && (
+                                        <div>
+                                            <p className="text-xs text-light/40 mb-1">Видео:</p>
+                                            <a 
+                                                href={comment.videoUrl} 
+                                                target="_blank" 
+                                                rel="noopener noreferrer"
+                                                className="text-xs text-blue-400 hover:underline break-all"
+                                            >
+                                                {comment.videoUrl}
+                                            </a>
+                                        </div>
+                                    )}
+                                    {comment.audioUrl && (
+                                        <div>
+                                            <p className="text-xs text-light/40 mb-1">Аудио:</p>
+                                            <a 
+                                                href={comment.audioUrl} 
+                                                target="_blank" 
+                                                rel="noopener noreferrer"
+                                                className="text-xs text-blue-400 hover:underline break-all"
+                                            >
+                                                {comment.audioUrl}
+                                            </a>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Статистика */}
+                            <div className="flex items-center gap-4 text-xs text-light/40 mb-4">
+                                <span>👍 {comment.likes}</span>
+                                {comment.reports > 0 && (
+                                    <span className="text-red-400">⚠️ Жалоб: {comment.reports}</span>
+                                )}
+                            </div>
+
+                            {/* Кнопки модерации */}
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => handleApproveComment(comment.id)}
+                                    disabled={loading}
+                                    className="flex items-center gap-2 px-4 py-2 bg-green-500/20 text-green-400 rounded-lg text-sm hover:bg-green-500/30 transition-colors disabled:opacity-50"
+                                >
+                                    <Check className="w-4 h-4" />
+                                    Одобрить
+                                </button>
+                                <button
+                                    onClick={() => handleRejectComment(comment.id)}
+                                    disabled={loading}
+                                    className="flex items-center gap-2 px-4 py-2 bg-red-500/20 text-red-400 rounded-lg text-sm hover:bg-red-500/30 transition-colors disabled:opacity-50"
+                                >
+                                    <X className="w-4 h-4" />
+                                    Отклонить
+                                </button>
+                                <Link
+                                    href={`/effect/${comment.effectId}`}
+                                    target="_blank"
+                                    className="flex items-center gap-2 px-4 py-2 bg-white/5 text-light/60 rounded-lg text-sm hover:bg-white/10 transition-colors"
+                                >
+                                    <Eye className="w-4 h-4" />
+                                    Открыть эффект
+                                </Link>
+                            </div>
+                        </div>
+                    ))
+                )}
             </div>
         )}
 

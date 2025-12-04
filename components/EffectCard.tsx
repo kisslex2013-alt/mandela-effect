@@ -5,7 +5,7 @@ import Link from 'next/link';
 import ImageWithSkeleton from '@/components/ui/ImageWithSkeleton';
 import { useSound } from '@/lib/hooks/useSound';
 import { 
-  Film, Music, Tag, User, Globe, Gamepad2, Baby, Ghost, Sparkles, Check
+  Film, Music, Tag, User, Globe, Gamepad2, Baby, Ghost, Sparkles, Check, MessageSquare, Link as LinkIcon
 } from 'lucide-react';
 import { CATEGORY_MAP } from '@/lib/constants';
 
@@ -23,6 +23,9 @@ interface EffectCardProps {
   hasVoted?: boolean;
   className?: string;
   priority?: boolean;
+  commentsCount?: number;
+  commentsWithMediaCount?: number;
+  hasNewComments?: boolean;
 }
 
 export default function EffectCard({
@@ -39,6 +42,9 @@ export default function EffectCard({
   hasVoted = false,
   className = '',
   priority = false,
+  commentsCount = 0,
+  commentsWithMediaCount = 0,
+  hasNewComments = false,
 }: EffectCardProps) {
   const { playClick, playHover } = useSound();
 
@@ -85,10 +91,50 @@ export default function EffectCard({
               <div className="glitch-layer" style={{ backgroundImage: `url('${safeImageUrl}')` }} />
               <div className="glitch-layer" style={{ backgroundImage: `url('${safeImageUrl}')` }} />
             </div>
+            {/* Бейдж комментариев */}
+            {commentsCount > 0 && (
+              <div className={`absolute top-2 right-2 z-[30] flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold backdrop-blur-sm transition-all ${
+                hasNewComments 
+                  ? 'bg-purple-500/90 text-white border-2 border-purple-400/70 shadow-lg shadow-purple-500/50 animate-pulse' 
+                  : 'bg-darkCard/95 text-light/90 border border-light/30'
+              }`}>
+                {commentsWithMediaCount > 0 ? (
+                  <>
+                    <LinkIcon className="w-3 h-3" />
+                    <span className="font-bold">{commentsCount}</span>
+                  </>
+                ) : (
+                  <>
+                    <MessageSquare className="w-3 h-3" />
+                    <span className="font-bold">{commentsCount}</span>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         ) : (
           <div className="relative z-10 h-48 min-h-[192px] shrink-0 w-full bg-gradient-to-br from-primary/20 via-secondary/20 to-primary/20 flex items-center justify-center rounded-t-xl border-b border-light/10">
             <span className="text-white/50">{getCategoryIcon(category)}</span>
+            {/* Бейдж комментариев для карточек без изображения */}
+            {commentsCount > 0 && (
+              <div className={`absolute top-2 right-2 z-[30] flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold backdrop-blur-sm transition-all ${
+                hasNewComments 
+                  ? 'bg-purple-500/90 text-white border-2 border-purple-400/70 shadow-lg shadow-purple-500/50 animate-pulse' 
+                  : 'bg-darkCard/95 text-light/90 border border-light/30'
+              }`}>
+                {commentsWithMediaCount > 0 ? (
+                  <>
+                    <LinkIcon className="w-3 h-3" />
+                    <span className="font-bold">{commentsCount}</span>
+                  </>
+                ) : (
+                  <>
+                    <MessageSquare className="w-3 h-3" />
+                    <span className="font-bold">{commentsCount}</span>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         )}
 

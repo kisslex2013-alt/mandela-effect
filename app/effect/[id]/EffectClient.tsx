@@ -9,6 +9,7 @@ import { getAllEffectIds, getRelatedEffects } from '@/app/actions/effects';
 import { votesStore } from '@/lib/votes-store';
 import { getVisitorId } from '@/lib/visitor';
 import ImageWithSkeleton from '@/components/ui/ImageWithSkeleton';
+import ArchiveAnomalies from '@/components/comments/ArchiveAnomalies';
 import toast from 'react-hot-toast';
 
 interface Effect {
@@ -117,6 +118,9 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
   const [nextUnvotedId, setNextUnvotedId] = useState<string | null>(null);
   const [prevId, setPrevId] = useState<string | null>(null);
   const [hasUnvoted, setHasUnvoted] = useState(true);
+  
+  // Состояние для аккордеона (только один открыт одновременно)
+  const [openAccordion, setOpenAccordion] = useState<string | null>(null);
 
   // Варианты из контента
   const contentLines = effect.content.split('\n');
@@ -220,8 +224,8 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
       const visitorId = getVisitorId();
       if (visitorId) {
         await saveVote({
-          visitorId,
-          effectId: effect.id,
+        visitorId,
+        effectId: effect.id,
           variant
         });
       }
@@ -266,12 +270,12 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
                                 <div className="glitch-layer" style={{ backgroundImage: `url('${safeImageUrl}')` }} />
                                 <div className="glitch-layer" style={{ backgroundImage: `url('${safeImageUrl}')` }} />
                             </div>
-                        </div>
+          </div>
                     ) : (
                         <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/10 to-secondary/10"><span className="text-6xl">🖼️</span></div>
                     )}
                     <div className="absolute top-4 left-4 px-3 py-1 bg-black/60 backdrop-blur-md rounded-full text-xs font-bold uppercase tracking-wider border border-white/10">{effect.category}</div>
-                </div>
+        </div>
 
                 {/* Навигация */}
                 <div className="bg-darkCard border border-light/10 rounded-xl p-2 flex items-center justify-between gap-2 shadow-lg mb-8">
@@ -307,11 +311,11 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
                                     </div>
                                 </Link>
                             ))}
-                        </div>
-                    </div>
-                )}
+              </div>
             </div>
-          </div>
+          )}
+            </div>
+                </div>
 
           {/* Правая колонка */}
           <div className="space-y-8">
@@ -320,7 +324,7 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
             <div>
               <h1 className="text-3xl md:text-4xl font-black text-white mb-4 leading-tight">{effect.title}</h1>
               <p className="text-lg text-light/80 leading-relaxed">{effect.description}</p>
-            </div>
+                </div>
 
             {/* Блок Голосования */}
             <motion.div 
@@ -342,17 +346,17 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
                         <button onClick={() => handleVote('A')} className="group relative overflow-hidden p-6 rounded-2xl bg-darkCard border border-light/10 hover:border-blue-500/50 transition-all hover:shadow-lg hover:shadow-blue-500/10 text-left h-full">
                             <div className="flex items-center justify-between mb-3">
                                 <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400 font-bold text-sm">A</div>
-                            </div>
+                </div>
                             <div className="text-lg font-bold text-light group-hover:text-blue-200 transition-colors line-clamp-4">{variantA}</div>
                         </button>
 
                         <button onClick={() => handleVote('B')} className="group relative overflow-hidden p-6 rounded-2xl bg-darkCard border border-light/10 hover:border-amber-500/50 transition-all hover:shadow-lg hover:shadow-amber-500/10 text-left h-full">
                             <div className="flex items-center justify-between mb-3">
                                 <div className="w-8 h-8 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-400 font-bold text-sm">B</div>
-                            </div>
+        </div>
                             <div className="text-lg font-bold text-light group-hover:text-amber-200 transition-colors line-clamp-4">{variantB}</div>
                         </button>
-                    </div>
+                </div>
                 ) : (
                     // Результаты
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-darkCard border border-light/10 rounded-2xl p-6 shadow-xl relative overflow-hidden">
@@ -362,17 +366,17 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
                                 {userVote === 'A' && (
                                     <div className={`absolute top-4 right-4 border-2 font-black text-xs px-2 py-1 rotate-12 opacity-80 tracking-widest ${isMajority ? 'border-green-500 text-green-500' : 'border-purple-500 text-purple-500'}`}>
                                         {isMajority ? 'БОЛЬШИНСТВО' : 'УНИКУМ'}
-                                    </div>
+                </div>
                                 )}
                                 <div className="flex items-center gap-2 mb-2">
                                     <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold">A</div>
-                                </div>
+              </div>
                                 <div className="text-sm font-medium text-white mb-3 line-clamp-4">{variantA}</div>
                                 <div className="relative h-2 bg-dark rounded-full overflow-hidden mb-1">
                                     <motion.div initial={{ width: 0 }} animate={{ width: `${percentA}%` }} className="h-full bg-blue-500" />
-                                </div>
+                </div>
                                 <div className="text-right font-black text-blue-400">{percentA}%</div>
-                            </div>
+              </div>
 
                             {/* Вариант Б */}
                             <div className={`p-4 rounded-xl border-2 relative overflow-hidden ${userVote === 'B' ? 'border-amber-500 bg-amber-500/5' : 'border-white/5 bg-white/5 opacity-80'}`}>
@@ -383,14 +387,14 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
                                 )}
                                 <div className="flex items-center gap-2 mb-2">
                                     <div className="w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center text-white text-xs font-bold">B</div>
-                                </div>
+                </div>
                                 <div className="text-sm font-medium text-white mb-3 line-clamp-4">{variantB}</div>
                                 <div className="relative h-2 bg-dark rounded-full overflow-hidden mb-1">
                                     <motion.div initial={{ width: 0 }} animate={{ width: `${percentB}%` }} className="h-full bg-amber-500" />
-                                </div>
+                </div>
                                 <div className="text-right font-black text-amber-400">{percentB}%</div>
-                            </div>
-                        </div>
+              </div>
+            </div>
 
                         {/* Инфо */}
                         <div className="bg-white/5 rounded-xl p-4 border border-white/5 relative z-10">
@@ -399,10 +403,10 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
                                 <p className="text-xs text-light/60">
                                     Эффект Манделы — это нормально! Нет правильных или неправильных ответов, только разные версии воспоминаний.
                                 </p>
-                            </div>
-                        </div>
-                    </motion.div>
-                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
             </motion.div>
 
             {/* Аккордеоны */}
@@ -412,7 +416,14 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
                         
                         {/* 1. Реальность (Факты) */}
                         {(effect.currentState || scientificText) && (
-                            <AccordionItem title="Текущее состояние (Факты)" icon={<EyeIcon />} color="green" defaultOpen={false}>
+                            <AccordionItem 
+                              id="facts"
+                              title="Текущее состояние | Факты" 
+                              icon={<EyeIcon />} 
+                              color="green" 
+                              isOpen={openAccordion === 'facts'}
+                              onToggle={() => setOpenAccordion(openAccordion === 'facts' ? null : 'facts')}
+                            >
                                 <p>{effect.currentState || scientificText}</p>
                                 {scientificLink && (
                                     <a href={scientificLink} target="_blank" rel="noopener" className="mt-3 text-xs text-green-400 hover:underline flex items-center gap-1">
@@ -424,7 +435,14 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
 
                         {/* 2. Остатки */}
                         {effect.residue && (
-                            <AccordionItem title="Культурные следы (Остатки)" icon={<SearchIcon />} color="blue">
+                            <AccordionItem 
+                              id="residue"
+                              title="Культурные следы | Остатки" 
+                              icon={<SearchIcon />} 
+                              color="blue"
+                              isOpen={openAccordion === 'residue'}
+                              onToggle={() => setOpenAccordion(openAccordion === 'residue' ? null : 'residue')}
+                            >
                                 <div className="whitespace-pre-wrap">{effect.residue}</div>
                                 {effect.residueSource && (
                                     <a href={effect.residueSource} target="_blank" rel="noopener" className="mt-3 text-xs text-blue-400 hover:underline flex items-center gap-1">
@@ -436,7 +454,14 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
 
                         {/* 3. История */}
                         {effect.history && (
-                            <AccordionItem title="Временная шкала (История)" icon={<ScrollTextIcon />} color="amber">
+                            <AccordionItem 
+                              id="history"
+                              title="Временная шкала | История" 
+                              icon={<ScrollTextIcon />} 
+                              color="amber"
+                              isOpen={openAccordion === 'history'}
+                              onToggle={() => setOpenAccordion(openAccordion === 'history' ? null : 'history')}
+                            >
                                 <div className="whitespace-pre-wrap">{effect.history}</div>
                                 {effect.historySource && (
                                     <a href={effect.historySource} target="_blank" rel="noopener" className="mt-3 text-xs text-amber-400 hover:underline flex items-center gap-1">
@@ -448,7 +473,14 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
 
                         {/* 4. Теории (Разделенный) */}
                         {(scientificText || communityText) && (
-                            <AccordionItem title="Что об этом говорят (Теории)" icon={<BrainIcon />} color="pink">
+                            <AccordionItem 
+                              id="theories"
+                              title="Что об этом говорят | Теории" 
+                              icon={<BrainIcon />} 
+                              color="pink"
+                              isOpen={openAccordion === 'theories'}
+                              onToggle={() => setOpenAccordion(openAccordion === 'theories' ? null : 'theories')}
+                            >
                                 {/* Научное объяснение */}
                                 {scientificText && (
                                     <div className="mb-4 pb-4 border-b border-white/5">
@@ -457,40 +489,46 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
                                         {scientificLink && (
                                             <a href={scientificLink} target="_blank" rel="noopener" className="mt-2 text-xs text-pink-400 hover:underline flex items-center gap-1">
                                                 <ExternalLinkIcon /> Источник
-                                            </a>
-                                        )}
-                                    </div>
-                                )}
-                                
+                            </a>
+                          )}
+            </div>
+          )}
+
                                 {/* Мнение сообщества */}
                                 {communityText && (
-                                    <div>
+            <div>
                                         <h4 className="text-xs font-bold text-pink-300 uppercase tracking-wider mb-2">Теории сообщества</h4>
                                         <div className="whitespace-pre-wrap">{communityText}</div>
                                         {communityLink && (
                                             <a href={communityLink} target="_blank" rel="noopener" className="mt-2 text-xs text-pink-400 hover:underline flex items-center gap-1">
                                                 <ExternalLinkIcon /> Источник
-                                            </a>
-                                        )}
-                                    </div>
+                            </a>
+                          )}
+                        </div>
                                 )}
                             </AccordionItem>
                         )}
 
-                    </motion.div>
-                )}
-            </AnimatePresence>
+                        {/* 5. Архив Аномалий */}
+                        <ArchiveAnomalies 
+                          effectId={effect.id} 
+                          isOpen={openAccordion === 'comments'}
+                          onToggle={() => setOpenAccordion(openAccordion === 'comments' ? null : 'comments')}
+                        />
 
-          </div>
-        </div>
-      </div>
-    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+                        </div>
+                        </div>
+                      </div>
+                    </div>
   );
 }
 
 // Компонент Аккордеона
-function AccordionItem({ title, icon, color, children, defaultOpen = false }: any) {
-    const [isOpen, setIsOpen] = useState(defaultOpen);
+function AccordionItem({ id, title, icon, color, children, isOpen, onToggle }: any) {
     
     const colors: any = {
         green: 'border-green-500/20 hover:border-green-500/40',
@@ -501,30 +539,30 @@ function AccordionItem({ title, icon, color, children, defaultOpen = false }: an
 
     return (
         <div className={`bg-darkCard border rounded-xl overflow-hidden transition-colors ${colors[color] || 'border-light/10'}`}>
-            <button 
-                onClick={() => setIsOpen(!isOpen)}
+              <button
+                onClick={onToggle}
                 className="w-full p-4 flex items-center justify-between text-left hover:bg-white/5 transition-colors"
-            >
+              >
                 <div className="flex items-center gap-3">
                     {icon}
                     <span className="font-bold text-light text-sm">{title}</span>
                 </div>
                 {isOpen ? <ChevronUp /> : <ChevronDown />}
-            </button>
-            <AnimatePresence>
+              </button>
+              <AnimatePresence>
                 {isOpen && (
-                    <motion.div 
+                  <motion.div
                         initial={{ height: 0, opacity: 0 }} 
                         animate={{ height: 'auto', opacity: 1 }} 
                         exit={{ height: 0, opacity: 0 }}
-                        className="overflow-hidden"
-                    >
+                    className="overflow-hidden"
+                  >
                         <div className="p-4 pt-0 text-sm text-light/70 leading-relaxed border-t border-white/5 mx-4 mt-2 mb-4">
                             {children}
-                        </div>
-                    </motion.div>
+                    </div>
+                  </motion.div>
                 )}
-            </AnimatePresence>
-        </div>
-    );
+              </AnimatePresence>
+            </div>
+  );
 }

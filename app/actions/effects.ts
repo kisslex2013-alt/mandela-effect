@@ -41,6 +41,9 @@ export interface EffectResult {
   currentState: string | null; // <-- Обязательное поле
   createdAt: string;
   updatedAt: string;
+  // Количество комментариев
+  commentsCount?: number;
+  commentsWithMediaCount?: number;
 }
 
 // Тип для сырых данных из Prisma (с Date)
@@ -218,8 +221,21 @@ export async function getEffects(params: GetEffectsParams = {}): Promise<EffectR
 
     console.log(`[getEffects] ✅ Получено эффектов: ${effects.length}`);
 
+    // Получаем количество комментариев для всех эффектов
+    const effectIds = effects.map(e => e.id);
+    const { getCommentsCountsBatch } = await import('@/app/actions/comments');
+    const commentsCounts = await getCommentsCountsBatch(effectIds);
+
     // Сериализуем даты в строки для корректной передачи клиенту
-    const serialized = effects.map(serializeEffect);
+    const serialized = effects.map(effect => {
+      const serializedEffect = serializeEffect(effect);
+      const counts = commentsCounts[effect.id] || { total: 0, withMedia: 0 };
+      return {
+        ...serializedEffect,
+        commentsCount: counts.total,
+        commentsWithMediaCount: counts.withMedia,
+      };
+    });
     console.log(`[getEffects] ✅ Сериализовано эффектов: ${serialized.length}`);
     
     return serialized;
@@ -281,8 +297,18 @@ export async function getEffectById(id: string): Promise<EffectResult | null> {
       return null;
     }
 
+    // Получаем количество комментариев
+    const { getCommentsCountsBatch } = await import('@/app/actions/comments');
+    const commentsCounts = await getCommentsCountsBatch([id]);
+    const counts = commentsCounts[id] || { total: 0, withMedia: 0 };
+
     // Сериализуем эффект (извлекает дополнительные поля из interpretations)
-    return serializeEffect(effect);
+    const serialized = serializeEffect(effect);
+    return {
+      ...serialized,
+      commentsCount: counts.total,
+      commentsWithMediaCount: counts.withMedia,
+    };
   } catch (error) {
     console.error('Ошибка при получении эффекта:', error);
     throw new Error('Не удалось загрузить эффект');
@@ -608,11 +634,21 @@ export async function getCatalogData() {
       }),
     ]);
 
+    // Получаем количество комментариев для всех эффектов
+    const effectIds = effects.map(e => e.id);
+    const { getCommentsCountsBatch } = await import('@/app/actions/comments');
+    const commentsCounts = await getCommentsCountsBatch(effectIds);
+
     // Сериализация дат для передачи на клиент
-    const serializedEffects = effects.map(effect => ({
-      ...effect,
-      createdAt: effect.createdAt.toISOString(),
-    }));
+    const serializedEffects = effects.map(effect => {
+      const counts = commentsCounts[effect.id] || { total: 0, withMedia: 0 };
+      return {
+        ...effect,
+        createdAt: effect.createdAt.toISOString(),
+        commentsCount: counts.total,
+        commentsWithMediaCount: counts.withMedia,
+      };
+    });
 
     return { 
       success: true, 
@@ -625,6 +661,17 @@ export async function getCatalogData() {
     console.error('Error fetching catalog data:', error);
     return { success: false, error: 'Failed to fetch catalog data' };
   }
+}
+
+function getDeterministicIndex(length: number): number {
+  const now = new Date();
+  const seed = `${now.getUTCFullYear()}-${now.getUTCMonth() + 1}-${now.getUTCDate()}`;
+  let hash = 0;
+  for (let i = 0; i < seed.length; i += 1) {
+    hash = (hash << 5) - hash + seed.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash) % length;
 }
 
 /**
@@ -651,17 +698,69 @@ export async function getHomeData() {
       prisma.vote.groupBy({ by: ['visitorId'] }).then(res => res.length) // Участников
     ]);
 
-    // Сортировка для Трендов (сумма голосов)
+    // Эффект дня: определяем детерминированно по текущей дате
+    let effectOfDay: (typeof effects)[number] | null = null;
+    if (effects.length > 0) {
+      const sortedForSeed = [...effects].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+      effectOfDay = sortedForSeed[getDeterministicIndex(sortedForSeed.length)];
+    }
+
+    // Получаем количество комментариев для всех эффектов
+    const effectIds = effects.map(e => e.id);
+    const { getCommentsCountsBatch } = await import('@/app/actions/comments');
+    const commentsCounts = await getCommentsCountsBatch(effectIds);
+
+    // Получаем количество комментариев для эффекта дня (если он есть)
+    const effectOfDayCounts = effectOfDay ? (commentsCounts[effectOfDay.id] || { total: 0, withMedia: 0 }) : null;
+
+    const effectOfDaySerialized = effectOfDay
+      ? (() => {
+          const totalVotes = effectOfDay!.votesFor + effectOfDay!.votesAgainst;
+          const mandelaPercent = totalVotes > 0 ? Math.round((effectOfDay!.votesFor / totalVotes) * 100) : 50;
+          const realityPercent = 100 - mandelaPercent;
+          const nextReset = new Date();
+          nextReset.setHours(24, 0, 0, 0);
+          return {
+            ...effectOfDay!,
+            createdAt: effectOfDay!.createdAt.toISOString(),
+            mandelaPercent,
+            realityPercent,
+            totalVotes,
+            nextReset: nextReset.toISOString(),
+            commentsCount: effectOfDayCounts?.total || 0,
+            commentsWithMediaCount: effectOfDayCounts?.withMedia || 0,
+          };
+        })()
+      : null;
+
+    // Сортировка для Трендов (сумма голосов), исключаем эффект дня
     const trending = [...effects]
+      .filter((effect) => !effectOfDay || effect.id !== effectOfDay.id)
       .sort((a, b) => (b.votesFor + b.votesAgainst) - (a.votesFor + a.votesAgainst))
       .slice(0, 3)
-      .map(e => ({ ...e, createdAt: e.createdAt.toISOString() }));
+      .map(e => {
+        const counts = commentsCounts[e.id] || { total: 0, withMedia: 0 };
+        return { 
+          ...e, 
+          createdAt: e.createdAt.toISOString(),
+          commentsCount: counts.total,
+          commentsWithMediaCount: counts.withMedia,
+        };
+      });
 
     // Сортировка для Новых (дата)
     const newEffects = [...effects]
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
       .slice(0, 6)
-      .map(e => ({ ...e, createdAt: e.createdAt.toISOString() }));
+      .map(e => {
+        const counts = commentsCounts[e.id] || { total: 0, withMedia: 0 };
+        return { 
+          ...e, 
+          createdAt: e.createdAt.toISOString(),
+          commentsCount: counts.total,
+          commentsWithMediaCount: counts.withMedia,
+        };
+      });
 
     // Статистика
     const stats = {
@@ -676,7 +775,8 @@ export async function getHomeData() {
         trending,
         newEffects,
         categories,
-        stats
+        stats,
+        effectOfDay: effectOfDaySerialized,
       }
     };
   } catch (error) {

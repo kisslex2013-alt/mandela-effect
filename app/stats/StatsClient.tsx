@@ -129,7 +129,12 @@ export default function StatsClient({ effects, totalParticipants, totalVotes }: 
   const [currentScenarioIndex, setCurrentScenarioIndex] = useState(0);
   const [anomalyCount, setAnomalyCount] = useState(1420);
 
+  // Все данные берутся из одного источника (пропсы из page.tsx):
+  // - effects: массив эффектов из БД
+  // - totalParticipants: количество уникальных visitorId из таблицы vote
+  // - totalVotes: общее количество записей в таблице vote (prisma.vote.count())
   const globalStats = useMemo(() => {
+    // Вычисляем общее количество голосов "за" Манделу из массива effects
     let mandelaVotes = 0;
     const categoryStats: Record<string, { mandela: number; total: number }> = {};
     effects.forEach(e => {
@@ -138,6 +143,8 @@ export default function StatsClient({ effects, totalParticipants, totalVotes }: 
       categoryStats[e.category].mandela += e.votesFor;
       categoryStats[e.category].total += (e.votesFor + e.votesAgainst);
     });
+    // Индекс сдвига = процент голосов "за" Манделу от общего количества голосов
+    // Используем totalVotes из пропсов (из БД), чтобы данные были согласованы
     const shiftIndex = totalVotes > 0 ? Math.round((mandelaVotes / totalVotes) * 100) : 0;
     const categoryData = Object.entries(categoryStats).map(([slug, data]) => ({ slug, name: CATEGORY_MAP[slug]?.name || slug, percent: data.total > 0 ? Math.round((data.mandela / data.total) * 100) : 0, fill: CAT_COLORS[slug] || '#64748b' })).sort((a, b) => b.percent - a.percent).slice(0, 7); 
     const controversial = [...effects].filter(e => (e.votesFor + e.votesAgainst) > 5).map(e => { const total = e.votesFor + e.votesAgainst; const ratio = (e.votesFor / total) * 100; return { ...e, diff: Math.abs(50 - ratio), total, percentA: ratio, percentB: 100 - ratio }; }).sort((a, b) => a.diff - b.diff).slice(0, 3);
@@ -147,6 +154,10 @@ export default function StatsClient({ effects, totalParticipants, totalVotes }: 
   const pieData = [{ name: 'Мандела', value: globalStats.mandelaVotes }, { name: 'Реальность', value: globalStats.realityVotes }];
 
   // Хуки анимации должны быть здесь, ДО return
+  // Все значения берутся из пропсов для согласованности данных:
+  // - countEffects: количество эффектов из массива effects
+  // - countParticipants: количество участников из пропса totalParticipants (из БД)
+  // - countVotes: общее количество голосов из пропса totalVotes (из БД)
   const countEffects = useCountUp(effects.length, 1000, mounted);
   const countParticipants = useCountUp(totalParticipants, 1000, mounted);
   const countVotes = useCountUp(totalVotes, 1000, mounted);

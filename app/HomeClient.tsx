@@ -1,19 +1,22 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import EffectCard from '@/components/EffectCard';
 import { votesStore } from '@/lib/votes-store';
-import { redirectToRandomEffect } from '@/app/actions/effects';
+import { redirectToRandomEffect, getEffectById } from '@/app/actions/effects';
 import { useCountUp } from '@/lib/hooks/useCountUp';
+import ImageWithSkeleton from '@/components/ui/ImageWithSkeleton';
+import { getReadCommentsData } from '@/lib/comments-tracker';
 import { 
   Sparkles, ArrowRight, Activity, Search, Shuffle, 
   BrainCircuit, Database, Flame, AlertTriangle, Info,
   CheckCircle2, TrendingUp, Sparkles as SparklesIcon,
-  Brain, Users, Zap
+  Brain, Users, Zap, CalendarClock, ArrowUpRight, Radar,
+  Film, Music, Tag, User, Globe, Gamepad2, Baby, Ghost
 } from 'lucide-react';
-import { EffectCardSkeleton } from '@/components/EmptyState';
+import { CATEGORY_MAP } from '@/lib/constants';
 
 interface HomeClientProps {
   initialEffects?: any[]; // Оставляем для обратной совместимости
@@ -25,18 +28,38 @@ interface HomeClientProps {
     totalVotes: number;
     totalParticipants: number;
   };
+  effectOfDay?: EffectOfDay | null;
 }
+
+type EffectOfDay = {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  imageUrl: string | null;
+  votesFor: number;
+  votesAgainst: number;
+  createdAt: string;
+  mandelaPercent: number;
+  realityPercent: number;
+  totalVotes: number;
+  nextReset: string;
+};
 
 export default function HomeClient({ 
   initialEffects = [], 
   trendingEffects = [], // <--- Теперь используем это
   newEffects = [],      // <--- И это
   topCategories = [],
-  globalStats = { totalEffects: 0, totalVotes: 0, totalParticipants: 0 }
+  globalStats = { totalEffects: 0, totalVotes: 0, totalParticipants: 0 },
+  effectOfDay = null,
 }: HomeClientProps) {
   const [voteCount, setVoteCount] = useState(0);
   const [mounted, setMounted] = useState(false);
   const [votedEffectIds, setVotedEffectIds] = useState<string[]>([]);
+  const [shiftCountdown, setShiftCountdown] = useState('--:--:--');
+  const [currentEffectOfDay, setCurrentEffectOfDay] = useState<EffectOfDay | null>(effectOfDay);
+  const [readCommentsData, setReadCommentsData] = useState<Record<string, { lastReadAt: string; lastCommentCount: number }>>({});
 
   // УДАЛЕНО: const trendingEffects = useMemo(...) - больше не нужно нарезать на клиенте
 
@@ -46,20 +69,125 @@ export default function HomeClient({
 
   useEffect(() => {
     setMounted(true);
-    const updateVotes = () => {
+    const updateVotes = async () => {
       const votes = votesStore.get();
       setVoteCount(Object.keys(votes).length);
       setVotedEffectIds(Object.keys(votes));
+      
+      // Обновляем данные эффекта дня, если он был изменен
+      if (currentEffectOfDay && votes[currentEffectOfDay.id]) {
+        try {
+          const updatedEffect = await getEffectById(currentEffectOfDay.id);
+          if (updatedEffect) {
+            const totalVotes = updatedEffect.votesFor + updatedEffect.votesAgainst;
+            const mandelaPercent = totalVotes > 0 ? Math.round((updatedEffect.votesFor / totalVotes) * 100) : 50;
+            const realityPercent = 100 - mandelaPercent;
+            
+            setCurrentEffectOfDay({
+              ...currentEffectOfDay,
+              votesFor: updatedEffect.votesFor,
+              votesAgainst: updatedEffect.votesAgainst,
+              mandelaPercent,
+              realityPercent,
+              totalVotes,
+            });
+          }
+        } catch (error) {
+          console.error('Ошибка при обновлении данных эффекта дня:', error);
+        }
+      }
     };
+    const loadReadComments = () => {
+      const data = getReadCommentsData();
+      setReadCommentsData(data);
+    };
+    
     updateVotes();
+    loadReadComments();
+    
+    // Слушаем событие обновления прочитанных комментариев для обновления бейджей
+    const handleCommentsRead = () => {
+      // Обновляем данные о прочитанных комментариях из localStorage
+      loadReadComments();
+    };
+    
     window.addEventListener('votes-updated', updateVotes);
-    return () => window.removeEventListener('votes-updated', updateVotes);
-  }, []);
+    window.addEventListener('comments-read', handleCommentsRead);
+    return () => {
+      window.removeEventListener('votes-updated', updateVotes);
+      window.removeEventListener('comments-read', handleCommentsRead);
+    };
+  }, [currentEffectOfDay?.id]);
+
+  useEffect(() => {
+    setCurrentEffectOfDay(effectOfDay);
+  }, [effectOfDay]);
+
+  useEffect(() => {
+    if (!currentEffectOfDay?.nextReset) return;
+    const target = new Date(currentEffectOfDay.nextReset).getTime();
+    if (Number.isNaN(target)) return;
+
+    const updateCountdown = () => {
+      const diff = target - Date.now();
+      if (diff <= 0) {
+        setShiftCountdown('00:00:00');
+        return;
+      }
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff / (1000 * 60)) % 60);
+      const seconds = Math.floor((diff / 1000) % 60);
+      const format = (num: number) => String(num).padStart(2, '0');
+      setShiftCountdown(`${format(hours)}:${format(minutes)}:${format(seconds)}`);
+    };
+
+    updateCountdown();
+    const timer = setInterval(updateCountdown, 1000);
+    return () => clearInterval(timer);
+  }, [currentEffectOfDay?.nextReset]);
+
+  const shiftLogLabel = useMemo(() => {
+    if (!currentEffectOfDay) return '';
+    const date = new Date(currentEffectOfDay.createdAt);
+    const startOfYear = new Date(date.getFullYear(), 0, 0);
+    const diff = date.getTime() - startOfYear.getTime();
+    const dayOfYear = Math.floor(diff / (1000 * 60 * 60 * 24));
+    return `SHIFT LOG #${String(dayOfYear).padStart(3, '0')}`;
+  }, [currentEffectOfDay]);
+
+  const shiftMood = useMemo(() => {
+    if (!currentEffectOfDay) return 'Ждём фиксации следующей аномалии';
+    if (currentEffectOfDay.mandelaPercent === 50) return 'Критический парадокс 50/50';
+    if (currentEffectOfDay.mandelaPercent >= 65) return 'Коллективная память дрейфует';
+    if (currentEffectOfDay.mandelaPercent <= 35) return 'Реальность удерживает контроль';
+    return 'Наблюдаем мягкий сдвиг';
+  }, [currentEffectOfDay]);
+
+  const shiftMoodTone = useMemo(() => {
+    if (!currentEffectOfDay) return 'text-light/60';
+    if (currentEffectOfDay.mandelaPercent >= 65) return 'text-purple-200';
+    if (currentEffectOfDay.mandelaPercent <= 35) return 'text-green-200';
+    return 'text-yellow-200';
+  }, [currentEffectOfDay]);
+
+  const getCategoryIcon = (slug: string) => {
+    switch (slug) {
+      case 'films': return <Film className="w-4 h-4" />;
+      case 'music': return <Music className="w-4 h-4" />;
+      case 'brands': return <Tag className="w-4 h-4" />;
+      case 'people': return <User className="w-4 h-4" />;
+      case 'geography': return <Globe className="w-4 h-4" />;
+      case 'popculture': return <Gamepad2 className="w-4 h-4" />;
+      case 'childhood': return <Baby className="w-4 h-4" />;
+      case 'russian': return <Ghost className="w-4 h-4" />;
+      default: return <Sparkles className="w-4 h-4" />;
+    }
+  };
 
   if (!mounted) return <div className="min-h-screen bg-dark" />;
 
   return (
-    <div className="min-h-screen bg-dark relative font-sans text-light overflow-hidden">
+    <div className="bg-dark relative font-sans text-light">
       
       {/* BACKGROUND */}
       <div className="fixed inset-0 pointer-events-none z-0">
@@ -68,8 +196,8 @@ export default function HomeClient({
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-[128px] opacity-50" />
       </div>
 
-      {/* === ПЕРВЫЙ ЭКРАН (min-h-screen) === */}
-      <div className="relative z-10 max-w-7xl mx-auto px-4 min-h-screen flex flex-col justify-center pt-32 pb-20 gap-12">
+      {/* === ПЕРВЫЙ ЭКРАН (адаптивная высота, равномерное распределение) === */}
+      <div className="relative z-10 max-w-7xl mx-auto px-4 min-h-screen flex flex-col justify-between pt-32 pb-12 gap-8">
         
         {/* 1. HERO & HUD */}
         <div className="text-center">
@@ -105,6 +233,124 @@ export default function HomeClient({
           </motion.div>
         </div>
 
+        {currentEffectOfDay && (
+          <motion.section
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="relative w-full bg-gradient-to-r from-[#1b1030]/90 via-darkCard to-[#071c2a]/70 border border-white/10 rounded-3xl p-6 lg:p-8 shadow-[0_0_80px_rgba(80,34,255,0.25)] overflow-hidden"
+          >
+            <div className="absolute inset-0 pointer-events-none opacity-50">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,#5b21b6,transparent_55%)] blur-3xl" />
+              <div className="absolute inset-0 bg-[linear-gradient(120deg,transparent,rgba(59,130,246,0.15))]" />
+            </div>
+            <div className="relative grid gap-8 lg:grid-cols-[1.05fr_1fr]">
+              <Link
+                href={`/effect/${currentEffectOfDay.id}`}
+                className="group relative rounded-2xl overflow-hidden border border-white/10 bg-black/30 min-h-[260px] shadow-2xl force-active"
+              >
+                {currentEffectOfDay.imageUrl ? (
+                  <ImageWithSkeleton
+                    src={currentEffectOfDay.imageUrl}
+                    alt={currentEffectOfDay.title}
+                    fill
+                    className="object-cover transition-transform duration-700 group-hover:scale-105"
+                    priority
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-6xl opacity-30">
+                    🌀
+                  </div>
+                )}
+                <div className="absolute inset-0 glitch-layers pointer-events-none z-[2]">
+                  <div className="glitch-layer" style={{ backgroundImage: currentEffectOfDay.imageUrl ? `url('${currentEffectOfDay.imageUrl}')` : 'none' }} />
+                  <div className="glitch-layer" style={{ backgroundImage: currentEffectOfDay.imageUrl ? `url('${currentEffectOfDay.imageUrl}')` : 'none' }} />
+                  <div className="glitch-layer" style={{ backgroundImage: currentEffectOfDay.imageUrl ? `url('${currentEffectOfDay.imageUrl}')` : 'none' }} />
+                </div>
+                <div className="absolute top-4 left-4 flex items-center gap-2 px-3 py-1 rounded-full bg-black/70 border border-white/10 text-[11px] font-semibold tracking-[0.3em] uppercase text-white/80">
+                  <Sparkles className="w-4 h-4 text-purple-300" />
+                  Log
+                </div>
+                <div className="absolute bottom-4 left-4 flex items-center gap-2 bg-black/70 px-3 py-1 rounded-full border border-white/10 text-xs font-semibold uppercase tracking-widest text-white/80">
+                  <span className="text-primary opacity-80">
+                    {getCategoryIcon(currentEffectOfDay.category)}
+                  </span>
+                </div>
+              </Link>
+
+              <div className="relative flex flex-col gap-5">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <span className="flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-[11px] font-semibold uppercase tracking-[0.3em] text-white">
+                      <Sparkles className="w-4 h-4 text-purple-200" /> Эффект дня
+                    </span>
+                    {shiftLogLabel && <span className="text-light/40 font-mono text-xs">{shiftLogLabel}</span>}
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-cyan-200 font-mono">
+                    <CalendarClock className="w-4 h-4" />
+                    <span>{shiftCountdown}</span>
+                  </div>
+                </div>
+
+                <div>
+                  <h2 className="text-3xl md:text-4xl font-black text-white mb-2 leading-tight">{currentEffectOfDay.title}</h2>
+                  <p className="text-light/70 text-base md:text-lg max-w-2xl">
+                    {currentEffectOfDay.description}
+                  </p>
+                </div>
+
+                <div className="grid sm:grid-cols-3 gap-4">
+                  <div className="bg-black/30 rounded-2xl border border-white/5 p-4">
+                    <div className="text-xs uppercase text-light/40 tracking-[0.3em] mb-2">Мандела</div>
+                    <div className="text-3xl font-black text-white">{currentEffectOfDay.mandelaPercent}%</div>
+                    <p className="text-xs text-light/50 mt-1">коллективная память</p>
+                  </div>
+                  <div className="bg-black/30 rounded-2xl border border-white/5 p-4">
+                    <div className="text-xs uppercase text-light/40 tracking-[0.3em] mb-2">Реальность</div>
+                    <div className="text-3xl font-black text-white">{currentEffectOfDay.realityPercent}%</div>
+                    <p className="text-xs text-light/50 mt-1">официальная версия</p>
+                  </div>
+                  <div className="bg-black/30 rounded-2xl border border-white/5 p-4">
+                    <div className="text-xs uppercase text-light/40 tracking-[0.3em] mb-2">голосов</div>
+                    <div className="text-3xl font-black text-white">{currentEffectOfDay.totalVotes}</div>
+                    <p className={`text-xs mt-1 ${shiftMoodTone}`}>{shiftMood}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex justify-between text-[11px] uppercase text-light/40 font-bold tracking-[0.3em]">
+                    <span>ложная память</span>
+                    <span>реальность</span>
+                  </div>
+                  <div className="h-3 rounded-full bg-black/40 overflow-hidden flex border border-white/10">
+                    <div
+                      className="h-full bg-gradient-to-r from-purple-500 to-purple-300"
+                      style={{ width: `${currentEffectOfDay.mandelaPercent}%` }}
+                    />
+                    <div
+                      className="h-full bg-gradient-to-r from-green-400 to-green-300"
+                      style={{ width: `${currentEffectOfDay.realityPercent}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-3 items-center">
+                  <Link
+                    href={`/effect/${currentEffectOfDay.id}`}
+                    className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-white/10 border border-white/20 text-sm font-semibold text-white hover:bg-white/20 transition-colors"
+                  >
+                    Исследовать эффект <ArrowUpRight className="w-4 h-4" />
+                  </Link>
+                  <div className="flex items-center gap-2 text-xs text-light/60 uppercase tracking-[0.3em]">
+                    <Radar className="w-4 h-4 text-cyan-300" />
+                    {shiftMood}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.section>
+        )}
+
         {/* 2. QUICK ACTIONS */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <button onClick={() => redirectToRandomEffect()} className="group relative px-4 py-3 bg-darkCard border border-light/10 rounded-xl hover:border-purple-500/50 transition-all overflow-hidden flex items-center gap-3 shadow-lg">
@@ -123,7 +369,11 @@ export default function HomeClient({
                 <div className="text-left flex-1"><h3 className="font-bold text-white text-sm leading-tight">Полный архив</h3><p className="text-[10px] text-light/50">Вся база данных</p></div>
             </Link>
         </div>
+      </div>
 
+      {/* === ВТОРОЙ ЭКРАН (Скролл) === */}
+      <div className="relative z-10 max-w-7xl mx-auto px-4 pb-20 space-y-20 pt-12">
+        
         {/* 3. TRENDING */}
         <section>
             <div className="flex items-end justify-between mb-6">
@@ -133,17 +383,28 @@ export default function HomeClient({
             {trendingEffects.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {trendingEffects.map((effect, i) => (
-                        <EffectCard key={effect.id} {...effect} badge={`#${i + 1}`} priority={i < 3} hasVoted={votedEffectIds.includes(effect.id)} showProgress={votedEffectIds.includes(effect.id)} />
+                        <EffectCard 
+                            key={effect.id} 
+                            {...effect} 
+                            badge={`#${i + 1}`} 
+                            priority={i < 3} 
+                            hasVoted={votedEffectIds.includes(effect.id)} 
+                            showProgress={votedEffectIds.includes(effect.id)}
+                            hasNewComments={mounted && (() => {
+                              const readData = readCommentsData[effect.id];
+                              const commentCount = effect.commentsCount || 0;
+                              if (!readData) {
+                                return commentCount > 0;
+                              }
+                              return commentCount > readData.lastCommentCount;
+                            })()}
+                        />
                     ))}
                 </div>
             ) : (
                 <div className="text-center py-12 border border-dashed border-light/10 rounded-2xl bg-white/5"><p className="text-light/40">Данные загружаются или отсутствуют...</p></div>
             )}
         </section>
-      </div>
-
-      {/* === ВТОРОЙ ЭКРАН (Скролл) === */}
-      <div className="relative z-10 max-w-7xl mx-auto px-4 pb-20 space-y-20">
         
         {/* 4. NEW DISCOVERIES */}
         <section className="pt-12 border-t border-light/5">
@@ -153,7 +414,20 @@ export default function HomeClient({
              {newEffects.length > 0 ? (
                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
                     {newEffects.map((effect) => (
-                        <EffectCard key={effect.id} {...effect} badge="Новое" hasVoted={votedEffectIds.includes(effect.id)} />
+                        <EffectCard 
+                            key={effect.id} 
+                            {...effect} 
+                            badge="Новое" 
+                            hasVoted={votedEffectIds.includes(effect.id)}
+                            hasNewComments={mounted && (() => {
+                              const readData = readCommentsData[effect.id];
+                              const commentCount = effect.commentsCount || 0;
+                              if (!readData) {
+                                return commentCount > 0;
+                              }
+                              return commentCount > readData.lastCommentCount;
+                            })()}
+                        />
                     ))}
                  </div>
              ) : (

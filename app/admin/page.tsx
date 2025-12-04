@@ -51,6 +51,20 @@ export default async function AdminPage() {
     orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
   });
 
+  // Загружаем комментарии на модерацию
+  const comments = await prisma.comment.findMany({
+    where: { status: 'PENDING' },
+    orderBy: { createdAt: 'desc' },
+    include: {
+      effect: {
+        select: {
+          id: true,
+          title: true,
+        },
+      },
+    },
+  });
+
   // Преобразуем данные для клиента
   const effectsData = effects.map((effect) => ({
     id: effect.id,
@@ -100,5 +114,28 @@ export default async function AdminPage() {
     updatedAt: cat.updatedAt.toISOString(),
   }));
 
-  return <AdminClient effects={effectsData} submissions={submissionsData} categories={categoriesData} />;
+  const commentsData = comments.map((comment) => ({
+    id: comment.id,
+    effectId: comment.effectId,
+    effectTitle: comment.effect.title,
+    visitorId: comment.visitorId,
+    type: comment.type,
+    text: comment.text,
+    imageUrl: comment.imageUrl,
+    videoUrl: comment.videoUrl,
+    audioUrl: comment.audioUrl,
+    theoryType: comment.theoryType,
+    status: comment.status,
+    likes: comment.likes,
+    reports: comment.reports,
+    createdAt: comment.createdAt.toISOString(),
+    moderatedAt: comment.moderatedAt?.toISOString() || null,
+  }));
+
+  return <AdminClient 
+    effects={effectsData} 
+    submissions={submissionsData} 
+    categories={categoriesData}
+    comments={commentsData}
+  />;
 }

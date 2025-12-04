@@ -18,6 +18,7 @@ export default async function Home() {
   const newEffects = result.success && result.data ? result.data.newEffects : [];
   const categories = result.success && result.data ? result.data.categories : [];
   const stats = result.success && result.data ? result.data.stats : { totalEffects: 0, totalVotes: 0, totalParticipants: 0 };
+  const effectOfDay = result.success && result.data ? result.data.effectOfDay : null;
 
   return (
     <HomeClient 
@@ -25,6 +26,7 @@ export default async function Home() {
       newEffects={newEffects}
       topCategories={categories}
       globalStats={stats}
+      effectOfDay={effectOfDay || undefined}
     />
   );
 }

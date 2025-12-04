@@ -274,6 +274,7 @@ textarea {
   height: 100%;
   background-size: cover;
   background-position: center;
+  background-repeat: no-repeat;
   z-index: 2;
   opacity: 0;
   pointer-events: none;
@@ -333,21 +334,46 @@ textarea {
 }
 
 /* Вечный глитч-эффект после голосования */
-.force-active .glitch-layers .glitch-layer:nth-child(1) {
+.force-active .glitch-layers .glitch-layer:nth-child(1),
+.force-active.group .glitch-layers .glitch-layer:nth-child(1),
+.group.force-active .glitch-layers .glitch-layer:nth-child(1) {
   opacity: 0.3 !important;
-  transform: translateX(-5%);
+  transform: translateX(-5%) !important;
   animation: glitch-anim-1 4s infinite linear alternate !important;
 }
 
-.force-active .glitch-layers .glitch-layer:nth-child(2) {
+.force-active .glitch-layers .glitch-layer:nth-child(2),
+.force-active.group .glitch-layers .glitch-layer:nth-child(2),
+.group.force-active .glitch-layers .glitch-layer:nth-child(2) {
   opacity: 0.3 !important;
-  transform: translateX(3%) translateY(3%);
+  transform: translateX(3%) translateY(3%) !important;
   animation: glitch-anim-2 5s -0.8s infinite linear alternate !important;
 }
 
-.force-active .glitch-layers .glitch-layer:nth-child(3) {
+.force-active .glitch-layers .glitch-layer:nth-child(3),
+.force-active.group .glitch-layers .glitch-layer:nth-child(3),
+.group.force-active .glitch-layers .glitch-layer:nth-child(3) {
   opacity: 0.2 !important;
-  transform: translateX(5%);
+  transform: translateX(5%) !important;
+  animation: glitch-anim-flash 1.5s infinite linear !important;
+}
+
+/* Отключаем hover эффект для force-active элементов */
+.force-active.group:hover .glitch-layers .glitch-layer:nth-child(1),
+.group.force-active:hover .glitch-layers .glitch-layer:nth-child(1) {
+  opacity: 0.3 !important;
+  animation: glitch-anim-1 4s infinite linear alternate !important;
+}
+
+.force-active.group:hover .glitch-layers .glitch-layer:nth-child(2),
+.group.force-active:hover .glitch-layers .glitch-layer:nth-child(2) {
+  opacity: 0.3 !important;
+  animation: glitch-anim-2 5s -0.8s infinite linear alternate !important;
+}
+
+.force-active.group:hover .glitch-layers .glitch-layer:nth-child(3),
+.group.force-active:hover .glitch-layers .glitch-layer:nth-child(3) {
+  opacity: 0.2 !important;
   animation: glitch-anim-flash 1.5s infinite linear !important;
 }
 

@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import EffectCard from '@/components/EffectCard';
 import CustomSelect, { type SelectOption } from '@/components/ui/CustomSelect';
 import { votesStore } from '@/lib/votes-store';
+import { hasNewComments, getReadCommentsData } from '@/lib/comments-tracker';
 import { 
   Search, Filter, SortAsc, Terminal, FileWarning, 
   Film, Music, Tag, User, Globe, Gamepad2, Baby, Ghost, HelpCircle,
@@ -72,17 +73,41 @@ export default function CatalogClient({ initialEffects, categories }: CatalogCli
   const [hideVoted, setHideVoted] = useState(false);
   const [userVotes, setUserVotes] = useState<Record<string, 'A' | 'B'>>({});
   const [mounted, setMounted] = useState(false);
+  const [readCommentsData, setReadCommentsData] = useState<Record<string, { lastReadAt: string; lastCommentCount: number }>>({});
 
   useEffect(() => {
     const loadVotes = () => {
       const votes = votesStore.get();
       setUserVotes(votes);
     };
+    
+    const loadReadComments = () => {
+      const data = getReadCommentsData();
+      setReadCommentsData(data);
+    };
+    
     loadVotes();
+    loadReadComments();
     setMounted(true);
     
+    // Слушаем событие обновления прочитанных комментариев
+    const handleCommentsRead = (event: Event) => {
+      // Обновляем данные о прочитанных комментариях из localStorage
+      loadReadComments();
+      // Принудительно обновляем компонент для пересчета hasNewComments
+      setMounted(false);
+      setTimeout(() => {
+        setMounted(true);
+        loadReadComments(); // Повторно загружаем данные после обновления mounted
+      }, 10);
+    };
+    
     window.addEventListener('votes-updated', loadVotes);
-    return () => window.removeEventListener('votes-updated', loadVotes);
+    window.addEventListener('comments-read', handleCommentsRead);
+    return () => {
+      window.removeEventListener('votes-updated', loadVotes);
+      window.removeEventListener('comments-read', handleCommentsRead);
+    };
   }, []);
 
   const getCategoryIcon = (slug: string) => {
@@ -179,9 +204,9 @@ export default function CatalogClient({ initialEffects, categories }: CatalogCli
                 </div>
             </div>
 
-            {/* ЛЕНТА КАТЕГОРИЙ (Smart Pills) */}
-            <div className="relative">
-                <div className="flex flex-wrap justify-center gap-2">
+            {/* ЛЕНТА КАТЕГОРИЙ (Smart Pills) + Чекбокс "Скрыть исследованные" */}
+            <div className="relative pr-40">
+                <div className="flex flex-wrap items-center justify-center gap-2">
                     {/* Кнопка ВСЕ (статичная) */}
                     <button
                         onClick={() => setSelectedCategory('all')}
@@ -230,25 +255,34 @@ export default function CatalogClient({ initialEffects, categories }: CatalogCli
                         );
                     })}
                 </div>
-            </div>
-
-            <div className="flex items-center justify-center gap-2 pt-2">
-                <label className="flex items-center gap-3 cursor-pointer group">
-                    <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${hideVoted ? 'bg-primary border-primary' : 'border-light/30 group-hover:border-light/60'}`}>
+                
+                {/* Чекбокс "Скрыть исследованные" - закреплен справа */}
+                <label className="absolute right-0 top-0 flex items-center gap-2 cursor-pointer group bg-darkCard/95 backdrop-blur-sm border border-light/10 rounded-lg px-3 py-2 shadow-lg z-10">
+                    <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all shrink-0 ${hideVoted ? 'bg-primary border-primary' : 'border-light/30 group-hover:border-light/60'}`}>
                         {hideVoted && <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}><div className="w-2 h-2 bg-black rounded-sm" /></motion.div>}
                     </div>
                     <input type="checkbox" checked={hideVoted} onChange={(e) => setHideVoted(e.target.checked)} className="hidden" />
-                    <span className={`text-sm font-medium transition-colors ${hideVoted ? 'text-light' : 'text-light/50 group-hover:text-light/80'}`}>Скрыть исследованные</span>
+                    <span className={`text-sm font-medium transition-colors whitespace-nowrap ${hideVoted ? 'text-light' : 'text-light/50 group-hover:text-light/80'}`}>Скрыть исследованные</span>
                 </label>
             </div>
         </div>
 
         <motion.div layout className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <AnimatePresence mode='popLayout'>
-                {filteredEffects.length > 0 ? (
-                    filteredEffects.map((effect, index) => (
+                    {filteredEffects.length > 0 ? (
+                    filteredEffects.map((effect, index) => {
+                      const readData = readCommentsData[effect.id];
+                      const commentCount = effect.commentsCount || 0;
+                      const hasNew = mounted && (() => {
+                        if (!readData) {
+                          return commentCount > 0;
+                        }
+                        return commentCount > readData.lastCommentCount;
+                      })();
+                      
+                      return (
                         <motion.div
-                            key={effect.id}
+                            key={`${effect.id}-${mounted ? 'mounted' : 'unmounted'}-${readData?.lastCommentCount || 0}`}
                             layout
                             initial={{ opacity: 0, scale: 0.9 }}
                             animate={{ opacity: 1, scale: 1 }}
@@ -261,9 +295,11 @@ export default function CatalogClient({ initialEffects, categories }: CatalogCli
                                 showProgress={!!userVotes[effect.id]}
                                 priority={index < 6}
                                 className="bg-darkCard/80 backdrop-blur-sm border border-light/10 hover:border-primary/50 hover:shadow-[0_0_30px_-10px_rgba(59,130,246,0.3)] transition-all"
+                                hasNewComments={hasNew}
                             />
                         </motion.div>
-                    ))
+                      );
+                    })
                 ) : (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="col-span-full py-20 text-center border border-dashed border-light/10 rounded-3xl bg-white/5">
                         <div className="flex justify-center mb-4"><div className="p-4 bg-red-500/10 rounded-full animate-pulse"><FileWarning className="w-12 h-12 text-red-500" /></div></div>
