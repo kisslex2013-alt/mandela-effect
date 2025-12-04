@@ -109,7 +109,6 @@ export async function saveUploadedFile(file: File): Promise<UploadResult> {
         if (error) {
           console.error('[FILE-UPLOAD] Ошибка Supabase Storage:', {
             message: error.message,
-            statusCode: error.statusCode,
             error: error
           });
           
