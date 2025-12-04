@@ -110,11 +110,31 @@ export default function ArchiveAnomalies({ effectId, isOpen: externalIsOpen, onT
             <div className="p-4 pt-0 text-sm text-light/70 leading-relaxed border-t border-white/5 mx-4 mt-2 mb-4">
               {/* Список комментариев - сначала */}
               {loading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                <div className="space-y-4 mb-6">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="bg-darkCard border border-light/10 rounded-xl p-3 space-y-3 animate-pulse">
+                      {/* Заголовок скелетона */}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 flex-1">
+                          <div className="h-5 w-20 bg-light/10 rounded"></div>
+                          <div className="h-4 w-24 bg-light/10 rounded"></div>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <div className="h-4 w-8 bg-light/10 rounded"></div>
+                          <div className="h-4 w-8 bg-light/10 rounded"></div>
+                        </div>
+                      </div>
+                      {/* Текст скелетона */}
+                      <div className="space-y-2">
+                        <div className="h-3 bg-light/10 rounded w-full"></div>
+                        <div className="h-3 bg-light/10 rounded w-5/6"></div>
+                        <div className="h-3 bg-light/10 rounded w-4/6"></div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : comments.length === 0 ? (
-                <div className="text-center py-12 text-light/40 mb-6">
+                <div className="text-center py-2 text-light/40 mb-3">
                   Пока нет комментариев. Будьте первым!
                 </div>
               ) : (
@@ -126,7 +146,7 @@ export default function ArchiveAnomalies({ effectId, isOpen: externalIsOpen, onT
               )}
 
               {/* Форма добавления комментария - внизу */}
-              <div className="pt-4 border-t border-white/5">
+              <div className="pt-3 border-t border-white/5">
                 <h3 className="text-sm font-bold text-white mb-3">Добавить комментарий</h3>
                 <CommentForm 
                   effectId={effectId} 

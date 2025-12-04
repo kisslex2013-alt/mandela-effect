@@ -28,6 +28,14 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: '**', // Разрешает любые домены
       },
+      {
+        protocol: 'https',
+        hostname: '*.supabase.co', // Supabase Storage
+      },
+      {
+        protocol: 'https',
+        hostname: '*.public.blob.vercel-storage.com', // Vercel Blob Storage (fallback)
+      },
     ],
   },
 

@@ -46,6 +46,8 @@ interface EffectData {
   category?: string;
   imageUrl?: string;
   videoUrl?: string;
+  imageSourceType?: 'YANDEX' | 'GOOGLE' | 'URL' | 'UPLOAD';
+  imageSourceValue?: string;
   residue?: string;
   residueSource?: string;
   history?: string;
@@ -93,6 +95,10 @@ export async function updateEffect(
     // Опциональные URL поля
     if (data.imageUrl !== undefined) updateData.imageUrl = data.imageUrl || null;
     if (data.videoUrl !== undefined) updateData.videoUrl = data.videoUrl || null;
+    
+    // Источник изображения
+    if (data.imageSourceType !== undefined) updateData.imageSourceType = data.imageSourceType || null;
+    if (data.imageSourceValue !== undefined) updateData.imageSourceValue = data.imageSourceValue || null;
 
     // Верхнеуровневые поля для доп. информации
     if (data.residue !== undefined) updateData.residue = data.residue || null;

@@ -25,6 +25,8 @@ export default async function AdminPage() {
       category: true,
       imageUrl: true,
       videoUrl: true,
+      imageSourceType: true,
+      imageSourceValue: true,
       votesFor: true,
       votesAgainst: true,
       views: true,

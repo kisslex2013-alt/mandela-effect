@@ -115,6 +115,7 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
   // Навигация и Похожие
   const [allIds, setAllIds] = useState<string[]>([]);
   const [relatedEffects, setRelatedEffects] = useState<any[]>([]);
+  const [isLoadingRelated, setIsLoadingRelated] = useState(true);
   const [nextUnvotedId, setNextUnvotedId] = useState<string | null>(null);
   const [prevId, setPrevId] = useState<string | null>(null);
   const [hasUnvoted, setHasUnvoted] = useState(true);
@@ -151,10 +152,12 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
       }
 
       // 2. Похожие эффекты
+      setIsLoadingRelated(true);
       const relatedRes = await getRelatedEffects(effect.category, effect.id);
       if (relatedRes.success && relatedRes.data) {
         setRelatedEffects(relatedRes.data);
       }
+      setIsLoadingRelated(false);
     };
 
     initData();
@@ -291,12 +294,26 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
                 </div>
 
                 {/* ПОХОЖИЕ ЭФФЕКТЫ (Только Desktop) */}
-                {relatedEffects.length > 0 && (
-                    <div className="hidden lg:block pt-4 border-t border-light/5">
-                        <div className="text-xs font-bold text-light/40 uppercase tracking-widest mb-4 flex items-center gap-2">
-                            <span className="w-1.5 h-1.5 rounded-full bg-primary/50"></span>
-                            Похожие сбои
+                <div className="hidden lg:block pt-4 border-t border-light/5">
+                    <div className="text-xs font-bold text-light/40 uppercase tracking-widest mb-4 flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-primary/50"></span>
+                        Похожие сбои
+                    </div>
+                    {isLoadingRelated ? (
+                        <div className="grid grid-cols-2 gap-4">
+                            {[1, 2, 3, 4].map((i) => (
+                                <div key={i} className="bg-darkCard border border-light/10 rounded-xl overflow-hidden animate-pulse">
+                                    <div className="relative aspect-video bg-light/10">
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
+                                        <div className="absolute bottom-2 left-2 right-2">
+                                            <div className="h-3 bg-light/20 rounded w-3/4"></div>
+                                            <div className="h-3 bg-light/20 rounded w-1/2 mt-1"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
+                    ) : relatedEffects.length > 0 ? (
                         <div className="grid grid-cols-2 gap-4">
                             {relatedEffects.map((relItem) => (
                                 <Link href={`/effect/${relItem.id}`} key={relItem.id} className="group/card block bg-darkCard border border-light/10 rounded-xl overflow-hidden hover:border-primary/50 transition-all hover:shadow-lg hover:shadow-primary/5">
@@ -311,9 +328,9 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
                                     </div>
                                 </Link>
                             ))}
-              </div>
-            </div>
-          )}
+                        </div>
+                    ) : null}
+                </div>
             </div>
                 </div>
 

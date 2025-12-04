@@ -18,7 +18,7 @@ import {
   Edit, Trash2, Eye, EyeOff, Check, X, Save, ArrowLeft, 
   ScrollText, BrainCircuit, Wand2, Loader2, Link as LinkIcon, 
   Zap, ScanSearch, FileText, Image as ImageIcon, Palette, LayoutTemplate,
-  CheckSquare, Square, Maximize2, ListChecks, MessageSquare,
+  CheckSquare, Square, Maximize2, ListChecks, MessageSquare, Upload,
   // Категории
   Film, Music, Tag, User, Globe, Gamepad2, Baby, Ghost, HelpCircle,
   Atom, FlaskConical, BookOpen, Library, Landmark, History, Hourglass, 
@@ -81,6 +81,8 @@ const ICON_PRESETS = [
 
 interface Effect {
   id: string; title: string; description: string; content: string; category: string; imageUrl: string | null;
+  imageSourceType?: 'YANDEX' | 'GOOGLE' | 'URL' | 'UPLOAD' | null;
+  imageSourceValue?: string | null;
   votesFor: number; votesAgainst: number; views: number; residue: string | null; residueSource: string | null;
   history: string | null; historySource: string | null; yearDiscovered: number | null;
   interpretations: Record<string, string> | null; isVisible?: boolean; createdAt: string; updatedAt: string;
@@ -144,7 +146,8 @@ export default function AdminClient({ effects: initialEffects, submissions: init
   const [aiLoading, setAiLoading] = useState(false);
   const [bulkLoading, setBulkLoading] = useState(false);
   
-  const [manualImageState, setManualImageState] = useState<{ isOpen: boolean; effect: Effect | null; url: string }>({ isOpen: false, effect: null, url: '' });
+  const [manualImageState, setManualImageState] = useState<{ isOpen: boolean; effect: Effect | null; url: string; mode: 'link' | 'upload' }>({ isOpen: false, effect: null, url: '', mode: 'link' });
+  const [uploadingFile, setUploadingFile] = useState(false);
   const [imageModalUrl, setImageModalUrl] = useState<string | null>(null);
   const [isFinderOpen, setIsFinderOpen] = useState(false);
   const [finderLoading, setFinderLoading] = useState(false);
@@ -279,19 +282,111 @@ export default function AdminClient({ effects: initialEffects, submissions: init
     window.open(url, '_blank');
   };
 
-  const handleManualImage = (effect: Effect) => { setManualImageState({ isOpen: true, effect, url: effect.imageUrl || '' }); };
+  const handleManualImage = (effect: Effect, mode: 'link' | 'upload' = 'link') => { 
+    setManualImageState({ isOpen: true, effect, url: effect.imageUrl || '', mode }); 
+  };
 
   const saveManualImage = async () => {
-    const { effect, url } = manualImageState;
-    if (!effect || !url.trim()) return;
+    const { effect, url, mode } = manualImageState;
+    if (!effect) return;
+    
+    if (mode === 'link' && !url.trim()) {
+      toast.error('Введите ссылку');
+      return;
+    }
+    
     try {
-        const result = await updateEffect(effect.id, { imageUrl: url });
-        if (result.success) {
-            setEffects(prev => prev.map(e => e.id === effect.id ? { ...e, imageUrl: url } : e));
-            toast.success('Картинка обновлена');
-            setManualImageState({ isOpen: false, effect: null, url: '' });
-        } else toast.error('Ошибка');
-    } catch (e) { toast.error('Ошибка'); }
+      // Определяем тип источника
+      let sourceType: 'YANDEX' | 'GOOGLE' | 'URL' | 'UPLOAD' | undefined = undefined;
+      let sourceValue: string | undefined = undefined;
+      
+      if (mode === 'link') {
+        // Определяем источник по URL
+        if (url.includes('yandex.ru') || url.includes('yandex.com')) {
+          sourceType = 'YANDEX';
+          sourceValue = url;
+        } else if (url.includes('google.com') || url.includes('google.ru')) {
+          sourceType = 'GOOGLE';
+          sourceValue = url;
+        } else {
+          sourceType = 'URL';
+          sourceValue = url;
+        }
+      } else {
+        // Для загрузки файла sourceType будет установлен после загрузки
+        sourceType = 'UPLOAD';
+      }
+      
+      const result = await updateEffect(effect.id, { 
+        imageUrl: url || undefined,
+        imageSourceType: sourceType,
+        imageSourceValue: sourceValue,
+      });
+      
+      if (result.success) {
+        setEffects(prev => prev.map(e => e.id === effect.id ? { 
+          ...e, 
+          imageUrl: url || e.imageUrl,
+          imageSourceType: sourceType,
+          imageSourceValue: sourceValue,
+        } : e));
+        toast.success('Картинка обновлена');
+        setManualImageState({ isOpen: false, effect: null, url: '', mode: 'link' });
+      } else toast.error('Ошибка');
+    } catch (e) { 
+      console.error(e);
+      toast.error('Ошибка'); 
+    }
+  };
+
+  const handleFileUpload = async (file: File) => {
+    const { effect } = manualImageState;
+    if (!effect || !file) return;
+    
+    setUploadingFile(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      const result = await response.json();
+      
+      if (!result.success) {
+        toast.error(result.error || 'Ошибка загрузки файла');
+        setUploadingFile(false);
+        return;
+      }
+      
+      // Обновляем URL и источник
+      const newUrl = result.url;
+      const updateResult = await updateEffect(effect.id, {
+        imageUrl: newUrl,
+        imageSourceType: 'UPLOAD',
+        imageSourceValue: result.filename,
+      });
+      
+      if (updateResult.success) {
+        setEffects(prev => prev.map(e => e.id === effect.id ? {
+          ...e,
+          imageUrl: newUrl,
+          imageSourceType: 'UPLOAD',
+          imageSourceValue: result.filename,
+        } : e));
+        toast.success('Файл загружен и сохранён');
+        setManualImageState({ isOpen: false, effect: null, url: '', mode: 'link' });
+      } else {
+        toast.error('Ошибка сохранения');
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки файла:', error);
+      toast.error('Ошибка загрузки файла');
+    } finally {
+      setUploadingFile(false);
+    }
   };
 
   const handleQuickAction = async (effect: Effect, type: 'data' | 'image' | 'restyle' | 'fit') => {
@@ -528,13 +623,53 @@ export default function AdminClient({ effects: initialEffects, submissions: init
                         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover/img:opacity-100 flex items-center justify-center transition-opacity"><Maximize2 className="w-5 h-5 text-white" /></div>
                       </div>
                       <div className="flex justify-between w-full gap-1">
-                        <button onClick={(e) => { e.stopPropagation(); handleManualImage(effect); }} className="h-7 w-7 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded text-light/60 hover:text-light transition-colors" title="Вставить ссылку"><LinkIcon className="w-3.5 h-3.5" /></button>
+                        <div className="relative group/dropdown">
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); }} 
+                            className="h-7 w-7 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded text-light/60 hover:text-light transition-colors" 
+                            title="Добавить изображение"
+                          >
+                            <LinkIcon className="w-3.5 h-3.5" />
+                          </button>
+                          <div className="absolute top-full left-0 mt-1 bg-darkCard border border-light/10 rounded-lg shadow-xl opacity-0 invisible group-hover/dropdown:opacity-100 group-hover/dropdown:visible transition-all z-30 min-w-[140px]">
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); handleManualImage(effect, 'link'); }} 
+                              className="w-full px-3 py-2 text-left text-sm hover:bg-white/5 flex items-center gap-2 text-light/70 hover:text-light transition-colors"
+                            >
+                              <LinkIcon className="w-3.5 h-3.5" />
+                              Ссылка
+                            </button>
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); handleManualImage(effect, 'upload'); }} 
+                              className="w-full px-3 py-2 text-left text-sm hover:bg-white/5 flex items-center gap-2 text-light/70 hover:text-light transition-colors"
+                            >
+                              <Upload className="w-3.5 h-3.5" />
+                              Загрузить файл
+                            </button>
+                          </div>
+                        </div>
                         <button onClick={(e) => { e.stopPropagation(); handleSearchImage(effect.title, 'google'); }} className="h-7 w-7 flex items-center justify-center bg-blue-500/10 hover:bg-blue-500/20 rounded text-blue-400 transition-colors font-bold text-[10px]" title="Google">G</button>
                         <button onClick={(e) => { e.stopPropagation(); handleSearchImage(effect.title, 'yandex'); }} className="h-7 w-7 flex items-center justify-center bg-red-500/10 hover:bg-red-500/20 rounded text-red-400 transition-colors font-bold text-[10px]" title="Yandex">Y</button>
                       </div>
                     </div>
 
                     <div className="flex-1 min-w-0">
+                        {effect.imageSourceType && (
+                          <div className="mb-2 flex items-center gap-2">
+                            <span className="text-xs text-light/50">Источник:</span>
+                            <span className={`text-xs px-2 py-0.5 rounded ${
+                              effect.imageSourceType === 'YANDEX' ? 'bg-red-500/20 text-red-400' :
+                              effect.imageSourceType === 'GOOGLE' ? 'bg-blue-500/20 text-blue-400' :
+                              effect.imageSourceType === 'UPLOAD' ? 'bg-green-500/20 text-green-400' :
+                              'bg-purple-500/20 text-purple-400'
+                            }`}>
+                              {effect.imageSourceType === 'YANDEX' ? 'Яндекс' :
+                               effect.imageSourceType === 'GOOGLE' ? 'Google' :
+                               effect.imageSourceType === 'UPLOAD' ? 'Загружено' :
+                               'Ссылка'}
+                            </span>
+                          </div>
+                        )}
                         <div className="flex items-start justify-between mb-1">
                             <div className="flex flex-wrap gap-2 items-center">
                                 <span className={`flex items-center gap-1 px-2 py-0.5 text-[10px] uppercase font-bold rounded ${getCategoryInfo(effect.category).color} bg-opacity-10 border border-opacity-20`}>
@@ -770,9 +905,62 @@ export default function AdminClient({ effects: initialEffects, submissions: init
             {manualImageState.isOpen && (
                 <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setManualImageState({ ...manualImageState, isOpen: false })}>
                     <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} className="bg-darkCard w-full max-w-md rounded-2xl border border-light/10 p-6" onClick={e => e.stopPropagation()}>
-                        <h3 className="text-xl font-bold text-white mb-4">Ссылка на фото</h3>
-                        <input type="text" value={manualImageState.url} onChange={e => setManualImageState({ ...manualImageState, url: e.target.value })} className="w-full bg-dark border border-light/10 rounded-lg p-3 text-white mb-4 outline-none focus:border-primary" autoFocus />
-                        <div className="flex justify-end gap-3"><button onClick={() => setManualImageState({ ...manualImageState, isOpen: false })} className="px-4 py-2 rounded-lg hover:bg-white/5 text-sm">Отмена</button><button onClick={saveManualImage} className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-bold">Сохранить</button></div>
+                        <h3 className="text-xl font-bold text-white mb-4">
+                          {manualImageState.mode === 'link' ? 'Ссылка на фото' : 'Загрузить файл'}
+                        </h3>
+                        
+                        {manualImageState.mode === 'link' ? (
+                          <>
+                            <input 
+                              type="text" 
+                              value={manualImageState.url} 
+                              onChange={e => setManualImageState({ ...manualImageState, url: e.target.value })} 
+                              className="w-full bg-dark border border-light/10 rounded-lg p-3 text-white mb-4 outline-none focus:border-primary" 
+                              placeholder="https://..." 
+                              autoFocus 
+                            />
+                            <div className="flex justify-end gap-3">
+                              <button onClick={() => setManualImageState({ ...manualImageState, isOpen: false })} className="px-4 py-2 rounded-lg hover:bg-white/5 text-sm">Отмена</button>
+                              <button onClick={saveManualImage} className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-bold">Сохранить</button>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="mb-4">
+                              <label className="block mb-2 text-sm text-light/70">Выберите файл изображения</label>
+                              <input 
+                                type="file" 
+                                accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    handleFileUpload(file);
+                                  }
+                                }}
+                                className="w-full bg-dark border border-light/10 rounded-lg p-3 text-white text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-white hover:file:bg-primary/80 cursor-pointer"
+                                disabled={uploadingFile}
+                              />
+                              <p className="mt-2 text-xs text-light/50">
+                                Максимальный размер: 10MB. Форматы: JPG, PNG, WEBP, GIF
+                              </p>
+                            </div>
+                            {uploadingFile && (
+                              <div className="flex items-center justify-center gap-2 mb-4 text-primary">
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span className="text-sm">Загрузка...</span>
+                              </div>
+                            )}
+                            <div className="flex justify-end gap-3">
+                              <button 
+                                onClick={() => setManualImageState({ ...manualImageState, isOpen: false })} 
+                                className="px-4 py-2 rounded-lg hover:bg-white/5 text-sm"
+                                disabled={uploadingFile}
+                              >
+                                Отмена
+                              </button>
+                            </div>
+                          </>
+                        )}
                     </motion.div>
                 </div>
             )}

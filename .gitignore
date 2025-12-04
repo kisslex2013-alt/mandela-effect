@@ -65,3 +65,6 @@ restore.json
 .cursor/
 .idea/
 .vscode/
+
+# Загруженные файлы
+public/uploads/

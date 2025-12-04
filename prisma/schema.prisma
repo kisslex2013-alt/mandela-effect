@@ -23,6 +23,10 @@ model Effect {
   imageUrl    String?
   videoUrl    String?
   
+  // Источник изображения
+  imageSourceType  ImageSourceType?
+  imageSourceValue String? // URL к оригиналу, имя файла, или null для загрузки
+  
   // Статистика
   votesFor     Int @default(0)
   votesAgainst Int @default(0)
@@ -197,4 +201,11 @@ enum CommentStatus {
   PENDING
   APPROVED
   REJECTED
+}
+
+enum ImageSourceType {
+  YANDEX
+  GOOGLE
+  URL
+  UPLOAD
 }
