@@ -1,41 +1,48 @@
-import { Metadata } from 'next';
-import { getEffectById, getEffects } from '@/app/actions/effects';
-import EffectClient from './EffectClient';
 import { notFound } from 'next/navigation';
+import prisma from '@/lib/prisma';
+import EffectPageClient from '@/components/EffectPageClient';
 
-interface PageProps {
-  params: Promise<{ id: string }>;
-}
+// ISR: Обновление раз в 1 секунду
+export const dynamic = 'force-dynamic';
+export const revalidate = 1;
 
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+export default async function EffectPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const effect = await getEffectById(id);
-  
-  if (!effect) {
-    return {
-      title: 'Эффект не найден',
-    };
-  }
 
-  return {
-    title: `${effect.title} | Эффект Манделы`,
-    description: effect.description,
-  };
-}
+  // Только чтение данных
+  const effect = await prisma.effect.findUnique({
+    where: { id },
+    include: {
+      _count: { select: { comments: true } },
+      comments: {
+        where: { status: 'APPROVED' },
+        orderBy: { createdAt: 'desc' },
+      }
+    },
+  });
 
-export default async function EffectPage({ params }: PageProps) {
-  const { id } = await params;
-  const effect = await getEffectById(id);
+  if (!effect) notFound();
 
-  if (!effect) {
-    notFound();
-  }
+  const nextEffect = await prisma.effect.findFirst({
+    where: { createdAt: { gt: effect.createdAt }, isVisible: true },
+    orderBy: { createdAt: 'asc' },
+    select: { id: true, title: true }
+  });
 
-  // Приведение типа interpretations к нужному формату
-  const serializedEffect = {
-    ...effect,
-    interpretations: effect.interpretations as Record<string, string> | null
-  };
+  const prevEffect = await prisma.effect.findFirst({
+    where: { createdAt: { lt: effect.createdAt }, isVisible: true },
+    orderBy: { createdAt: 'desc' },
+    select: { id: true, title: true }
+  });
 
-  return <EffectClient effect={serializedEffect} />;
+  const initialUserVote = null; 
+
+  return (
+    <EffectPageClient 
+      effect={effect} 
+      initialUserVote={initialUserVote} 
+      prevEffect={prevEffect}
+      nextEffect={nextEffect}
+    />
+  );
 }

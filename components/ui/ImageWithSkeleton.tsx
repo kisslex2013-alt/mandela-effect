@@ -30,6 +30,36 @@ export default function ImageWithSkeleton({
   const prevSrcRef = useRef<string | null | undefined>(src);
   const imageKeyRef = useRef(0);
 
+  // Проверяем, нужно ли проксировать через API для обхода CORS
+  // для URL из Google, которые блокируются CORS
+  const isGoogleUrl = src?.includes('googleusercontent.com') || src?.includes('googleapis.com');
+  
+  // Для Google URL используем прокси через API
+  const proxiedSrc = isGoogleUrl && src 
+    ? `/api/image-proxy?url=${encodeURIComponent(src)}`
+    : src;
+
+  // Определяем, нужно ли использовать обычный <img> вместо Next.js Image
+  // для проксированных URL (они содержат query параметры)
+  const useNativeImg = proxiedSrc?.startsWith('/api/image-proxy');
+
+  // Логирование для отладки
+  useEffect(() => {
+    if (isGoogleUrl && src) {
+      console.log('[ImageWithSkeleton] Google URL обнаружен:', {
+        original: src,
+        willProxy: true,
+        proxiedSrc,
+      });
+    }
+  }, [src, isGoogleUrl, proxiedSrc]);
+
+  useEffect(() => {
+    if (proxiedSrc?.startsWith('/api/image-proxy')) {
+      console.log('[ImageWithSkeleton] Используется прокси:', proxiedSrc);
+    }
+  }, [proxiedSrc]);
+
   // Сбрасываем состояния только при РЕАЛЬНОМ изменении src
   useEffect(() => {
     if (src && src !== prevSrcRef.current) {
@@ -46,7 +76,9 @@ export default function ImageWithSkeleton({
   }, [src]);
 
   // Всегда возвращаем обертку с relative для правильной работы fill
-  const imageSrc = retryCount > 0 && src ? `${src}${src.includes('?') ? '&' : '?'}retry=${retryCount}` : src;
+  const imageSrc = retryCount > 0 && proxiedSrc 
+    ? `${proxiedSrc}${proxiedSrc.includes('?') ? '&' : '?'}retry=${retryCount}` 
+    : proxiedSrc;
 
   return (
     <div className={`relative overflow-hidden bg-darkCard w-full h-full ${className}`} style={fill ? {} : { width, height }}>
@@ -66,6 +98,43 @@ export default function ImageWithSkeleton({
             <div className="text-xs text-light/40">Ошибка загрузки</div>
           </div>
         </div>
+      ) : useNativeImg ? (
+        // Используем обычный <img> для проксированных URL (с query параметрами)
+        <>
+          {isLoading && (
+            <div className="absolute inset-0 animate-pulse bg-white/5 z-20" />
+          )}
+          <img
+            key={`${imageKeyRef.current}-${retryCount}`}
+            src={imageSrc!}
+            alt={alt}
+            className={`absolute inset-0 w-full h-full ${objectFit === 'cover' ? 'object-cover' : objectFit === 'contain' ? 'object-contain' : 'object-cover'} transition-opacity duration-500 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
+            style={{ objectFit: objectFit === 'cover' ? 'cover' : objectFit === 'contain' ? 'contain' : 'cover' }}
+            onLoad={() => {
+              setIsLoading(false);
+              setHasError(false);
+            }}
+            onError={() => {
+              console.error('[ImageWithSkeleton] Ошибка загрузки изображения:', {
+                src: imageSrc,
+                retryCount,
+                isProxied: useNativeImg,
+              });
+              
+              if (retryCount < 2) {
+                setTimeout(() => {
+                  setRetryCount(prev => prev + 1);
+                  setIsLoading(true);
+                  setHasError(false);
+                }, 1000 * (retryCount + 1));
+              } else {
+                setIsLoading(false);
+                setHasError(true);
+                console.error('[ImageWithSkeleton] Все попытки загрузки исчерпаны. URL может быть заблокирован Google (403 Forbidden).');
+              }
+            }}
+          />
+        </>
       ) : (
         <>
           {/* Скелетон загрузки */}

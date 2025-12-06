@@ -337,12 +337,14 @@ export async function getCategories(): Promise<string[]> {
  */
 export async function incrementViews(id: string): Promise<void> {
   try {
+    console.log('[incrementViews] Увеличиваем просмотры для:', id); // <-- ЛОГ
     await prisma.effect.update({
       where: { id },
       data: { views: { increment: 1 } },
     });
+    console.log('[incrementViews] Успешно!'); // <-- ЛОГ
   } catch (error) {
-    console.error('Ошибка при обновлении просмотров:', error);
+    console.error('[incrementViews] Ошибка при обновлении просмотров:', error);
     // Не бросаем ошибку, чтобы не ломать UX
   }
 }
@@ -627,6 +629,7 @@ export async function getCatalogData() {
           createdAt: true,
           residue: true,
           history: true,
+          views: true, // <-- ДОБАВЛЕНО
         },
       }),
       prisma.category.findMany({
@@ -686,7 +689,8 @@ export async function getHomeData() {
         where: { isVisible: true },
         select: {
           id: true, title: true, description: true, category: true,
-          imageUrl: true, votesFor: true, votesAgainst: true, createdAt: true
+          imageUrl: true, votesFor: true, votesAgainst: true, createdAt: true,
+          views: true, // <-- ДОБАВЛЕНО
         }
       }),
       // 2. Категории

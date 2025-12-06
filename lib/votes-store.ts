@@ -1,35 +1,24 @@
 'use client';
 
-const STORAGE_KEY = 'mandela_votes';
-
-export type VoteMap = Record<string, 'A' | 'B'>;
-
 export const votesStore = {
-  get: (): VoteMap => {
+  get: (): Record<string, 'A' | 'B'> => {
     if (typeof window === 'undefined') return {};
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      return stored ? JSON.parse(stored) : {};
-    } catch (e) {
-      console.error('Error reading votes:', e);
+      return JSON.parse(localStorage.getItem('mandela_votes') || '{}');
+    } catch {
       return {};
     }
   },
-
   set: (effectId: string, variant: 'A' | 'B') => {
     if (typeof window === 'undefined') return;
     const votes = votesStore.get();
     votes[effectId] = variant;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(votes));
-    // Оповещаем все компоненты
+    localStorage.setItem('mandela_votes', JSON.stringify(votes));
+    // Генерируем событие, чтобы другие компоненты могли обновиться
     window.dispatchEvent(new Event('votes-updated'));
   },
-
-  clear: () => {
-    if (typeof window === 'undefined') return;
-    localStorage.removeItem(STORAGE_KEY);
-    // Оповещаем все компоненты
-    window.dispatchEvent(new Event('votes-updated'));
+  has: (effectId: string): boolean => {
+    const votes = votesStore.get();
+    return !!votes[effectId];
   }
 };
-

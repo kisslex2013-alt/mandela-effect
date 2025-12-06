@@ -33,6 +33,7 @@ interface Effect {
   history?: string | null;
   commentsCount?: number;
   commentsWithMediaCount?: number;
+  views: number; // <-- ДОБАВЛЕНО
 }
 
 interface CatalogClientProps {
@@ -294,6 +295,7 @@ export default function CatalogClient({ initialEffects, categories }: CatalogCli
                             <EffectCard 
                                 {...effect} 
                                 hasVoted={!!userVotes[effect.id]} 
+                                initialUserVote={userVotes[effect.id] ?? null}
                                 showProgress={!!userVotes[effect.id]}
                                 priority={index < 6}
                                 className="bg-darkCard/80 backdrop-blur-sm border border-light/10 hover:border-primary/50 hover:shadow-[0_0_30px_-10px_rgba(59,130,246,0.3)] transition-all"

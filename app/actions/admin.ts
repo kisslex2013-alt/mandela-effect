@@ -48,6 +48,7 @@ interface EffectData {
   videoUrl?: string;
   imageSourceType?: 'YANDEX' | 'GOOGLE' | 'URL' | 'UPLOAD';
   imageSourceValue?: string;
+  currentState?: string; // Добавлено
   residue?: string;
   residueSource?: string;
   history?: string;
@@ -64,6 +65,7 @@ interface CreateEffectData {
   category: string;
   imageUrl?: string;
   videoUrl?: string;
+  currentState?: string; // Добавлено
   residue?: string;
   residueSource?: string;
   history?: string;
@@ -81,38 +83,34 @@ export async function updateEffect(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     console.log('[updateEffect] Начало обновления эффекта:', id);
-    console.log('[updateEffect] Входящие данные:', JSON.stringify(data, null, 2));
-
-    // Формируем объект для обновления
+    
     const updateData: Record<string, unknown> = {};
 
-    // Основные текстовые поля
     if (data.title) updateData.title = data.title;
     if (data.description) updateData.description = data.description;
     if (data.content) updateData.content = data.content;
     if (data.category) updateData.category = data.category;
 
-    // Опциональные URL поля
     if (data.imageUrl !== undefined) updateData.imageUrl = data.imageUrl || null;
     if (data.videoUrl !== undefined) updateData.videoUrl = data.videoUrl || null;
     
-    // Источник изображения
     if (data.imageSourceType !== undefined) updateData.imageSourceType = data.imageSourceType || null;
     if (data.imageSourceValue !== undefined) updateData.imageSourceValue = data.imageSourceValue || null;
 
-    // Верхнеуровневые поля для доп. информации
+    // ЯВНОЕ ЛОГИРОВАНИЕ
+    if (data.currentState !== undefined) {
+      console.log('[updateEffect] Обновляем currentState:', data.currentState);
+      updateData.currentState = data.currentState || null;
+    }
+    
     if (data.residue !== undefined) updateData.residue = data.residue || null;
     if (data.residueSource !== undefined) updateData.residueSource = data.residueSource || null;
     if (data.history !== undefined) updateData.history = data.history || null;
     if (data.historySource !== undefined) updateData.historySource = data.historySource || null;
 
-    // Год открытия
     if (data.yearDiscovered !== undefined) updateData.yearDiscovered = data.yearDiscovered || null;
 
-    // Интерпретации (JSON объект)
-    // Ожидаем объект вида: { scientific, scientificSource, community, communitySource, sourceLink }
     if (data.interpretations !== undefined) {
-      // Если передан пустой объект или null - очищаем
       if (!data.interpretations || Object.keys(data.interpretations).length === 0) {
         updateData.interpretations = null;
       } else {
@@ -120,32 +118,26 @@ export async function updateEffect(
       }
     }
 
-    // Видимость эффекта
     if (data.isVisible !== undefined) {
       updateData.isVisible = data.isVisible;
     }
 
-    console.log('[updateEffect] Данные для Prisma:', JSON.stringify(updateData, null, 2));
+    console.log('[updateEffect] Итоговый объект для Prisma:', JSON.stringify(updateData, null, 2));
 
-    // Выполняем обновление
-    const updatedEffect = await prisma.effect.update({
+    await prisma.effect.update({
       where: { id },
       data: updateData,
     });
 
-    console.log('[updateEffect] Эффект успешно обновлён:', updatedEffect.id);
-
-    // Ревалидируем кэш
-    revalidatePath('/catalog');
+    // АГРЕССИВНАЯ РЕВАЛИДАЦИЯ
+    revalidatePath('/', 'layout'); 
     revalidatePath(`/effect/${id}`);
     revalidatePath('/admin');
+    revalidatePath('/catalog');
 
     return { success: true };
   } catch (error) {
-    console.error('[updateEffect] ОШИБКА при обновлении эффекта:');
-    console.error(error);
-    
-    // Пытаемся извлечь более информативное сообщение об ошибке
+    console.error('[updateEffect] ОШИБКА:', error);
     const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
     return { success: false, error: `Не удалось обновить эффект: ${errorMessage}` };
   }
@@ -166,6 +158,7 @@ export async function createEffect(
         category: data.category,
         imageUrl: data.imageUrl || null,
         videoUrl: data.videoUrl || null,
+        currentState: data.currentState || null, // Добавлено
         residue: data.residue || null,
         residueSource: data.residueSource || null,
         history: data.history || null,
@@ -285,6 +278,7 @@ interface ApproveEffectData {
   category: string;
   imageUrl?: string;
   videoUrl?: string;
+  currentState?: string; // Добавлено
   residue?: string;
   residueSource?: string;
   history?: string;
@@ -346,6 +340,7 @@ export async function approveSubmission(
         category: data.category.trim(),
         imageUrl: data.imageUrl || null,
         videoUrl: data.videoUrl || null,
+        currentState: data.currentState || null, // Добавлено
         residue: data.residue || null,
         residueSource: data.residueSource || null,
         history: data.history || null,
@@ -421,5 +416,46 @@ export async function rejectSubmission(
     console.error('[rejectSubmission] ОШИБКА:', error);
     const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
     return { success: false, error: `Не удалось отклонить заявку: ${errorMessage}` };
+  }
+}
+
+/**
+ * МИГРАЦИЯ ДАННЫХ
+ * Парсит старый content и заполняет поле currentState
+ */
+export async function migrateData() {
+  try {
+    const effects = await prisma.effect.findMany();
+    let updatedCount = 0;
+
+    for (const effect of effects) {
+      // Если поле уже заполнено - пропускаем
+      if (effect.currentState) continue;
+
+      const content = effect.content || '';
+      let newState = '';
+
+      // Пытаемся найти "Текущее состояние:" в тексте
+      if (content.includes('Текущее состояние:')) {
+        const parts = content.split('Текущее состояние:');
+        if (parts.length > 1) {
+          newState = parts[1].trim();
+        }
+      }
+
+      if (newState) {
+        await prisma.effect.update({
+          where: { id: effect.id },
+          data: { currentState: newState }
+        });
+        updatedCount++;
+      }
+    }
+    
+    revalidatePath('/', 'layout');
+    return { success: true, count: updatedCount };
+  } catch (e) {
+    console.error(e);
+    return { success: false, error: String(e) };
   }
 }

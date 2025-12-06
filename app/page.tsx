@@ -1,9 +1,12 @@
+import { Suspense } from 'react';
 import { Metadata } from 'next';
 import { getHomeData } from '@/app/actions/effects';
 import HomeClient from './HomeClient';
+import Loading from '@/components/Loading';
 
+// ISR: Обновление раз в 1 секунду (предотвращает infinite loop в dev)
 export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+export const revalidate = 1;
 
 export const metadata: Metadata = {
   title: 'Эффект Манделы | Главная',
@@ -21,12 +24,14 @@ export default async function Home() {
   const effectOfDay = result.success && result.data ? result.data.effectOfDay : null;
 
   return (
-    <HomeClient 
-      trendingEffects={trending}
-      newEffects={newEffects}
-      topCategories={categories}
-      globalStats={stats}
-      effectOfDay={effectOfDay || undefined}
-    />
+    <Suspense fallback={<Loading />}>
+      <HomeClient 
+        trendingEffects={trending}
+        newEffects={newEffects}
+        topCategories={categories}
+        globalStats={stats}
+        effectOfDay={effectOfDay || undefined}
+      />
+    </Suspense>
   );
 }

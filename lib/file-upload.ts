@@ -42,6 +42,132 @@ export function validateFile(file: File): { valid: boolean; error?: string } {
 }
 
 /**
+ * Загружает изображение по URL и сохраняет его на наш сервер
+ * Используется для сохранения изображений из Gemini чата, чтобы обойти CORS/403 блокировки
+ */
+export async function saveImageFromUrl(imageUrl: string, originalName?: string): Promise<UploadResult> {
+  try {
+    console.log('[FILE-UPLOAD] Начало загрузки изображения по URL:', imageUrl);
+
+    // Загружаем изображение с сервера (где нет CORS ограничений)
+    const response = await fetch(imageUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+        'Referer': 'https://www.google.com/',
+      },
+    });
+
+    if (!response.ok) {
+      console.error('[FILE-UPLOAD] Ошибка загрузки изображения:', response.status, response.statusText);
+      return {
+        success: false,
+        error: `Не удалось загрузить изображение: ${response.status} ${response.statusText}`,
+      };
+    }
+
+    // Получаем тип контента
+    const contentType = response.headers.get('content-type') || 'image/jpeg';
+    
+    // Проверяем, что это изображение
+    if (!contentType.startsWith('image/')) {
+      return {
+        success: false,
+        error: `Получен неверный тип контента: ${contentType}. Ожидается изображение.`,
+      };
+    }
+
+    // Получаем данные изображения
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    // Генерируем имя файла
+    const extension = contentType.split('/')[1] || 'jpg';
+    const filename = generateFilename(originalName || `image.${extension}`);
+
+    console.log('[FILE-UPLOAD] Изображение загружено, размер:', buffer.length, 'байт');
+
+    // Сохраняем в Supabase Storage
+    if (supabase) {
+      try {
+        console.log('[FILE-UPLOAD] Попытка сохранения в Supabase Storage...');
+        
+        const { data, error } = await supabase.storage
+          .from(UPLOADS_BUCKET)
+          .upload(filename, buffer, {
+            contentType,
+            upsert: false,
+          });
+
+        if (error) {
+          console.error('[FILE-UPLOAD] Ошибка Supabase Storage:', error);
+          
+          if (error.message.includes('Bucket not found') || error.message.includes('not found')) {
+            return {
+              success: false,
+              error: `Бакет ${UPLOADS_BUCKET} не найден. Создайте его в Supabase Dashboard.`,
+            };
+          }
+          throw error;
+        }
+
+        // Получаем публичный URL
+        const { data: urlData } = supabase.storage
+          .from(UPLOADS_BUCKET)
+          .getPublicUrl(filename);
+
+        if (!urlData.publicUrl.startsWith('http')) {
+          return {
+            success: false,
+            error: 'Получен относительный URL вместо полного Supabase URL.',
+          };
+        }
+
+        console.log('[FILE-UPLOAD] Изображение сохранено:', urlData.publicUrl);
+
+        return {
+          success: true,
+          url: urlData.publicUrl,
+          filename,
+        };
+      } catch (error) {
+        console.error('[FILE-UPLOAD] Ошибка при сохранении в Supabase:', error);
+        throw error;
+      }
+    }
+
+    // Fallback: сохраняем локально в dev режиме
+    if (process.env.NODE_ENV === 'development') {
+      const fs = await import('fs/promises');
+      const path = await import('path');
+      
+      const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
+      await fs.mkdir(uploadsDir, { recursive: true });
+      
+      const filePath = path.join(uploadsDir, filename);
+      await fs.writeFile(filePath, buffer);
+      
+      return {
+        success: true,
+        url: `/uploads/${filename}`,
+        filename,
+      };
+    }
+
+    return {
+      success: false,
+      error: 'Supabase Storage не настроен и не в dev режиме.',
+    };
+  } catch (error) {
+    console.error('[FILE-UPLOAD] Критическая ошибка при загрузке изображения:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Неизвестная ошибка при загрузке изображения',
+    };
+  }
+}
+
+/**
  * Генерация уникального имени файла
  */
 function generateFilename(originalName: string): string {

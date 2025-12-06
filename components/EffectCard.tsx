@@ -1,197 +1,221 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
+import { MessageSquare, Share2, Eye } from 'lucide-react';
+import { saveVote } from '@/app/actions/votes';
 import ImageWithSkeleton from '@/components/ui/ImageWithSkeleton';
-import { useSound } from '@/lib/hooks/useSound';
-import { 
-  Film, Music, Tag, User, Globe, Gamepad2, Baby, Ghost, Sparkles, Check, MessageSquare, Link as LinkIcon
-} from 'lucide-react';
-import { CATEGORY_MAP } from '@/lib/constants';
+import StrangerVote from '@/components/ui/StrangerVote';
+import { getCategoryInfo } from '@/lib/constants';
+import { votesStore } from '@/lib/votes-store';
+import toast from 'react-hot-toast';
 
 interface EffectCardProps {
-  id: string;
-  title: string;
-  description: string;
-  category: string;
+  effect?: {
+    id: string;
+    title: string;
+    description: string;
+    content: string;
+    category: string;
+    imageUrl: string | null;
+    votesFor: number;
+    votesAgainst: number;
+    views: number;
+    _count?: { comments: number };
+  };
+  // Пропсы для обратной совместимости
+  id?: string;
+  title?: string;
+  description?: string;
+  content?: string;
+  category?: string;
   imageUrl?: string | null;
-  votesFor: number;
-  votesAgainst: number;
-  createdAt?: string;
-  badge?: string;
-  showProgress?: boolean;
-  hasVoted?: boolean;
-  className?: string;
-  priority?: boolean;
+  votesFor?: number;
+  votesAgainst?: number;
+  views?: number;
   commentsCount?: number;
-  commentsWithMediaCount?: number;
+  _count?: { comments: number };
+  initialUserVote?: 'A' | 'B' | null;
+  hasVoted?: boolean;
+  showProgress?: boolean;
+  priority?: boolean;
+  className?: string;
+  badge?: string;
   hasNewComments?: boolean;
+  commentsWithMediaCount?: number;
 }
 
-export default function EffectCard({
-  id,
-  title,
-  description,
-  category,
-  imageUrl,
-  votesFor,
-  votesAgainst,
-  createdAt,
-  badge,
-  showProgress = false,
-  hasVoted = false,
-  className = '',
-  priority = false,
-  commentsCount = 0,
-  commentsWithMediaCount = 0,
-  hasNewComments = false,
-}: EffectCardProps) {
-  const { playClick, playHover } = useSound();
-
-  const getCategoryIcon = (slug: string) => {
-    switch (slug) {
-      case 'films': return <Film className="w-6 h-6" />;
-      case 'music': return <Music className="w-6 h-6" />;
-      case 'brands': return <Tag className="w-6 h-6" />;
-      case 'people': return <User className="w-6 h-6" />;
-      case 'geography': return <Globe className="w-6 h-6" />;
-      case 'popculture': return <Gamepad2 className="w-6 h-6" />;
-      case 'childhood': return <Baby className="w-6 h-6" />;
-      case 'russian': return <Ghost className="w-6 h-6" />;
-      default: return <Sparkles className="w-6 h-6" />;
-    }
+export default function EffectCard(props: EffectCardProps) {
+  const router = useRouter();
+  const effectData = props.effect || {
+    id: props.id!,
+    title: props.title!,
+    description: props.description!,
+    content: props.content || '',
+    category: props.category!,
+    imageUrl: props.imageUrl || null,
+    votesFor: props.votesFor || 0,
+    votesAgainst: props.votesAgainst || 0,
+    views: props.views || 0,
+    _count: props._count || { comments: props.commentsCount || 0 },
   };
 
-  const totalVotes = votesFor + votesAgainst;
-  const percentA = totalVotes > 0 ? (votesFor / totalVotes) * 100 : 50;
-  const safeImageUrl = imageUrl ? imageUrl.replace(/'/g, '%27') : null;
-  const categoryName = CATEGORY_MAP[category]?.name || category;
+  // Определяем начальное состояние голоса на основе пропсов
+  // Если hasVoted=true, но вариант не передан, по умолчанию ставим 'A' (визуально)
+  const [userVote, setUserVote] = useState<'A' | 'B' | null>(
+    props.initialUserVote || (props.hasVoted ? 'A' : null)
+  );
+  
+  const [votes, setVotes] = useState({ 
+    for: effectData.votesFor, 
+    against: effectData.votesAgainst 
+  });
+  const [isVoting, setIsVoting] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+
+  const categoryInfo = getCategoryInfo(effectData.category);
+  const CategoryIcon = categoryInfo.icon;
+
+  // СИНХРОНИЗАЦИЯ С LOCALSTORAGE (Мгновенная реакция)
+  useEffect(() => {
+    const localVotes = votesStore.get();
+    if (localVotes[effectData.id]) {
+      setUserVote(localVotes[effectData.id]);
+    }
+
+    const handleUpdate = () => {
+      const updatedVotes = votesStore.get();
+      if (updatedVotes[effectData.id]) {
+        setUserVote(updatedVotes[effectData.id]);
+      }
+    };
+
+    window.addEventListener('votes-updated', handleUpdate);
+    return () => window.removeEventListener('votes-updated', handleUpdate);
+  }, [effectData.id]);
+
+  const parseVariants = () => {
+    let vA = "Как я помню";
+    let vB = "Как в реальности";
+    if (effectData.content) {
+      const matchA = effectData.content.match(/Вариант А:\s*(.*?)(?:\n|$)/);
+      const matchB = effectData.content.match(/Вариант Б:\s*(.*?)(?:\n|$)/);
+      if (matchA && matchA[1]) vA = matchA[1].trim();
+      if (matchB && matchB[1]) vB = matchB[1].trim();
+    }
+    return { vA, vB };
+  };
+
+  const { vA, vB } = parseVariants();
+
+  const handleVote = async (variant: 'A' | 'B') => {
+    if (isVoting || userVote) return;
+    setIsVoting(true);
+    setUserVote(variant);
+    setVotes(prev => ({ for: variant === 'A' ? prev.for + 1 : prev.for, against: variant === 'B' ? prev.against + 1 : prev.against }));
+    // Сохраняем локально сразу
+    votesStore.set(effectData.id, variant);
+
+    try {
+      let visitorId = localStorage.getItem('visitorId');
+      if (!visitorId) { visitorId = crypto.randomUUID(); localStorage.setItem('visitorId', visitorId); }
+      const result = await saveVote({ visitorId, effectId: effectData.id, variant });
+      if (!result.success) { 
+        if (result.vote) {
+          setUserVote(result.vote.variant as 'A' | 'B');
+        } else {
+          setUserVote(null); 
+          setVotes({ for: effectData.votesFor, against: effectData.votesAgainst }); 
+          toast.error('Ошибка'); 
+        }
+      } else { 
+        toast.success('Голос записан');
+        if (result.effect) {
+          setVotes({ for: result.effect.votesFor, against: result.effect.votesAgainst });
+        }
+      }
+    } catch (error) { 
+      setUserVote(null);
+      setVotes({ for: effectData.votesFor, against: effectData.votesAgainst });
+      toast.error('Ошибка');
+    } finally { setIsVoting(false); }
+  };
 
   return (
-    <Link 
-      href={`/effect/${id}`} 
-      className="group"
-      onClick={playClick}
-      onMouseEnter={() => Math.random() > 0.7 && playHover()}
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      className={`group relative bg-darkCard border border-light/5 rounded-2xl overflow-hidden hover:border-primary/30 transition-all duration-500 hover:shadow-[0_0_30px_rgba(6,182,212,0.1)] flex flex-col h-full ${props.className || ''}`}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
-      <div className={`group relative overflow-hidden bg-darkCard rounded-xl border border-light/10 hover:border-primary/30 transition-all duration-300 hover:-translate-y-2 hover:shadow-xl hover:shadow-primary/20 flex flex-col h-full ${className}`}>
+      {/* Контейнер картинки */}
+      <div className="block relative aspect-video overflow-hidden shrink-0 glitch-wrapper">
+        <Link href={`/effect/${effectData.id}`} className="absolute inset-0 z-0">
+          {effectData.imageUrl ? (
+            <>
+              <ImageWithSkeleton src={effectData.imageUrl} alt={effectData.title} fill className={`object-cover transition-transform duration-700 ${isHovered ? 'scale-105' : 'scale-100'} relative z-[1]`} priority={props.priority} />
+              <div className={`absolute inset-0 bg-gradient-to-t from-dark via-transparent to-transparent opacity-60 z-[1]`} />
+              {/* GLITCH LAYERS (Complex Glitch Effect) */}
+              <div className="glitch-layers absolute inset-0 z-[2] opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="glitch-layer" style={{ backgroundImage: `url('${effectData.imageUrl.replace(/'/g, '%27')}')` }} />
+                <div className="glitch-layer" style={{ backgroundImage: `url('${effectData.imageUrl.replace(/'/g, '%27')}')` }} />
+                <div className="glitch-layer" style={{ backgroundImage: `url('${effectData.imageUrl.replace(/'/g, '%27')}')` }} />
+              </div>
+            </>
+          ) : <div className="w-full h-full bg-white/5 flex items-center justify-center"><span className="text-4xl">👾</span></div>}
+        </Link>
+
+        <div className="absolute top-3 left-3 z-10 pointer-events-none">
+          <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md backdrop-blur-md border border-white/10 ${categoryInfo.color} bg-opacity-20 text-xs font-bold uppercase tracking-wider shadow-lg`}>
+            <CategoryIcon className="w-3 h-3" />{props.badge || categoryInfo.name}
+          </div>
+        </div>
         
-        {/* Верхняя часть - Изображение */}
-        {imageUrl && safeImageUrl ? (
-          <div className="shine-effect relative z-10 w-full h-48 min-h-[192px] shrink-0 bg-darkCard border-b border-light/10">
-            <ImageWithSkeleton
-              src={imageUrl}
-              alt={title}
-              fill
-              className="object-cover transition-transform duration-500 group-hover:scale-105"
-              priority={priority}
-            />
-            <div className="glitch-layers absolute inset-0 z-[2]">
-              <div className="glitch-layer" style={{ backgroundImage: `url('${safeImageUrl}')` }} />
-              <div className="glitch-layer" style={{ backgroundImage: `url('${safeImageUrl}')` }} />
-              <div className="glitch-layer" style={{ backgroundImage: `url('${safeImageUrl}')` }} />
-            </div>
-            {/* Бейдж комментариев */}
-            {commentsCount > 0 && (
-              <div className={`absolute top-2 right-2 z-[30] flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold backdrop-blur-sm transition-all ${
-                hasNewComments 
-                  ? 'bg-purple-500/90 text-white border-2 border-purple-400/70 shadow-lg shadow-purple-500/50 animate-pulse' 
-                  : 'bg-darkCard/95 text-light/90 border border-light/30'
-              }`}>
-                {commentsWithMediaCount > 0 ? (
-                  <>
-                    <LinkIcon className="w-3 h-3" />
-                    <span className="font-bold">{commentsCount}</span>
-                  </>
-                ) : (
-                  <>
-                    <MessageSquare className="w-3 h-3" />
-                    <span className="font-bold">{commentsCount}</span>
-                  </>
-                )}
-              </div>
-            )}
+        <div className="absolute top-3 right-3 z-10 flex items-center gap-2">
+          <Link 
+            href={`/effect/${effectData.id}#comments`} 
+            className={`flex items-center gap-1 px-2 py-1 rounded-md backdrop-blur-md text-xs transition-colors z-20 ${
+              props.hasNewComments 
+                ? 'bg-primary/30 text-primary border border-primary/50 hover:bg-primary/40' 
+                : 'bg-black/40 text-white/70 hover:text-white'
+            }`}
+          >
+            <MessageSquare className="w-3 h-3" />{effectData._count?.comments || 0}
+          </Link>
+          <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-black/40 backdrop-blur-md text-xs text-white/70 pointer-events-none">
+            <Eye className="w-3 h-3" />{effectData.views}
           </div>
-        ) : (
-          <div className="relative z-10 h-48 min-h-[192px] shrink-0 w-full bg-gradient-to-br from-primary/20 via-secondary/20 to-primary/20 flex items-center justify-center rounded-t-xl border-b border-light/10">
-            <span className="text-white/50">{getCategoryIcon(category)}</span>
-            {/* Бейдж комментариев для карточек без изображения */}
-            {commentsCount > 0 && (
-              <div className={`absolute top-2 right-2 z-[30] flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold backdrop-blur-sm transition-all ${
-                hasNewComments 
-                  ? 'bg-purple-500/90 text-white border-2 border-purple-400/70 shadow-lg shadow-purple-500/50 animate-pulse' 
-                  : 'bg-darkCard/95 text-light/90 border border-light/30'
-              }`}>
-                {commentsWithMediaCount > 0 ? (
-                  <>
-                    <LinkIcon className="w-3 h-3" />
-                    <span className="font-bold">{commentsCount}</span>
-                  </>
-                ) : (
-                  <>
-                    <MessageSquare className="w-3 h-3" />
-                    <span className="font-bold">{commentsCount}</span>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Нижняя часть - Контент */}
-        <div className="relative z-10 p-5 flex flex-col flex-grow">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-primary opacity-80 group-hover:scale-110 transition-transform duration-300">
-              {getCategoryIcon(category)}
-            </span>
-            {badge ? (
-              <span className="text-xs bg-primary/20 text-primary px-2 py-1 rounded">{badge}</span>
-            ) : (
-              <span className="text-xs text-light/40 font-bold uppercase tracking-wider">
-                {categoryName}
-              </span>
-            )}
-          </div>
-
-          <h3 className="text-lg md:text-xl font-bold text-light mb-2 transition-colors duration-300 group-hover:text-primary line-clamp-2">
-            {title}
-          </h3>
-
-          <p className="text-sm text-light/60 mb-4 line-clamp-2 flex-grow">
-            {description}
-          </p>
-
-          {/* Блок Статистики (Если проголосовал) */}
-          {showProgress && totalVotes > 0 && hasVoted ? (
-            <div className="mt-auto pt-2">
-              {/* Инфо-строка: Голоса и Статус */}
-              <div className="flex justify-between items-center text-xs mb-2">
-                <span className="text-light/50">{totalVotes.toLocaleString('ru-RU')} голосов</span>
-                <span className="flex items-center gap-1 text-green-400 font-medium">
-                  <Check className="w-3 h-3" /> Проголосовал
-                </span>
-              </div>
-
-              {/* Прогресс-бар в одну строку */}
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-bold text-primary w-8 text-right">{Math.round(percentA)}%</span>
-                <div className="flex-1 h-2 rounded-full bg-dark/50 overflow-hidden flex">
-                   <div className="h-full bg-primary" style={{ width: `${percentA}%` }}></div>
-                   <div className="h-full bg-secondary" style={{ width: `${100 - percentA}%` }}></div>
-                </div>
-                <span className="text-sm font-bold text-secondary w-8 text-left">{Math.round(100 - percentA)}%</span>
-              </div>
-            </div>
-          ) : (
-            /* Футер для непроголосовавших */
-            <div className="flex items-center justify-between text-xs text-light/40 mt-auto pt-2 border-t border-light/5">
-                <span>{totalVotes > 0 ? `${totalVotes} голосов` : 'Пока нет голосов'}</span>
-                <span className="group-hover:text-light transition-colors">Нажмите, чтобы выбрать</span>
-            </div>
-          )}
-
         </div>
       </div>
-    </Link>
+
+      <div className="p-5 flex flex-col flex-1 relative">
+        <div className="flex items-center justify-between mb-2">
+          <Link href={`/effect/${effectData.id}`} className="block group-hover:text-primary transition-colors flex-1">
+            <h3 className="text-xl font-bold text-white line-clamp-1 leading-tight">{effectData.title}</h3>
+          </Link>
+          <button className="flex items-center gap-1.5 hover:text-primary transition-colors text-xs text-light/40 ml-4" title="Поделиться">
+            <Share2 className="w-4 h-4" />
+          </button>
+        </div>
+        <p className="text-sm text-light/60 mb-6 line-clamp-2 h-10 leading-relaxed">{effectData.description}</p>
+        <div className="mt-auto">
+          <StrangerVote 
+            variantA={vA} 
+            variantB={vB} 
+            votesFor={votes.for} 
+            votesAgainst={votes.against} 
+            userVote={userVote} 
+            onVote={handleVote} 
+            isVoting={isVoting} 
+            onOpenCard={() => router.push(`/effect/${effectData.id}`)}
+            openOnClick 
+          />
+        </div>
+      </div>
+    </motion.div>
   );
 }

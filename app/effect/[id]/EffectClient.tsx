@@ -115,7 +115,6 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
   // Навигация и Похожие
   const [allIds, setAllIds] = useState<string[]>([]);
   const [relatedEffects, setRelatedEffects] = useState<any[]>([]);
-  const [isLoadingRelated, setIsLoadingRelated] = useState(true);
   const [nextUnvotedId, setNextUnvotedId] = useState<string | null>(null);
   const [prevId, setPrevId] = useState<string | null>(null);
   const [hasUnvoted, setHasUnvoted] = useState(true);
@@ -152,12 +151,10 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
       }
 
       // 2. Похожие эффекты
-      setIsLoadingRelated(true);
       const relatedRes = await getRelatedEffects(effect.category, effect.id);
       if (relatedRes.success && relatedRes.data) {
         setRelatedEffects(relatedRes.data);
       }
-      setIsLoadingRelated(false);
     };
 
     initData();
@@ -299,37 +296,34 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
                         <span className="w-1.5 h-1.5 rounded-full bg-primary/50"></span>
                         Похожие сбои
                     </div>
-                    {isLoadingRelated ? (
-                        <div className="grid grid-cols-2 gap-4">
-                            {[1, 2, 3, 4].map((i) => (
-                                <div key={i} className="bg-darkCard border border-light/10 rounded-xl overflow-hidden animate-pulse">
-                                    <div className="relative aspect-video bg-light/10">
-                                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
-                                        <div className="absolute bottom-2 left-2 right-2">
-                                            <div className="h-3 bg-light/20 rounded w-3/4"></div>
-                                            <div className="h-3 bg-light/20 rounded w-1/2 mt-1"></div>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    ) : relatedEffects.length > 0 ? (
-                        <div className="grid grid-cols-2 gap-4">
-                            {relatedEffects.map((relItem) => (
-                                <Link href={`/effect/${relItem.id}`} key={relItem.id} className="group/card block bg-darkCard border border-light/10 rounded-xl overflow-hidden hover:border-primary/50 transition-all hover:shadow-lg hover:shadow-primary/5">
-                                    <div className="relative aspect-video bg-black/20">
-                                        {relItem.imageUrl && (
-                                            <ImageWithSkeleton src={relItem.imageUrl} alt={relItem.title} fill className="object-cover opacity-80 group-hover/card:opacity-100 transition-opacity" />
-                                        )}
-                                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
-                                        <div className="absolute bottom-2 left-2 right-2">
-                                            <div className="text-xs font-bold text-white line-clamp-2 leading-tight group-hover/card:text-primary transition-colors">{relItem.title}</div>
-                                        </div>
-                                    </div>
-                                </Link>
-                            ))}
-                        </div>
-                    ) : null}
+                    {relatedEffects.length > 0 && (
+                        <motion.div layout className="grid grid-cols-2 gap-4">
+                            <AnimatePresence mode="popLayout">
+                                {relatedEffects.map((relItem, index) => (
+                                    <motion.div
+                                        key={relItem.id}
+                                        layout
+                                        initial={{ opacity: 0, scale: 0.9 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        exit={{ opacity: 0, scale: 0.9 }}
+                                        transition={{ duration: 0.2, delay: index * 0.05 }}
+                                    >
+                                        <Link href={`/effect/${relItem.id}`} className="group/card block bg-darkCard border border-light/10 rounded-xl overflow-hidden hover:border-primary/50 transition-all hover:shadow-lg hover:shadow-primary/5">
+                                            <div className="relative aspect-video bg-black/20">
+                                                {relItem.imageUrl && (
+                                                    <ImageWithSkeleton src={relItem.imageUrl} alt={relItem.title} fill className="object-cover opacity-80 group-hover/card:opacity-100 transition-opacity" />
+                                                )}
+                                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
+                                                <div className="absolute bottom-2 left-2 right-2">
+                                                    <div className="text-xs font-bold text-white line-clamp-2 leading-tight group-hover/card:text-primary transition-colors">{relItem.title}</div>
+                                                </div>
+                                            </div>
+                                        </Link>
+                                    </motion.div>
+                                ))}
+                            </AnimatePresence>
+                        </motion.div>
+                    )}
                 </div>
             </div>
                 </div>
@@ -473,7 +467,7 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
                         {effect.history && (
                             <AccordionItem 
                               id="history"
-                              title="Временная шкала | История" 
+                              title="История" 
                               icon={<ScrollTextIcon />} 
                               color="amber"
                               isOpen={openAccordion === 'history'}
@@ -492,7 +486,7 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
                         {(scientificText || communityText) && (
                             <AccordionItem 
                               id="theories"
-                              title="Что об этом говорят | Теории" 
+                              title="Теории" 
                               icon={<BrainIcon />} 
                               color="pink"
                               isOpen={openAccordion === 'theories'}

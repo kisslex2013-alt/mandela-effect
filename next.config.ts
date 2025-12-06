@@ -24,17 +24,40 @@ const nextConfig: NextConfig = {
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
     remotePatterns: [
+      // Cloudinary
       {
         protocol: 'https',
-        hostname: '**', // Разрешает любые домены
+        hostname: 'res.cloudinary.com',
       },
+      // AI генерация изображений
       {
         protocol: 'https',
-        hostname: '*.supabase.co', // Supabase Storage
+        hostname: 'image.pollinations.ai',
       },
+      // Ресайз изображений
       {
         protocol: 'https',
-        hostname: '*.public.blob.vercel-storage.com', // Vercel Blob Storage (fallback)
+        hostname: 'wsrv.nl',
+      },
+      // Превью видео YouTube
+      {
+        protocol: 'https',
+        hostname: 'img.youtube.com',
+      },
+      // Supabase Storage (все поддомены)
+      {
+        protocol: 'https',
+        hostname: '**.supabase.co',
+      },
+      // Аватарки Google
+      {
+        protocol: 'https',
+        hostname: 'lh3.googleusercontent.com',
+      },
+      // Vercel Blob Storage (fallback)
+      {
+        protocol: 'https',
+        hostname: '*.public.blob.vercel-storage.com',
       },
     ],
   },

@@ -31,6 +31,16 @@ export interface ModerateCommentResult {
   error?: string;
 }
 
+export interface UpdateCommentResult {
+  success: boolean;
+  error?: string;
+}
+
+export interface DeleteCommentResult {
+  success: boolean;
+  error?: string;
+}
+
 /**
  * Создать комментарий с валидацией безопасности
  */
@@ -187,14 +197,17 @@ export async function createComment(data: CreateCommentData): Promise<CommentRes
 }
 
 /**
- * Получить комментарии для эффекта (только одобренные)
+ * Получить комментарии для эффекта
+ * @param effectId - ID эффекта
+ * @param visitorId - ID посетителя (опционально)
+ * @param includePending - Включить комментарии на модерации (для админа)
  */
-export async function getComments(effectId: string, visitorId?: string) {
+export async function getComments(effectId: string, visitorId?: string, includePending: boolean = false) {
   try {
     const comments = await prisma.comment.findMany({
       where: {
         effectId,
-        status: 'APPROVED', // Только одобренные
+        ...(includePending ? {} : { status: 'APPROVED' }), // Для админа показываем все, для пользователей только одобренные
       },
       orderBy: {
         createdAt: 'desc',
@@ -280,23 +293,11 @@ export async function moderateComment(
 /**
  * Лайк/дизлайк комментария
  */
-export async function toggleCommentLike(
-  commentId: string,
-  visitorId: string,
-  isLike: boolean
-): Promise<{ success: boolean; likes?: number; dislikes?: number; error?: string }> {
+export async function toggleCommentLike(commentId: string, visitorId: string) {
   try {
-    // Проверяем существование комментария
-    const comment = await prisma.comment.findUnique({
-      where: { id: commentId },
-      select: { id: true, likes: true, dislikes: true },
-    });
+    if (!visitorId) return { success: false, error: 'No visitor ID' };
 
-    if (!comment) {
-      return { success: false, error: 'Комментарий не найден' };
-    }
-
-    // Проверяем, есть ли уже лайк/дизлайк от этого пользователя
+    // Проверяем, есть ли уже лайк
     const existingLike = await prisma.commentLike.findUnique({
       where: {
         commentId_visitorId: {
@@ -307,72 +308,39 @@ export async function toggleCommentLike(
     });
 
     if (existingLike) {
-      // Если пользователь уже лайкнул/дизлайкнул
-      if (existingLike.isLike === isLike) {
-        // Убираем лайк/дизлайк
-        await prisma.commentLike.delete({
-          where: { id: existingLike.id },
-        });
-        
-        await prisma.comment.update({
-          where: { id: commentId },
-          data: {
-            likes: isLike ? { decrement: 1 } : undefined,
-            dislikes: !isLike ? { decrement: 1 } : undefined,
-          },
-        });
-      } else {
-        // Меняем лайк на дизлайк или наоборот
-        await prisma.commentLike.update({
-          where: { id: existingLike.id },
-          data: { isLike },
-        });
-        
-        await prisma.comment.update({
-          where: { id: commentId },
-          data: {
-            likes: isLike ? { increment: 1 } : { decrement: 1 },
-            dislikes: !isLike ? { increment: 1 } : { decrement: 1 },
-          },
-        });
-      }
+      // Если есть - удаляем (дизлайк/отмена)
+      await prisma.commentLike.delete({
+        where: { id: existingLike.id },
+      });
+      
+      // Обновляем счетчик в комментарии
+      await prisma.comment.update({
+        where: { id: commentId },
+        data: { likes: { decrement: 1 } },
+      });
+      
+      return { success: true, action: 'removed' };
     } else {
-      // Создаем новый лайк/дизлайк
+      // Если нет - создаем
       await prisma.commentLike.create({
         data: {
           commentId,
           visitorId,
-          isLike,
+          isLike: true,
         },
       });
       
+      // Обновляем счетчик
       await prisma.comment.update({
         where: { id: commentId },
-        data: {
-          likes: isLike ? { increment: 1 } : undefined,
-          dislikes: !isLike ? { increment: 1 } : undefined,
-        },
+        data: { likes: { increment: 1 } },
       });
+      
+      return { success: true, action: 'added' };
     }
-
-    // Получаем обновленные значения и effectId для ревалидации
-    const updated = await prisma.comment.findUnique({
-      where: { id: commentId },
-      select: { likes: true, dislikes: true, effectId: true },
-    });
-
-    if (updated?.effectId) {
-      revalidatePath(`/effect/${updated.effectId}`);
-    }
-    
-    return {
-      success: true,
-      likes: updated?.likes || 0,
-      dislikes: updated?.dislikes || 0,
-    };
   } catch (error) {
-    console.error('[toggleCommentLike] Ошибка:', error);
-    return { success: false, error: 'Не удалось изменить лайк' };
+    console.error('Error toggling like:', error);
+    return { success: false, error: 'Failed to toggle like' };
   }
 }
 
@@ -543,6 +511,114 @@ export async function getCommentsCountsBatch(effectIds: string[]): Promise<Recor
   } catch (error) {
     console.error('[getCommentsCountsBatch] Ошибка:', error);
     return {};
+  }
+}
+
+/**
+ * Обновить комментарий (только для админа)
+ */
+export async function updateComment(
+  commentId: string,
+  data: {
+    text?: string;
+    imageUrl?: string | null;
+    videoUrl?: string | null;
+    audioUrl?: string | null;
+  }
+): Promise<UpdateCommentResult> {
+  try {
+    // Валидация текста если передан
+    if (data.text !== undefined) {
+      if (!data.text.trim() || data.text.length < 3) {
+        return { success: false, error: 'Текст комментария слишком короткий (минимум 3 символа)' };
+      }
+      if (data.text.length > 5000) {
+        return { success: false, error: 'Текст комментария слишком длинный (максимум 5000 символов)' };
+      }
+    }
+
+    // Валидация медиа-ссылок если переданы
+    if (data.imageUrl) {
+      const normalized = normalizeUrl(data.imageUrl);
+      if (isSuspiciousUrl(normalized)) {
+        return { success: false, error: 'Подозрительная ссылка на изображение' };
+      }
+      if (!isDomainAllowed(normalized, 'image')) {
+        return { success: false, error: 'Разрешены только ссылки с проверенных сервисов' };
+      }
+      data.imageUrl = normalized;
+    }
+
+    if (data.videoUrl) {
+      const normalized = normalizeUrl(data.videoUrl);
+      if (isSuspiciousUrl(normalized)) {
+        return { success: false, error: 'Подозрительная ссылка на видео' };
+      }
+      if (!isDomainAllowed(normalized, 'video')) {
+        return { success: false, error: 'Разрешены только ссылки с проверенных сервисов' };
+      }
+      data.videoUrl = normalized;
+    }
+
+    if (data.audioUrl) {
+      const normalized = normalizeUrl(data.audioUrl);
+      if (isSuspiciousUrl(normalized)) {
+        return { success: false, error: 'Подозрительная ссылка на аудио' };
+      }
+      if (!isDomainAllowed(normalized, 'audio')) {
+        return { success: false, error: 'Разрешены только ссылки с проверенных сервисов' };
+      }
+      data.audioUrl = normalized;
+    }
+
+    const comment = await prisma.comment.update({
+      where: { id: commentId },
+      data: {
+        ...(data.text !== undefined && { text: data.text.trim() }),
+        ...(data.imageUrl !== undefined && { imageUrl: data.imageUrl }),
+        ...(data.videoUrl !== undefined && { videoUrl: data.videoUrl }),
+        ...(data.audioUrl !== undefined && { audioUrl: data.audioUrl }),
+      },
+      select: {
+        effectId: true,
+      },
+    });
+
+    revalidatePath(`/effect/${comment.effectId}`);
+    revalidatePath('/admin');
+
+    return { success: true };
+  } catch (error) {
+    console.error('[updateComment] Ошибка:', error);
+    return { success: false, error: 'Не удалось обновить комментарий' };
+  }
+}
+
+/**
+ * Удалить комментарий (только для админа)
+ */
+export async function deleteComment(commentId: string): Promise<DeleteCommentResult> {
+  try {
+    const comment = await prisma.comment.findUnique({
+      where: { id: commentId },
+      select: { effectId: true },
+    });
+
+    if (!comment) {
+      return { success: false, error: 'Комментарий не найден' };
+    }
+
+    await prisma.comment.delete({
+      where: { id: commentId },
+    });
+
+    revalidatePath(`/effect/${comment.effectId}`);
+    revalidatePath('/admin');
+
+    return { success: true };
+  } catch (error) {
+    console.error('[deleteComment] Ошибка:', error);
+    return { success: false, error: 'Не удалось удалить комментарий' };
   }
 }
 
