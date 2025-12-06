@@ -372,10 +372,10 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
           getPrevUnvotedEffect(effect.id, votedIds),
         ]);
         if (nextResult.success) {
-          setNextUnvotedEffect(nextResult.data);
+          setNextUnvotedEffect(nextResult.data ?? null);
         }
         if (prevResult.success) {
-          setPrevUnvotedEffect(prevResult.data);
+          setPrevUnvotedEffect(prevResult.data ?? null);
         }
       };
       fetchUnvotedEffects();
