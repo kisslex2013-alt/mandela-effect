@@ -54,18 +54,22 @@ export default function CommentCard({
     }
 
     try {
-      const result = await toggleCommentLike(id, visitorId, isLike);
+      // Вызываем функцию с правильными аргументами (только commentId и visitorId)
+      const result = await toggleCommentLike(id, visitorId);
       if (result.success) {
-        setLikes(result.likes || 0);
-        setDislikes(result.dislikes || 0);
+        // Обновляем счетчики из ответа сервера
+        if (result.likes !== undefined) {
+          setLikes(result.likes);
+        }
+        if (result.dislikes !== undefined) {
+          setDislikes(result.dislikes);
+        }
         
         // Обновляем состояние лайка пользователя
-        if (userLike === isLike) {
-          // Убираем лайк/дизлайк
+        if (result.action === 'added') {
+          setUserLike(true);
+        } else if (result.action === 'removed') {
           setUserLike(null);
-        } else {
-          // Ставим новый лайк/дизлайк
-          setUserLike(isLike);
         }
         
         onLikeChange?.();

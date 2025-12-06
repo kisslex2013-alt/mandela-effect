@@ -313,13 +313,14 @@ export async function toggleCommentLike(commentId: string, visitorId: string) {
         where: { id: existingLike.id },
       });
       
-      // Обновляем счетчик в комментарии
-      await prisma.comment.update({
+      // Обновляем счетчик в комментарии и получаем обновленные значения
+      const updatedComment = await prisma.comment.update({
         where: { id: commentId },
         data: { likes: { decrement: 1 } },
+        select: { likes: true, dislikes: true },
       });
       
-      return { success: true, action: 'removed' };
+      return { success: true, action: 'removed', likes: updatedComment.likes, dislikes: updatedComment.dislikes };
     } else {
       // Если нет - создаем
       await prisma.commentLike.create({
@@ -330,13 +331,14 @@ export async function toggleCommentLike(commentId: string, visitorId: string) {
         },
       });
       
-      // Обновляем счетчик
-      await prisma.comment.update({
+      // Обновляем счетчик и получаем обновленные значения
+      const updatedComment = await prisma.comment.update({
         where: { id: commentId },
         data: { likes: { increment: 1 } },
+        select: { likes: true, dislikes: true },
       });
       
-      return { success: true, action: 'added' };
+      return { success: true, action: 'added', likes: updatedComment.likes, dislikes: updatedComment.dislikes };
     }
   } catch (error) {
     console.error('Error toggling like:', error);
