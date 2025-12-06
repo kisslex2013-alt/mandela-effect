@@ -48,12 +48,13 @@ const ImageLightbox = ({ src, onClose }: { src: string | null, onClose: () => vo
 const AccordionItem = ({ title, icon: Icon, children, color = "cyan", sourceLink, defaultOpen = false }: any) => {
   const [isOpen, setIsOpen] = useState(defaultOpen);
   
-  const colorClasses = {
+  const colorClassesMap: Record<string, string> = {
     cyan: "text-cyan-400 border-cyan-500/30 bg-cyan-950/20",
     red: "text-red-400 border-red-500/30 bg-red-950/20",
     purple: "text-purple-400 border-purple-500/30 bg-purple-950/20",
     orange: "text-orange-400 border-orange-500/30 bg-orange-950/20",
-  }[color] || "text-cyan-400 border-cyan-500/30 bg-cyan-950/20";
+  };
+  const colorClasses = colorClassesMap[color] || "text-cyan-400 border-cyan-500/30 bg-cyan-950/20";
 
   return (
     <div className={`border rounded-xl overflow-hidden transition-all ${isOpen ? colorClasses : "border-white/10 bg-darkCard"}`}>
