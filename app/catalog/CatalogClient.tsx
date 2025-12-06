@@ -208,7 +208,7 @@ export default function CatalogClient({ initialEffects, categories }: CatalogCli
             </div>
 
             {/* ЛЕНТА КАТЕГОРИЙ (Smart Pills) + Чекбокс "Скрыть исследованные" */}
-            <div className="relative pr-40">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div className="flex flex-wrap items-center justify-center gap-2">
                     {/* Кнопка ВСЕ (статичная) */}
                     <button
@@ -259,8 +259,8 @@ export default function CatalogClient({ initialEffects, categories }: CatalogCli
                     })}
                 </div>
                 
-                {/* Чекбокс "Скрыть исследованные" - закреплен справа */}
-                <label className="absolute right-0 top-0 flex items-center gap-2 cursor-pointer group bg-darkCard/95 backdrop-blur-sm border border-light/10 rounded-lg px-3 py-2 shadow-lg z-10">
+                {/* Чекбокс "Скрыть исследованные" - справа на десктопе, под кнопками на мобильных */}
+                <label className="flex items-center gap-2 cursor-pointer group bg-darkCard/95 backdrop-blur-sm border border-light/10 rounded-lg px-3 py-2 shadow-lg shrink-0 self-center md:self-auto">
                     <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all shrink-0 ${hideVoted ? 'bg-primary border-primary' : 'border-light/30 group-hover:border-light/60'}`}>
                         {hideVoted && <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}><div className="w-2 h-2 bg-black rounded-sm" /></motion.div>}
                     </div>

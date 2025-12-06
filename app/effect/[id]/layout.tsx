@@ -1,17 +1,5 @@
 import type { Metadata } from 'next';
-import { readFileSync } from 'fs';
-import { join } from 'path';
-
-async function getEffectById(id: number) {
-  try {
-    const filePath = join(process.cwd(), 'data', 'effects.json');
-    const fileContents = readFileSync(filePath, 'utf8');
-    const effectsData = JSON.parse(fileContents);
-    return effectsData.find((effect: any) => effect.id === id);
-  } catch (error) {
-    return null;
-  }
-}
+import prisma from '@/lib/prisma';
 
 export async function generateMetadata({
   params,
@@ -19,7 +7,17 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
-  const effect = await getEffectById(parseInt(id));
+  
+  const effect = await prisma.effect.findUnique({
+    where: { id },
+    select: {
+      title: true,
+      description: true,
+      imageUrl: true,
+      votesFor: true,
+      votesAgainst: true,
+    }
+  });
 
   if (!effect) {
     return {
@@ -27,9 +25,34 @@ export async function generateMetadata({
     };
   }
 
+  // Next.js автоматически подхватывает opengraph-image.tsx
+  // Используем абсолютный URL для OG-изображения
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+  const ogImageUrl = `${baseUrl}/effect/${id}/opengraph-image`;
+
   return {
     title: `${effect.title} - Эффект Манделы`,
-    description: effect.question,
+    description: effect.description || 'Исследуй коллективные заблуждения и проверь свою реальность',
+    openGraph: {
+      title: effect.title,
+      description: effect.description || 'Исследуй коллективные заблуждения и проверь свою реальность',
+      url: `${baseUrl}/effect/${id}`,
+      images: [
+        {
+          url: ogImageUrl,
+          width: 1200,
+          height: 630,
+          alt: effect.title,
+        },
+      ],
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: effect.title,
+      description: effect.description || 'Исследуй коллективные заблуждения и проверь свою реальность',
+      images: [ogImageUrl],
+    },
   };
 }
 

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { ArrowRight, Sparkles, Flame, Activity, Zap, Users, CheckCircle, Clock, Hash, ChevronDown, AlertTriangle } from 'lucide-react';
 import EffectCard from '@/components/EffectCard';
@@ -9,6 +10,7 @@ import ImageWithSkeleton from '@/components/ui/ImageWithSkeleton';
 import StrangerVote from '@/components/ui/StrangerVote';
 import { votesStore } from '@/lib/votes-store';
 import { saveVote, getUserVote } from '@/app/actions/votes';
+import { generateSystemLog } from '@/lib/system-logs';
 import toast from 'react-hot-toast';
 
 interface HomeClientProps {
@@ -26,6 +28,7 @@ export default function HomeClient({
   globalStats,
   effectOfDay 
 }: HomeClientProps) {
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   
   const [dayVote, setDayVote] = useState<'A' | 'B' | null>(null);
@@ -33,6 +36,8 @@ export default function HomeClient({
   const [isDayVoting, setIsDayVoting] = useState(false);
   const [userContribution, setUserContribution] = useState(0);
   const [timeLeft, setTimeLeft] = useState<string>('');
+  
+  const systemLog = effectOfDay ? generateSystemLog(effectOfDay.title) : '';
 
   useEffect(() => {
     setMounted(true);
@@ -110,11 +115,14 @@ export default function HomeClient({
   if (!mounted) return <div className="min-h-screen bg-dark" />;
 
   return (
-    <div className="pb-20">
+    <div className="pb-20 relative">
+      {/* Background Grid - вынесен на уровень основного контейнера для скролла */}
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]" />
+      </div>
+      
       {/* Hero Section (Full Screen) */}
       <section className="relative min-h-screen flex flex-col justify-center py-20 overflow-hidden">
-        <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]" />
-        
         <div className="container mx-auto px-4 relative z-10 flex-1 flex flex-col justify-center items-center">
           
           {/* Title & Stats */}
@@ -128,7 +136,7 @@ export default function HomeClient({
               </p>
               
               {/* STATS BAR */}
-              <div className="w-full max-w-4xl mx-auto grid grid-cols-2 md:grid-cols-4 bg-white/5 backdrop-blur-md border border-light/10 rounded-2xl shadow-2xl divide-x divide-y md:divide-y-0 divide-light/10 overflow-hidden">
+              <div className="w-full max-w-4xl mx-auto grid grid-cols-2 md:grid-cols-4 bg-[#111] border border-white/10 rounded-2xl shadow-2xl divide-x divide-y md:divide-y-0 divide-white/10 overflow-hidden">
                 <div className="p-4 flex flex-col items-center justify-center group hover:bg-white/5 transition-colors">
                   <div className="flex items-center gap-2 mb-1 text-cyan-400"><Zap className="w-4 h-4" /><span className="text-xl font-mono font-bold text-white">{globalStats.totalEffects}</span></div>
                   <span className="text-[10px] text-light/40 uppercase font-bold tracking-wider">Эффектов</span>
@@ -181,7 +189,7 @@ export default function HomeClient({
                   <div className="flex flex-wrap items-center gap-4 mb-8">
                     <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 text-xs font-bold uppercase tracking-widest shadow-[0_0_15px_rgba(234,179,8,0.2)]"><Sparkles className="w-3 h-3" /> Эффект дня</div>
                     {effectOfDay?.nextReset && (
-                      <div className="flex items-center gap-2 text-[10px] font-mono text-cyan-400/80 bg-black/40 px-3 py-1 rounded-full border border-white/5">
+                      <div className="flex items-center gap-2 text-[10px] font-mono text-cyan-400/80 bg-black/40 px-3 py-1 rounded-full border border-white/5 shadow-[0_0_15px_rgba(6,182,212,0.2)]">
                         <Clock className="w-3 h-3" /><span className="animate-pulse tracking-widest">ДО СДВИГА РЕАЛЬНОСТИ:</span><span className="text-cyan-300 font-bold text-xs">{timeLeft}</span>
                       </div>
                     )}
@@ -190,13 +198,30 @@ export default function HomeClient({
                   <Link href={`/effect/${effectOfDay.id}`} className="block group-hover:text-primary transition-colors">
                     <h2 className="text-4xl md:text-7xl font-black text-white mb-6 leading-none tracking-tight drop-shadow-lg">{effectOfDay.title}</h2>
                   </Link>
-                  <p className="text-lg md:text-xl text-light/80 mb-10 line-clamp-3 leading-relaxed max-w-xl border-l-2 border-primary/50 pl-6">{effectOfDay.description}</p>
+                  <p className="text-base md:text-lg lg:text-xl text-light/80 md:text-light/80 mb-6 md:mb-10 leading-relaxed max-w-xl border-l-2 border-primary/50 pl-4 md:pl-6 line-clamp-2 md:line-clamp-3 font-semibold md:font-normal drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] md:drop-shadow-none">{effectOfDay.description}</p>
                   
-                  <div className="mb-10 max-w-xl"><StrangerVote variantA={vA} variantB={vB} votesFor={dayVotes.for} votesAgainst={dayVotes.against} userVote={dayVote} onVote={handleDayVote} isVoting={isDayVoting} /></div>
+                  <div className="mb-10 max-w-xl">
+                    <StrangerVote 
+                      variantA={vA} 
+                      variantB={vB} 
+                      votesFor={dayVotes.for} 
+                      votesAgainst={dayVotes.against} 
+                      userVote={dayVote} 
+                      onVote={handleDayVote} 
+                      isVoting={isDayVoting}
+                      onOpenCard={() => router.push(`/effect/${effectOfDay.id}`)}
+                      openOnClick={true}
+                    />
+                  </div>
+
+                  {/* System Log */}
+                  <div className="flex items-center gap-2 text-[10px] font-mono text-green-500/60 mb-6">
+                    <Hash className="w-3 h-3" />
+                    <span className="uppercase tracking-wider">{systemLog}<span className="animate-pulse">_</span></span>
+                  </div>
 
                   <div className="flex items-center gap-6 mt-auto">
                     <Link href={`/effect/${effectOfDay.id}`} className="flex items-center gap-2 text-sm font-bold text-black bg-white hover:bg-primary hover:text-white transition-all px-6 py-3 rounded-full shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:shadow-[0_0_30px_rgba(6,182,212,0.4)]">Исследовать аномалию <ArrowRight className="w-4 h-4" /></Link>
-                    <div className="flex items-center gap-2 text-[10px] font-mono text-light/30"><Hash className="w-3 h-3" /><span>SYSTEM_LOG_ID: {effectOfDay.id.slice(0, 8).toUpperCase()}</span></div>
                   </div>
                 </div>
               </div>
@@ -229,12 +254,12 @@ export default function HomeClient({
       </section>
 
       {/* Trending Section */}
-      <section id="trending-section" className="container mx-auto px-4 mb-20 pt-24 scroll-mt-24">
+      <section id="trending-section" className="max-w-7xl mx-auto px-4 mb-20 pt-24 scroll-mt-24">
         <div className="flex items-center justify-between mb-8">
           <h2 className="text-2xl font-bold text-white flex items-center gap-3"><Flame className="w-6 h-6 text-orange-500" /> В тренде</h2>
           <Link href="/catalog?sort=popular" className="text-sm text-light/50 hover:text-white transition-colors flex items-center gap-1">ПОКАЗАТЬ ВСЕ <ArrowRight className="w-4 h-4" /></Link>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {trendingEffects.map((effect, i) => (
             <EffectCard key={effect.id} effect={effect} badge={`#${i + 1}`} priority />
           ))}
@@ -242,7 +267,7 @@ export default function HomeClient({
       </section>
 
       {/* New Effects Section */}
-      <section className="container mx-auto px-4 mb-20">
+      <section className="max-w-7xl mx-auto px-4 mb-20">
         <div className="flex items-center justify-center mb-12">
           <h2 className="text-2xl font-bold text-white flex items-center gap-3"><Sparkles className="w-6 h-6 text-yellow-400" /> Новые обнаружения</h2>
         </div>
@@ -257,7 +282,7 @@ export default function HomeClient({
       </section>
 
       {/* Warning Block */}
-      <section className="container mx-auto px-4 mt-6 mb-6">
+      <section className="max-w-7xl mx-auto px-4 mt-6 mb-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}

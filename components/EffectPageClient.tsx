@@ -6,14 +6,15 @@ import {
   ArrowLeft, Share2, Eye, Calendar, MessageSquare, ChevronRight, ChevronLeft, 
   ChevronDown, Search, BookOpen, BrainCircuit, History, ExternalLink, Lock, 
   Users, AlertTriangle, ThumbsUp, ThumbsDown, Image as ImageIcon, PlayCircle, 
-  Mic, Plus, X, Loader2, Maximize2 
+  Mic, Plus, X, Loader2, Maximize2, Sparkles
 } from 'lucide-react';
 import Link from 'next/link';
 import ImageWithSkeleton from '@/components/ui/ImageWithSkeleton';
 import StrangerVote from '@/components/ui/StrangerVote';
+import ShareModal from '@/components/ui/ShareModal';
 import { saveVote, getUserVote } from '@/app/actions/votes';
 import { createComment, toggleCommentLike } from '@/app/actions/comments';
-import { incrementViews } from '@/app/actions/effects';
+import { incrementViews, getNextUnvotedEffect, getPrevUnvotedEffect } from '@/app/actions/effects';
 import { getCategoryInfo } from '@/lib/constants';
 import { votesStore } from '@/lib/votes-store';
 import toast from 'react-hot-toast';
@@ -246,22 +247,31 @@ const AddCommentModal = ({ isOpen, onClose, effectId }: any) => {
 };
 
 // 4. Заглушка
-const LockedContent = () => (
-  <div className="relative overflow-hidden rounded-xl border border-white/5 bg-darkCard p-8 text-center h-full flex flex-col items-center justify-center min-h-[200px]">
-    <div className="absolute inset-0 bg-dark/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center">
-      <Lock className="w-12 h-12 text-white/20 mb-4" />
-      <h3 className="text-xl font-bold text-white mb-2">ДАННЫЕ ЗАСЕКРЕЧЕНЫ</h3>
-      <p className="text-light/50 text-sm max-w-md">
-        Доступ к архивам, фактам и теориям открывается только после верификации вашей памяти.
-        <br /><span className="text-primary mt-2 block">Проголосуйте выше, чтобы получить доступ.</span>
-      </p>
-    </div>
-    <div className="opacity-20 blur-sm select-none pointer-events-none space-y-4 w-full">
-      <div className="h-6 bg-white/20 rounded w-3/4 mx-auto"></div>
-      <div className="h-4 bg-white/10 rounded w-full"></div>
-      <div className="h-4 bg-white/10 rounded w-5/6 mx-auto"></div>
-    </div>
-  </div>
+const LockedContent = ({ isVisible }: { isVisible: boolean }) => (
+  <AnimatePresence>
+    {isVisible && (
+      <motion.div 
+        initial={{ opacity: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        transition={{ duration: 0.4 }}
+        className="relative overflow-hidden rounded-xl border border-light/10 bg-darkCard p-8 text-center h-full flex flex-col items-center justify-center min-h-[200px]"
+      >
+        <div className="absolute inset-0 bg-dark/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center">
+          <Lock className="w-12 h-12 text-white/20 mb-4" />
+          <h3 className="text-xl font-bold text-white mb-2">ДАННЫЕ ЗАСЕКРЕЧЕНЫ</h3>
+          <p className="text-light/50 text-sm max-w-md">
+            Доступ к архивам, фактам и теориям открывается только после верификации вашей памяти.
+            <br /><span className="text-primary mt-2 block">Проголосуйте выше, чтобы получить доступ.</span>
+          </p>
+        </div>
+        <div className="opacity-20 blur-sm select-none pointer-events-none space-y-4 w-full">
+          <div className="h-6 bg-white/20 rounded w-3/4 mx-auto"></div>
+          <div className="h-4 bg-white/10 rounded w-full"></div>
+          <div className="h-4 bg-white/10 rounded w-5/6 mx-auto"></div>
+        </div>
+      </motion.div>
+    )}
+  </AnimatePresence>
 );
 
 // --- MAIN COMPONENT ---
@@ -270,13 +280,20 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
   const [votes, setVotes] = useState({ for: effect.votesFor, against: effect.votesAgainst });
   const [isVoting, setIsVoting] = useState(false);
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const [nextUnvotedEffect, setNextUnvotedEffect] = useState<{ id: string; title: string } | null>(null);
+  const [prevUnvotedEffect, setPrevUnvotedEffect] = useState<{ id: string; title: string } | null>(null);
+  const [showUnvotedOnly, setShowUnvotedOnly] = useState(true); // Фильтр активен по умолчанию
   
   const votingCardRef = useRef<HTMLDivElement>(null);
   const infoBlockRef = useRef<HTMLDivElement>(null);
+  const lockedContentRef = useRef<HTMLDivElement>(null);
+  const commentsBlockRef = useRef<HTMLDivElement>(null);
 
   const categoryInfo = getCategoryInfo(effect.category);
   const CategoryIcon = categoryInfo.icon;
+  const hasAccess = !!userVote; // Определяем hasAccess до использования в useEffect
 
   useEffect(() => {
     const initPage = async () => {
@@ -304,12 +321,24 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
     initPage();
   }, [effect.id]);
 
-  // Синхронизация высоты блока "Информация" с блоком "Голосование"
+  // Синхронизация высоты блока "Информация" с блоком "Голосование" (только при первой загрузке)
   useEffect(() => {
     const syncHeights = () => {
       if (votingCardRef.current && infoBlockRef.current) {
         const votingHeight = votingCardRef.current.offsetHeight;
-        infoBlockRef.current.style.minHeight = `${votingHeight}px`;
+        // Устанавливаем minHeight только один раз при загрузке, не меняем после голосования
+        if (!infoBlockRef.current.dataset.heightSet) {
+          infoBlockRef.current.style.minHeight = `${votingHeight}px`;
+          infoBlockRef.current.dataset.heightSet = 'true';
+        }
+      }
+      
+      // Синхронизация высоты блока "Архив Аномалий" с LockedContent когда доступ закрыт
+      if (!hasAccess && lockedContentRef.current && commentsBlockRef.current) {
+        const lockedHeight = lockedContentRef.current.offsetHeight;
+        commentsBlockRef.current.style.minHeight = `${lockedHeight}px`;
+      } else if (hasAccess && commentsBlockRef.current) {
+        commentsBlockRef.current.style.minHeight = 'auto';
       }
     };
 
@@ -323,7 +352,7 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
       window.removeEventListener('resize', syncHeights);
       clearTimeout(timeout);
     };
-  }, [userVote, votes]); // Пересчитываем при изменении голосования
+  }, [hasAccess]); // Пересчитываем только при изменении доступа, не при изменении голосования
 
   // Если пришёл initialUserVote, записываем его в локальный store, чтобы превью в каталоге/главной знали о голосе
   useEffect(() => {
@@ -331,6 +360,30 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
       votesStore.set(effect.id, initialUserVote);
     }
   }, [effect.id, initialUserVote]);
+
+  // Получаем следующий и предыдущий не проголосованные эффекты (только если фильтр включен)
+  useEffect(() => {
+    if (showUnvotedOnly) {
+      const fetchUnvotedEffects = async () => {
+        const votes = votesStore.get();
+        const votedIds = Object.keys(votes);
+        const [nextResult, prevResult] = await Promise.all([
+          getNextUnvotedEffect(effect.id, votedIds),
+          getPrevUnvotedEffect(effect.id, votedIds),
+        ]);
+        if (nextResult.success) {
+          setNextUnvotedEffect(nextResult.data);
+        }
+        if (prevResult.success) {
+          setPrevUnvotedEffect(prevResult.data);
+        }
+      };
+      fetchUnvotedEffects();
+    } else {
+      setNextUnvotedEffect(null);
+      setPrevUnvotedEffect(null);
+    }
+  }, [effect.id, showUnvotedOnly]);
 
   const parseVariants = () => {
     let vA = "Как я помню";
@@ -392,12 +445,23 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
     } finally { setIsVoting(false); }
   };
 
-  const hasAccess = !!userVote;
-
   return (
-    <div className="min-h-screen bg-dark text-light pb-20">
+    <motion.div 
+      key={effect.id}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.3 }}
+      className="min-h-screen bg-dark text-light pb-20"
+    >
       {/* Hero Section */}
-      <div className="relative h-[50vh] w-full overflow-hidden">
+      <motion.div 
+        key={`hero-${effect.id}`}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="relative h-[50vh] w-full overflow-hidden"
+      >
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-dark/60 to-dark z-10" />
         {effect.imageUrl && <ImageWithSkeleton src={effect.imageUrl} alt={effect.title} fill className="object-cover opacity-60" />}
         
@@ -407,7 +471,7 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
           <h1 className="text-4xl md:text-6xl font-black text-white mb-4 drop-shadow-lg">{effect.title}</h1>
           <p className="text-xl text-light/80 max-w-2xl leading-relaxed">{effect.description}</p>
         </div>
-      </div>
+      </motion.div>
 
       <div className="container mx-auto px-4 -mt-8 relative z-30 grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
         {/* Main Content (Left) */}
@@ -419,14 +483,49 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
               <h2 className="text-2xl font-bold text-white flex items-center gap-3"><span className="w-1 h-8 bg-primary rounded-full"></span>Голосование</h2>
               
               {/* Navigation Buttons */}
-              <div className="flex gap-2">
-                {prevEffect ? (
-                  <Link href={`/effect/${prevEffect.id}`} className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-light/50 hover:text-white transition-colors" title={`Предыдущий: ${prevEffect.title}`}>
+              <div className="flex gap-2 items-center justify-center">
+                {showUnvotedOnly && prevUnvotedEffect ? (
+                  <Link 
+                    href={`/effect/${prevUnvotedEffect.id}`} 
+                    className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-light/50 hover:text-white transition-colors" 
+                    title={`Предыдущий не проголосованный: ${prevUnvotedEffect.title}`}
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </Link>
+                ) : prevEffect ? (
+                  <Link 
+                    href={`/effect/${prevEffect.id}`} 
+                    className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-light/50 hover:text-white transition-colors" 
+                    title={`Предыдущий: ${prevEffect.title}`}
+                  >
                     <ChevronLeft className="w-5 h-5" />
                   </Link>
                 ) : <div className="w-9 h-9" />}
-                {nextEffect ? (
-                  <Link href={`/effect/${nextEffect.id}`} className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-light/50 hover:text-white transition-colors" title={`Следующий: ${nextEffect.title}`}>
+                <button
+                  onClick={() => setShowUnvotedOnly(!showUnvotedOnly)}
+                  className={`p-2 rounded-lg transition-colors flex items-center justify-center ${
+                    showUnvotedOnly 
+                      ? 'bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30 shadow-[0_0_10px_rgba(6,182,212,0.2)]' 
+                      : 'bg-white/5 hover:bg-white/10 text-light/50 hover:text-white'
+                  }`}
+                  title={showUnvotedOnly ? 'Показать все эффекты' : 'Показать только не проголосованные'}
+                >
+                  <Sparkles className="w-5 h-5" />
+                </button>
+                {showUnvotedOnly && nextUnvotedEffect ? (
+                  <Link 
+                    href={`/effect/${nextUnvotedEffect.id}`} 
+                    className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-light/50 hover:text-white transition-colors" 
+                    title={`Следующий не проголосованный: ${nextUnvotedEffect.title}`}
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </Link>
+                ) : nextEffect ? (
+                  <Link 
+                    href={`/effect/${nextEffect.id}`} 
+                    className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-light/50 hover:text-white transition-colors" 
+                    title={`Следующий: ${nextEffect.title}`}
+                  >
                     <ChevronRight className="w-5 h-5" />
                   </Link>
                 ) : <div className="w-9 h-9" />}
@@ -434,15 +533,53 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
             </div>
             
             <StrangerVote variantA={vA} variantB={vB} votesFor={votes.for} votesAgainst={votes.against} userVote={userVote} onVote={handleVote} isVoting={isVoting} />
+            
+            {/* Блок с фактами - появляется после голосования */}
+            <AnimatePresence>
+              {userVote && effect.currentState && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.4, ease: "easeOut" }}
+                  className="mt-6 pt-6 border-t border-cyan-500/30"
+                >
+                  <div className="flex items-center gap-3 mb-3">
+                    <BookOpen className="w-5 h-5 text-cyan-400" />
+                    <h3 className="font-bold text-lg text-cyan-400">Текущее состояние | Факты</h3>
+                  </div>
+                  <div className="text-light/80 leading-relaxed whitespace-pre-line">
+                    {effect.currentState}
+                  </div>
+                  {effect.interpretations?.sourceLink && (
+                    <div className="mt-4 pt-3 border-t border-white/10">
+                      <a href={effect.interpretations.sourceLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-xs text-light/50 hover:text-primary transition-colors">
+                        <ExternalLink className="w-3 h-3" /> Источник / Подтверждение
+                      </a>
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Accordions (Locked until vote) */}
-          {hasAccess ? (
-            <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
-              {/* Текущее состояние - всегда первое и открыто */}
-              <AccordionItem title="Текущее состояние | Факты" icon={BookOpen} color="cyan" sourceLink={effect.interpretations?.sourceLink} defaultOpen={true}>
-                {effect.currentState || "Информация уточняется..."}
-              </AccordionItem>
+          <AnimatePresence mode="wait">
+            {hasAccess ? (
+              <motion.div 
+                key="accordions"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.5, delay: 0.2 }}
+                className="space-y-4"
+              >
+              {/* Текущее состояние - показываем только если нет голоса (чтобы не дублировать) */}
+              {!userVote && (
+                <AccordionItem title="Текущее состояние | Факты" icon={BookOpen} color="cyan" sourceLink={effect.interpretations?.sourceLink} defaultOpen={true}>
+                  {effect.currentState || "Информация уточняется..."}
+                </AccordionItem>
+              )}
               
               {effect.residue && (
                 <AccordionItem title="Культурные следы | Остатки" icon={Search} color="red" sourceLink={effect.residueSource}>
@@ -474,10 +611,13 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
                   )}
                 </AccordionItem>
               )}
-            </div>
-          ) : (
-            <LockedContent />
-          )}
+              </motion.div>
+            ) : (
+              <div key="locked" ref={lockedContentRef}>
+                <LockedContent isVisible={!hasAccess} />
+              </div>
+            )}
+          </AnimatePresence>
 
         </div>
 
@@ -494,42 +634,71 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
               </div>
               <div className="flex justify-between py-1.5"><span className="text-light/50 flex items-center gap-1.5"><MessageSquare className="w-3.5 h-3.5" /> Обсуждения</span><span className="text-white">{effect._count?.comments || 0}</span></div>
             </div>
-            <button className="w-full mt-auto py-2 bg-white/5 hover:bg-white/10 rounded-lg text-light text-xs font-medium flex items-center justify-center gap-1.5 transition-colors"><Share2 className="w-3.5 h-3.5" /> Поделиться</button>
+            <button 
+              onClick={() => setIsShareModalOpen(true)}
+              className="w-full mt-auto py-2 bg-white/5 hover:bg-white/10 rounded-lg text-light text-xs font-medium flex items-center justify-center gap-1.5 transition-colors"
+            >
+              <Share2 className="w-3.5 h-3.5" /> Поделиться
+            </button>
           </div>
 
           {/* Comments Block */}
-          <div className="bg-darkCard border border-light/10 rounded-xl p-6 sticky top-24 flex flex-col" style={{ minHeight: hasAccess ? 'auto' : '300px' }}>
+          <div ref={commentsBlockRef} className="bg-darkCard border border-light/10 rounded-xl p-6 sticky top-24 flex flex-col" style={{ minHeight: hasAccess ? 'auto' : '300px' }}>
             <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><MessageSquare className="w-4 h-4 text-primary" /> Архив Аномалий</h3>
             
-            {hasAccess ? (
-              <>
-                {effect.comments && effect.comments.length > 0 ? (
-                  <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1 custom-scrollbar mb-4">
-                    {effect.comments.map((comment: any) => (
-                      <CommentItem key={comment.id} comment={comment} onImageClick={setLightboxImage} />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-light/40 text-sm border-2 border-dashed border-white/10 rounded-lg mb-4">
-                    <p>Архив пуст. Станьте первым свидетелем.</p>
-                  </div>
-                )}
-                <button onClick={() => setIsCommentModalOpen(true)} className="w-full mt-auto py-3 bg-primary/10 hover:bg-primary/20 text-primary text-sm font-bold rounded-xl transition-colors border border-primary/20 flex items-center justify-center gap-2">
-                  <Plus className="w-4 h-4" /> Добавить запись
-                </button>
-              </>
-            ) : (
-              <div className="flex-1 flex flex-col items-center justify-center text-center py-8 text-light/40 text-sm">
-                <Lock className="w-10 h-10 mx-auto mb-3 opacity-30" />
-                <p>Доступ к архиву закрыт.</p>
-              </div>
-            )}
+            <AnimatePresence mode="wait">
+              {hasAccess ? (
+                <motion.div
+                  key="comments-content"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ duration: 0.5, delay: 0.2 }}
+                  className="flex-1 flex flex-col"
+                >
+                  {effect.comments && effect.comments.length > 0 ? (
+                    <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1 custom-scrollbar mb-4">
+                      {effect.comments.map((comment: any) => (
+                        <CommentItem key={comment.id} comment={comment} onImageClick={setLightboxImage} />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-light/40 text-sm border-2 border-dashed border-white/10 rounded-lg mb-4">
+                      <p>Архив пуст. Станьте первым свидетелем.</p>
+                    </div>
+                  )}
+                  <button onClick={() => setIsCommentModalOpen(true)} className="w-full mt-auto py-3 bg-primary/10 hover:bg-primary/20 text-primary text-sm font-bold rounded-xl transition-colors border border-primary/20 flex items-center justify-center gap-2">
+                    <Plus className="w-4 h-4" /> Добавить запись
+                  </button>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="comments-locked"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.4 }}
+                  className="flex-1 flex flex-col items-center justify-center text-center py-8 text-light/40 text-sm"
+                >
+                  <Lock className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                  <p>Доступ к архиву закрыт.</p>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
       </div>
 
       <AddCommentModal isOpen={isCommentModalOpen} onClose={() => setIsCommentModalOpen(false)} effectId={effect.id} />
       <ImageLightbox src={lightboxImage} onClose={() => setLightboxImage(null)} />
-    </div>
+      <ShareModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        effectId={effect.id}
+        effectTitle={effect.title}
+        effectDescription={effect.description}
+        effectImageUrl={effect.imageUrl}
+      />
+    </motion.div>
   );
 }

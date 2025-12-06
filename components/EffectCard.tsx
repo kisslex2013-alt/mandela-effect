@@ -4,10 +4,11 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { MessageSquare, Share2, Eye } from 'lucide-react';
+import { MessageSquare, Share2, Eye, HelpCircle } from 'lucide-react';
 import { saveVote } from '@/app/actions/votes';
 import ImageWithSkeleton from '@/components/ui/ImageWithSkeleton';
 import StrangerVote from '@/components/ui/StrangerVote';
+import ShareModal from '@/components/ui/ShareModal';
 import { getCategoryInfo } from '@/lib/constants';
 import { votesStore } from '@/lib/votes-store';
 import toast from 'react-hot-toast';
@@ -24,8 +25,8 @@ interface EffectCardProps {
     votesAgainst: number;
     views: number;
     _count?: { comments: number };
+    commentsCount?: number;
   };
-  // Пропсы для обратной совместимости
   id?: string;
   title?: string;
   description?: string;
@@ -61,9 +62,13 @@ export default function EffectCard(props: EffectCardProps) {
     views: props.views || 0,
     _count: props._count || { comments: props.commentsCount || 0 },
   };
+  
+  // Получаем количество комментариев из разных источников (приоритет: effect.commentsCount > props.commentsCount > _count.comments)
+  const commentsCount = (props.effect as any)?.commentsCount ?? 
+                        props.commentsCount ?? 
+                        effectData._count?.comments ?? 
+                        0;
 
-  // Определяем начальное состояние голоса на основе пропсов
-  // Если hasVoted=true, но вариант не передан, по умолчанию ставим 'A' (визуально)
   const [userVote, setUserVote] = useState<'A' | 'B' | null>(
     props.initialUserVote || (props.hasVoted ? 'A' : null)
   );
@@ -74,11 +79,11 @@ export default function EffectCard(props: EffectCardProps) {
   });
   const [isVoting, setIsVoting] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
   const categoryInfo = getCategoryInfo(effectData.category);
   const CategoryIcon = categoryInfo.icon;
 
-  // СИНХРОНИЗАЦИЯ С LOCALSTORAGE (Мгновенная реакция)
   useEffect(() => {
     const localVotes = votesStore.get();
     if (localVotes[effectData.id]) {
@@ -115,7 +120,6 @@ export default function EffectCard(props: EffectCardProps) {
     setIsVoting(true);
     setUserVote(variant);
     setVotes(prev => ({ for: variant === 'A' ? prev.for + 1 : prev.for, against: variant === 'B' ? prev.against + 1 : prev.against }));
-    // Сохраняем локально сразу
     votesStore.set(effectData.id, variant);
 
     try {
@@ -159,7 +163,6 @@ export default function EffectCard(props: EffectCardProps) {
             <>
               <ImageWithSkeleton src={effectData.imageUrl} alt={effectData.title} fill className={`object-cover transition-transform duration-700 ${isHovered ? 'scale-105' : 'scale-100'} relative z-[1]`} priority={props.priority} />
               <div className={`absolute inset-0 bg-gradient-to-t from-dark via-transparent to-transparent opacity-60 z-[1]`} />
-              {/* GLITCH LAYERS (Complex Glitch Effect) */}
               <div className="glitch-layers absolute inset-0 z-[2] opacity-0 group-hover:opacity-100 transition-opacity">
                 <div className="glitch-layer" style={{ backgroundImage: `url('${effectData.imageUrl.replace(/'/g, '%27')}')` }} />
                 <div className="glitch-layer" style={{ backgroundImage: `url('${effectData.imageUrl.replace(/'/g, '%27')}')` }} />
@@ -181,10 +184,10 @@ export default function EffectCard(props: EffectCardProps) {
             className={`flex items-center gap-1 px-2 py-1 rounded-md backdrop-blur-md text-xs transition-colors z-20 ${
               props.hasNewComments 
                 ? 'bg-primary/30 text-primary border border-primary/50 hover:bg-primary/40' 
-                : 'bg-black/40 text-white/70 hover:text-white'
+                : 'bg-black/40 text-white/70 hover:text-white hover:bg-black/60'
             }`}
           >
-            <MessageSquare className="w-3 h-3" />{effectData._count?.comments || 0}
+            <MessageSquare className="w-3 h-3" />{commentsCount}
           </Link>
           <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-black/40 backdrop-blur-md text-xs text-white/70 pointer-events-none">
             <Eye className="w-3 h-3" />{effectData.views}
@@ -192,16 +195,30 @@ export default function EffectCard(props: EffectCardProps) {
         </div>
       </div>
 
-      <div className="p-5 flex flex-col flex-1 relative">
-        <div className="flex items-center justify-between mb-2">
-          <Link href={`/effect/${effectData.id}`} className="block group-hover:text-primary transition-colors flex-1">
-            <h3 className="text-xl font-bold text-white line-clamp-1 leading-tight">{effectData.title}</h3>
-          </Link>
-          <button className="flex items-center gap-1.5 hover:text-primary transition-colors text-xs text-light/40 ml-4" title="Поделиться">
-            <Share2 className="w-4 h-4" />
-          </button>
-        </div>
-        <p className="text-sm text-light/60 mb-6 line-clamp-2 h-10 leading-relaxed">{effectData.description}</p>
+      <div className="p-4 flex flex-col flex-1 relative">
+        {/* Кнопка "Поделиться" в правом верхнем углу */}
+        <button 
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setIsShareModalOpen(true);
+          }}
+          className="absolute top-4 right-4 z-10 flex items-center justify-center w-6 h-6 text-white/70 hover:text-white transition-colors" 
+          title="Поделиться"
+        >
+          <Share2 className="w-4 h-4" />
+        </button>
+        
+        {/* Заголовок */}
+        <Link href={`/effect/${effectData.id}`} className="block group-hover:text-primary transition-colors mb-3">
+          <h3 className="text-xl font-black text-white line-clamp-1 leading-tight">{effectData.title}</h3>
+        </Link>
+        
+        {/* Вопрос */}
+        <p className="text-sm text-gray-200 font-medium leading-relaxed line-clamp-2 mb-4">
+          {effectData.description}
+        </p>
+
         <div className="mt-auto">
           <StrangerVote 
             variantA={vA} 
@@ -216,6 +233,16 @@ export default function EffectCard(props: EffectCardProps) {
           />
         </div>
       </div>
+
+      {/* Share Modal */}
+      <ShareModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        effectId={effectData.id}
+        effectTitle={effectData.title}
+        effectDescription={effectData.description}
+        effectImageUrl={effectData.imageUrl}
+      />
     </motion.div>
   );
 }

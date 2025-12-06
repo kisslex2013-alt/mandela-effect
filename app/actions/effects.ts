@@ -678,6 +678,99 @@ function getDeterministicIndex(length: number): number {
 }
 
 /**
+ * Получить следующий не проголосованный эффект
+ * Используется для навигации между эффектами, за которые пользователь еще не проголосовал
+ */
+export async function getNextUnvotedEffect(currentEffectId: string, votedEffectIds: string[]) {
+  try {
+    // Получаем все видимые эффекты, отсортированные по дате создания
+    const allEffects = await prisma.effect.findMany({
+      where: { isVisible: true },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        title: true,
+      },
+    });
+
+    // Находим текущий эффект в списке
+    const currentIndex = allEffects.findIndex(e => e.id === currentEffectId);
+    
+    // Если текущий эффект не найден, возвращаем первый не проголосованный
+    if (currentIndex === -1) {
+      const firstUnvoted = allEffects.find(e => !votedEffectIds.includes(e.id));
+      return { success: true, data: firstUnvoted || null };
+    }
+
+    // Ищем следующий не проголосованный эффект после текущего
+    for (let i = currentIndex + 1; i < allEffects.length; i++) {
+      if (!votedEffectIds.includes(allEffects[i].id)) {
+        return { success: true, data: allEffects[i] };
+      }
+    }
+
+    // Если не нашли после текущего, ищем с начала списка
+    for (let i = 0; i < currentIndex; i++) {
+      if (!votedEffectIds.includes(allEffects[i].id)) {
+        return { success: true, data: allEffects[i] };
+      }
+    }
+
+    // Если все эффекты проголосованы, возвращаем null
+    return { success: true, data: null };
+  } catch (error) {
+    console.error('Error fetching next unvoted effect:', error);
+    return { success: false, error: 'Failed to fetch next unvoted effect' };
+  }
+}
+
+/**
+ * Получить предыдущий не проголосованный эффект
+ */
+export async function getPrevUnvotedEffect(currentEffectId: string, votedEffectIds: string[]) {
+  try {
+    // Получаем все видимые эффекты, отсортированные по дате создания
+    const allEffects = await prisma.effect.findMany({
+      where: { isVisible: true },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        title: true,
+      },
+    });
+
+    // Находим текущий эффект в списке
+    const currentIndex = allEffects.findIndex(e => e.id === currentEffectId);
+    
+    // Если текущий эффект не найден, возвращаем последний не проголосованный
+    if (currentIndex === -1) {
+      const lastUnvoted = [...allEffects].reverse().find(e => !votedEffectIds.includes(e.id));
+      return { success: true, data: lastUnvoted || null };
+    }
+
+    // Ищем предыдущий не проголосованный эффект до текущего
+    for (let i = currentIndex - 1; i >= 0; i--) {
+      if (!votedEffectIds.includes(allEffects[i].id)) {
+        return { success: true, data: allEffects[i] };
+      }
+    }
+
+    // Если не нашли до текущего, ищем с конца списка
+    for (let i = allEffects.length - 1; i > currentIndex; i--) {
+      if (!votedEffectIds.includes(allEffects[i].id)) {
+        return { success: true, data: allEffects[i] };
+      }
+    }
+
+    // Если все эффекты проголосованы, возвращаем null
+    return { success: true, data: null };
+  } catch (error) {
+    console.error('Error fetching prev unvoted effect:', error);
+    return { success: false, error: 'Failed to fetch prev unvoted effect' };
+  }
+}
+
+/**
  * Получить данные для главной страницы (тренды, новые эффекты, категории, статистика)
  * Используется в app/page.tsx
  */
