@@ -48,7 +48,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
       );
     }
 
-    // 3. Обработка картинки (WebP -> PNG)
+    // 3. Обработка картинки (WebP -> JPEG с агрессивной оптимизацией)
     let bgImageSrc: string | null = null;
     
     if (effect.imageUrl) {
@@ -58,32 +58,30 @@ export default async function Image({ params }: { params: Promise<{ id: string }
         if (imageRes.ok) {
           const imageBuffer = await imageRes.arrayBuffer();
 
-          // Оптимизируем изображение для соц. сетей (макс. 300 КБ для Telegram/WhatsApp)
-          // Сначала пробуем PNG с максимальной компрессией
+          // АГРЕССИВНАЯ ОПТИМИЗАЦИЯ для WhatsApp (макс. 200 КБ с запасом)
+          // Сразу конвертируем в JPEG с качеством 75 для меньшего размера
           let optimizedBuffer = await sharp(Buffer.from(imageBuffer))
             .resize(1200, 675, { fit: 'cover' })
-            .png({ 
-              compressionLevel: 9,
-              adaptiveFiltering: true,
-              palette: true // Используем палитру для меньшего размера
+            .jpeg({ 
+              quality: 75, // Снижено с 80 до 75 для меньшего размера
+              progressive: true,
+              mozjpeg: true
             })
             .toBuffer();
           
-          // Если PNG все еще больше 300 КБ, конвертируем в JPEG
-          if (optimizedBuffer.length > 300 * 1024) {
+          // Если все еще больше 200 КБ, еще больше снижаем качество
+          if (optimizedBuffer.length > 200 * 1024) {
             optimizedBuffer = await sharp(Buffer.from(imageBuffer))
               .resize(1200, 675, { fit: 'cover' })
               .jpeg({ 
-                quality: 80,
+                quality: 65, // Еще более агрессивное сжатие
                 progressive: true,
                 mozjpeg: true
               })
               .toBuffer();
-            bgImageSrc = `data:image/jpeg;base64,${optimizedBuffer.toString('base64')}`;
-          } else {
-            bgImageSrc = `data:image/png;base64,${optimizedBuffer.toString('base64')}`;
           }
           
+          bgImageSrc = `data:image/jpeg;base64,${optimizedBuffer.toString('base64')}`;
         }
       } catch (imgError) {
         console.error('[OG] Failed to process image:', imgError);
@@ -96,7 +94,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
     const percentB = total === 0 ? 50 : Math.round((effect.votesAgainst / total) * 100);
 
     // 5. Генерируем картинку
-    return new ImageResponse(
+    const imageResponse = new ImageResponse(
       (
         <div
           style={{
@@ -150,12 +148,12 @@ export default async function Image({ params }: { params: Promise<{ id: string }
               paddingRight: 20,
             }}
           >
-            {/* Бейдж (FIXED: alignSelf вместо width: fit-content) */}
+            {/* Бейдж */}
             <div
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                alignSelf: 'flex-start', // <-- ВАЖНОЕ ИСПРАВЛЕНИЕ
+                alignSelf: 'flex-start',
                 background: 'rgba(234, 179, 8, 0.1)',
                 border: '2px solid rgba(234, 179, 8, 0.4)',
                 borderRadius: 50,
@@ -213,12 +211,46 @@ export default async function Image({ params }: { params: Promise<{ id: string }
             weight: 900,
           },
         ],
-        headers: {
-          'Content-Type': 'image/png',
-          'Cache-Control': 'public, max-age=31536000, immutable',
-        },
       }
     );
+
+    // 6. ОПТИМИЗАЦИЯ ФИНАЛЬНОГО ИЗОБРАЖЕНИЯ для WhatsApp
+    // Получаем буфер из Response
+    const imageBuffer = await imageResponse.arrayBuffer();
+    
+    // Оптимизируем через sharp
+    let finalBuffer = await sharp(Buffer.from(imageBuffer))
+      .png({ 
+        compressionLevel: 9,
+        adaptiveFiltering: true,
+        palette: true
+      })
+      .toBuffer();
+    
+    // Если PNG все еще больше 300 КБ, конвертируем в JPEG
+    if (finalBuffer.length > 300 * 1024) {
+      finalBuffer = await sharp(Buffer.from(imageBuffer))
+        .jpeg({ 
+          quality: 85,
+          progressive: true,
+          mozjpeg: true
+        })
+        .toBuffer();
+      
+      return new Response(finalBuffer, {
+        headers: {
+          'Content-Type': 'image/jpeg',
+          'Cache-Control': 'public, max-age=31536000, immutable',
+        },
+      });
+    }
+    
+    return new Response(finalBuffer, {
+      headers: {
+        'Content-Type': 'image/png',
+        'Cache-Control': 'public, max-age=31536000, immutable',
+      },
+    });
   } catch (e) {
     console.error('[OG] Error generating image:', e);
     return new Response('Failed to generate image', { status: 500 });
