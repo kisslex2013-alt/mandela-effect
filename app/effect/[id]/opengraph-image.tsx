@@ -58,12 +58,32 @@ export default async function Image({ params }: { params: Promise<{ id: string }
         if (imageRes.ok) {
           const imageBuffer = await imageRes.arrayBuffer();
 
-          const pngBuffer = await sharp(Buffer.from(imageBuffer))
-            .toFormat('png')
+          // Оптимизируем изображение для соц. сетей (макс. 300 КБ для Telegram/WhatsApp)
+          // Сначала пробуем PNG с максимальной компрессией
+          let optimizedBuffer = await sharp(Buffer.from(imageBuffer))
             .resize(1200, 630, { fit: 'cover' })
+            .png({ 
+              compressionLevel: 9,
+              adaptiveFiltering: true,
+              palette: true // Используем палитру для меньшего размера
+            })
             .toBuffer();
           
-          bgImageSrc = `data:image/png;base64,${pngBuffer.toString('base64')}`;
+          // Если PNG все еще больше 300 КБ, конвертируем в JPEG
+          if (optimizedBuffer.length > 300 * 1024) {
+            optimizedBuffer = await sharp(Buffer.from(imageBuffer))
+              .resize(1200, 630, { fit: 'cover' })
+              .jpeg({ 
+                quality: 80,
+                progressive: true,
+                mozjpeg: true
+              })
+              .toBuffer();
+            bgImageSrc = `data:image/jpeg;base64,${optimizedBuffer.toString('base64')}`;
+          } else {
+            bgImageSrc = `data:image/png;base64,${optimizedBuffer.toString('base64')}`;
+          }
+          
         }
       } catch (imgError) {
         console.error('[OG] Failed to process image:', imgError);
@@ -193,6 +213,10 @@ export default async function Image({ params }: { params: Promise<{ id: string }
             weight: 900,
           },
         ],
+        headers: {
+          'Content-Type': 'image/png',
+          'Cache-Control': 'public, max-age=31536000, immutable',
+        },
       }
     );
   } catch (e) {

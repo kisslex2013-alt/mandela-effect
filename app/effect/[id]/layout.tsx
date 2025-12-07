@@ -37,15 +37,18 @@ export async function generateMetadata({
       title: effect.title,
       description: effect.description || 'Исследуй коллективные заблуждения и проверь свою реальность',
       url: `${baseUrl}/effect/${id}`,
+      siteName: 'Эффект Манделы',
+      locale: 'ru_RU',
+      type: 'website',
       images: [
         {
           url: ogImageUrl,
           width: 1200,
           height: 630,
           alt: effect.title,
+          type: 'image/png',
         },
       ],
-      type: 'website',
     },
     twitter: {
       card: 'summary_large_image',
