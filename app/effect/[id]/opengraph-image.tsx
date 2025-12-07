@@ -4,7 +4,7 @@ import sharp from 'sharp';
 
 export const size = {
   width: 1200,
-  height: 630,
+  height: 675, // Формат 16:9 для VK
 };
 
 export const contentType = 'image/png';
@@ -61,7 +61,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
           // Оптимизируем изображение для соц. сетей (макс. 300 КБ для Telegram/WhatsApp)
           // Сначала пробуем PNG с максимальной компрессией
           let optimizedBuffer = await sharp(Buffer.from(imageBuffer))
-            .resize(1200, 630, { fit: 'cover' })
+            .resize(1200, 675, { fit: 'cover' })
             .png({ 
               compressionLevel: 9,
               adaptiveFiltering: true,
@@ -72,7 +72,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
           // Если PNG все еще больше 300 КБ, конвертируем в JPEG
           if (optimizedBuffer.length > 300 * 1024) {
             optimizedBuffer = await sharp(Buffer.from(imageBuffer))
-              .resize(1200, 630, { fit: 'cover' })
+              .resize(1200, 675, { fit: 'cover' })
               .jpeg({ 
                 quality: 80,
                 progressive: true,
