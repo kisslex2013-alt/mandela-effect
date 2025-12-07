@@ -51,34 +51,37 @@ export default function ShareModal({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Формируем красивый текст для шаринга
-  const shareText = `${effectTitle}\n\nmandela-effect.ru`;
+  // Текст для шаринга (без ссылки, ссылка добавляется отдельно)
+  const shareTitle = effectTitle;
+  const shareText = `${effectTitle}\n\nПроверь свою память на mandela-effect.ru`;
 
   const shareLinks = [
     {
       name: 'Telegram',
       icon: Send,
       color: 'bg-blue-500',
-      href: `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(shareText)}`
+      // Telegram: передаем только URL и заголовок (без дублирования ссылки в тексте)
+      href: `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(shareTitle)}`
     },
     {
       name: 'VK',
       icon: VKIcon,
       color: 'bg-blue-600',
-      // Для VK передаем картинку явно
-      href: `https://vk.com/share.php?url=${encodeURIComponent(url)}&title=${encodeURIComponent(effectTitle)}&image=${encodeURIComponent(`${url}/opengraph-image`)}`
+      // VK: передаем картинку явно
+      href: `https://vk.com/share.php?url=${encodeURIComponent(url)}&title=${encodeURIComponent(shareTitle)}&image=${encodeURIComponent(`${url}/opengraph-image`)}`
     },
     {
       name: 'WhatsApp',
       icon: WhatsAppIcon,
       color: 'bg-green-500',
+      // WhatsApp: Текст + Ссылка
       href: `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText + ' ' + url)}`
     },
     {
       name: 'Twitter',
       icon: Twitter,
       color: 'bg-sky-500',
-      href: `https://twitter.com/intent/tweet?text=${encodeURIComponent(effectTitle)}&url=${encodeURIComponent(url)}`
+      href: `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareTitle)}&url=${encodeURIComponent(url)}`
     }
   ];
 
