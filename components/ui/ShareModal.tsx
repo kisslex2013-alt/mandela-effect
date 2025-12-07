@@ -5,10 +5,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Copy, Check, Send, Twitter } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-// VK Icon Component - VK logo
+// VK Icon Component
 const VKIcon = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-    <path d="M15.684 0H8.316C1.592 0 0 1.592 0 8.316v7.368C0 22.408 1.592 24 8.316 24h7.368C22.408 24 24 22.408 24 15.684V8.316C24 1.592 22.408 0 15.684 0zm3.692 17.123h-1.744c-.66 0-.864-.525-2.05-1.727-1.584-1.69-2.3-.372-2.3.372v1.355c0 .66-.198.66-1.744.66H9.23c-.66 0-.66-.198-.66-.66V9.23c0-.66.198-.66.66-.66h1.744c.66 0 .66.198.66.66v1.355c.66-1.158 1.584-2.3 3.468-2.3h2.05c.66 0 .66.198.66.66v1.744c0 .66-.198.66-.66.66h-1.32c-.66 0-.66.198-.66.66v2.3c0 .66.198.66.66.66h1.32c.66 0 .66.198.66.66v1.744c0 .66-.198.66-.66.66z"/>
+    <path d="M15.07 2H8.93C3.33 2 2 3.33 2 8.93v6.14C2 20.67 3.33 22 8.93 22h6.14c5.6 0 6.93-1.33 6.93-6.93V8.93C22 3.33 20.67 2 15.07 2zM17.6 14.5c.3.44.76 1.18.95 1.5.17.28.15.42-.06.42h-2.1c-.72 0-1.05-.38-1.6-1.3-.2-.33-.45-.67-.6-.67-.13 0-.18.1-.18.6v1.37c0 .2-.06.33-.55.33-1.8 0-3.8-1.08-5.25-3.1-2.18-3.05-2.8-5.35-2.8-5.68 0-.15.06-.28.35-.28h2.1c.27 0 .37.12.47.4.52 1.5 1.4 2.8 1.75 2.8.13 0 .2-.06.2-.38V8.6c-.05-.85-.5-1.05-.5-1.4 0-.15.12-.3.32-.3h2c.27 0 .36.13.36.43v2.25c0 .25.1.33.17.33.14 0 .25-.08.5-.33 1-1.1 1.7-2.68 1.7-2.68.1-.2.25-.3.6-.3h2.1c.63 0 .76.32.62.75-.3.98-2.2 3.68-2.2 3.68-.18.28-.25.4 0 .75z"/>
   </svg>
 );
 
@@ -51,24 +51,28 @@ export default function ShareModal({
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // Формируем красивый текст для шаринга
+  const shareText = `${effectTitle}\n\nmandela-effect.ru`;
+
   const shareLinks = [
     {
       name: 'Telegram',
       icon: Send,
       color: 'bg-blue-500',
-      href: `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(effectTitle)}`
+      href: `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(shareText)}`
     },
     {
       name: 'VK',
       icon: VKIcon,
       color: 'bg-blue-600',
-      href: `https://vk.com/share.php?url=${encodeURIComponent(url)}&title=${encodeURIComponent(effectTitle)}`
+      // Для VK передаем картинку явно
+      href: `https://vk.com/share.php?url=${encodeURIComponent(url)}&title=${encodeURIComponent(effectTitle)}&image=${encodeURIComponent(`${url}/opengraph-image`)}`
     },
     {
       name: 'WhatsApp',
       icon: WhatsAppIcon,
       color: 'bg-green-500',
-      href: `https://api.whatsapp.com/send?text=${encodeURIComponent(effectTitle + ' ' + url)}`
+      href: `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText + ' ' + url)}`
     },
     {
       name: 'Twitter',
