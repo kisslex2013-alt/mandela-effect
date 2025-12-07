@@ -1,9 +1,23 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Share2, Copy, Check, Send, MessageCircle } from 'lucide-react';
-import { useState } from 'react';
+import { X, Copy, Check, Send, Twitter } from 'lucide-react';
 import toast from 'react-hot-toast';
+
+// VK Icon Component - VK logo
+const VKIcon = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+    <path d="M15.684 0H8.316C1.592 0 0 1.592 0 8.316v7.368C0 22.408 1.592 24 8.316 24h7.368C22.408 24 24 22.408 24 15.684V8.316C24 1.592 22.408 0 15.684 0zm3.692 17.123h-1.744c-.66 0-.864-.525-2.05-1.727-1.584-1.69-2.3-.372-2.3.372v1.355c0 .66-.198.66-1.744.66H9.23c-.66 0-.66-.198-.66-.66V9.23c0-.66.198-.66.66-.66h1.744c.66 0 .66.198.66.66v1.355c.66-1.158 1.584-2.3 3.468-2.3h2.05c.66 0 .66.198.66.66v1.744c0 .66-.198.66-.66.66h-1.32c-.66 0-.66.198-.66.66v2.3c0 .66.198.66.66.66h1.32c.66 0 .66.198.66.66v1.744c0 .66-.198.66-.66.66z"/>
+  </svg>
+);
+
+// WhatsApp Icon Component
+const WhatsAppIcon = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+  </svg>
+);
 
 interface ShareModalProps {
   isOpen: boolean;
@@ -14,211 +28,131 @@ interface ShareModalProps {
   effectImageUrl?: string | null;
 }
 
-export default function ShareModal({
-  isOpen,
-  onClose,
-  effectId,
+export default function ShareModal({ 
+  isOpen, 
+  onClose, 
+  effectId, 
   effectTitle,
-  effectDescription,
-  effectImageUrl,
+  effectDescription 
 }: ShareModalProps) {
   const [copied, setCopied] = useState(false);
-  
-  const shareUrl = typeof window !== 'undefined' 
-    ? `${window.location.origin}/effect/${effectId}`
-    : '';
-  
-  // Ссылка на OG-изображение для шаринга
-  const ogImageUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/effect/${effectId}/opengraph-image`
-    : '';
-  
-  const shareText = `${effectTitle}${effectDescription ? ` - ${effectDescription}` : ''}`;
+  const [url, setUrl] = useState('');
 
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      setCopied(true);
-      toast.success('Ссылка скопирована!');
-      setTimeout(() => setCopied(false), 2000);
-    } catch (error) {
-      toast.error('Не удалось скопировать');
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setUrl(`${window.location.origin}/effect/${effectId}`);
     }
+  }, [effectId]);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(url);
+    setCopied(true);
+    toast.success('Ссылка скопирована');
+    setTimeout(() => setCopied(false), 2000);
   };
 
-  const shareToTelegram = () => {
-    // Telegram подхватывает изображение из OG мета-тегов страницы
-    const url = `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`;
-    window.open(url, '_blank', 'width=600,height=400');
-  };
+  const shareLinks = [
+    {
+      name: 'Telegram',
+      icon: Send,
+      color: 'bg-blue-500',
+      href: `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(effectTitle)}`
+    },
+    {
+      name: 'VK',
+      icon: VKIcon,
+      color: 'bg-blue-600',
+      href: `https://vk.com/share.php?url=${encodeURIComponent(url)}&title=${encodeURIComponent(effectTitle)}`
+    },
+    {
+      name: 'WhatsApp',
+      icon: WhatsAppIcon,
+      color: 'bg-green-500',
+      href: `https://api.whatsapp.com/send?text=${encodeURIComponent(effectTitle + ' ' + url)}`
+    },
+    {
+      name: 'Twitter',
+      icon: Twitter,
+      color: 'bg-sky-500',
+      href: `https://twitter.com/intent/tweet?text=${encodeURIComponent(effectTitle)}&url=${encodeURIComponent(url)}`
+    }
+  ];
 
-  const shareToVK = () => {
-    // VK: передаем OG-изображение как параметр image
-    const url = `https://vk.com/share.php?url=${encodeURIComponent(shareUrl)}&title=${encodeURIComponent(effectTitle)}&description=${encodeURIComponent(effectDescription || '')}&image=${encodeURIComponent(ogImageUrl)}`;
-    window.open(url, '_blank', 'width=600,height=400');
-  };
-
-  const shareToTwitter = () => {
-    // Twitter использует OG-изображение автоматически через мета-теги
-    const url = `https://twitter.com/intent/tweet?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`;
-    window.open(url, '_blank', 'width=600,height=400');
-  };
+  if (!isOpen) return null;
 
   return (
     <AnimatePresence>
       {isOpen && (
-        <>
-          {/* Backdrop с градиентом */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="fixed inset-0 bg-black/90 backdrop-blur-md z-50"
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={onClose}>
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            exit={{ opacity: 0 }} 
+            className="absolute inset-0 bg-black/80 backdrop-blur-sm" 
           />
           
-          {/* Modal */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
-            onClick={(e) => e.stopPropagation()}
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0 }} 
+            animate={{ scale: 1, opacity: 1 }} 
+            exit={{ scale: 0.9, opacity: 0 }} 
+            className="relative w-full max-w-md bg-darkCard border border-light/10 rounded-2xl p-6 shadow-2xl overflow-hidden"
+            onClick={e => e.stopPropagation()}
           >
-            <div className="relative bg-darkCard border-2 border-red-500/50 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
-              {/* Stranger Things Style Glow Effects */}
-              <div className="absolute inset-0 bg-gradient-to-r from-red-500/10 via-transparent to-cyan-500/10 opacity-50" />
-              <div className="absolute -inset-1 bg-gradient-to-r from-red-600/20 via-purple-600/20 to-cyan-600/20 blur-xl opacity-30 animate-pulse" />
-              
-              {/* Scanline эффект */}
-              <div className="absolute inset-0 bg-[linear-gradient(transparent_50%,rgba(0,255,255,0.03)_50%)] bg-[length:100%_4px] pointer-events-none opacity-30" />
-              
-              {/* Header */}
-              <div className="relative z-10 border-b-2 border-red-500/30 bg-gradient-to-r from-red-950/20 via-transparent to-cyan-950/20 p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="relative">
-                      <div className="absolute inset-0 bg-red-500/30 blur-md animate-pulse" />
-                      <div className="relative p-2.5 bg-gradient-to-br from-red-500/20 to-red-600/20 rounded-lg border-2 border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.3)]">
-                        <Share2 className="w-5 h-5 text-red-400" />
-                      </div>
-                    </div>
-                    <div>
-                      <h2 className="text-xl font-black text-white uppercase tracking-wider flex items-center gap-2">
-                        <span className="text-red-400">ПОДЕЛИТЬСЯ</span>
-                        <span className="text-cyan-400">ЭФФЕКТОМ</span>
-                      </h2>
-                      <div className="h-0.5 w-full bg-gradient-to-r from-red-500 via-purple-500 to-cyan-500 mt-1" />
-                    </div>
-                  </div>
-                  <button
-                    onClick={onClose}
-                    className="p-2 hover:bg-white/10 rounded-lg transition-colors text-white/70 hover:text-white border border-white/10 hover:border-red-500/50"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
+            {/* Glow Effect */}
+            <div className="absolute -top-20 -right-20 w-40 h-40 bg-primary/20 blur-3xl rounded-full pointer-events-none" />
+            
+            <div className="flex justify-between items-center mb-6 relative z-10">
+              <h3 className="text-xl font-bold text-white">Поделиться эффектом</h3>
+              <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-lg transition-colors flex items-center justify-center">
+                <X className="w-5 h-5 text-light/50 hover:text-white" />
+              </button>
+            </div>
 
-              {/* Content */}
-              <div className="relative z-10 p-6 space-y-4">
-                {/* Social buttons grid */}
-                <div className="grid grid-cols-2 gap-3">
-                  {/* Telegram - Cyan accent */}
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={shareToTelegram}
-                    className="group relative overflow-hidden bg-gradient-to-br from-cyan-950/40 to-cyan-900/40 border-2 border-cyan-500/50 rounded-xl p-4 flex flex-col items-center gap-2 hover:border-cyan-400 hover:shadow-[0_0_20px_rgba(6,182,212,0.5)] transition-all"
+            <div className="grid grid-cols-4 gap-4 mb-6 relative z-10">
+              {shareLinks.map((link) => (
+                <a 
+                  key={link.name}
+                  href={link.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex flex-col items-center gap-2 group cursor-pointer"
+                >
+                  <motion.div 
+                    whileHover={{ scale: 1.15 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                    className={`w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-lg transition-all duration-300 group-hover:shadow-[0_0_20px_rgba(0,0,0,0.5)] group-hover:brightness-110 ${link.color}`}
                   >
-                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-cyan-500/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
-                    <div className="relative z-10 p-2 bg-cyan-500/20 rounded-lg border border-cyan-500/30">
-                      <Send className="w-6 h-6 text-cyan-400" />
-                    </div>
-                    <span className="text-sm font-black text-white uppercase tracking-wider">Telegram</span>
-                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-cyan-400 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </motion.button>
+                    <motion.div
+                      whileHover={{ scale: 1.2 }}
+                      transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                    >
+                      <link.icon className="w-6 h-6" />
+                    </motion.div>
+                  </motion.div>
+                  <span className="text-xs text-light/60 group-hover:text-white transition-colors font-medium">{link.name}</span>
+                </a>
+              ))}
+            </div>
 
-                  {/* VK - Blue accent */}
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={shareToVK}
-                    className="group relative overflow-hidden bg-gradient-to-br from-blue-950/40 to-blue-900/40 border-2 border-blue-500/50 rounded-xl p-4 flex flex-col items-center gap-2 hover:border-blue-400 hover:shadow-[0_0_20px_rgba(59,130,246,0.5)] transition-all"
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-blue-500/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
-                    <div className="relative z-10 p-2 bg-blue-500/20 rounded-lg border border-blue-500/30">
-                      <MessageCircle className="w-6 h-6 text-blue-400" />
-                    </div>
-                    <span className="text-sm font-black text-white uppercase tracking-wider">VK</span>
-                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-blue-400 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </motion.button>
-
-                  {/* Twitter - Cyan accent */}
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={shareToTwitter}
-                    className="group relative overflow-hidden bg-gradient-to-br from-cyan-950/40 to-cyan-900/40 border-2 border-cyan-500/50 rounded-xl p-4 flex flex-col items-center gap-2 hover:border-cyan-400 hover:shadow-[0_0_20px_rgba(6,182,212,0.5)] transition-all"
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-cyan-500/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
-                    <div className="relative z-10 p-2 bg-cyan-500/20 rounded-lg border border-cyan-500/30">
-                      <Share2 className="w-6 h-6 text-cyan-400" />
-                    </div>
-                    <span className="text-sm font-black text-white uppercase tracking-wider">Twitter</span>
-                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-cyan-400 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </motion.button>
-
-                  {/* Copy Link - Red accent */}
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={handleCopy}
-                    className="group relative overflow-hidden bg-gradient-to-br from-red-950/40 to-red-900/40 border-2 border-red-500/50 rounded-xl p-4 flex flex-col items-center gap-2 hover:border-red-400 hover:shadow-[0_0_20px_rgba(239,68,68,0.5)] transition-all"
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-red-500/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
-                    <div className="relative z-10 p-2 bg-red-500/20 rounded-lg border border-red-500/30">
-                      {copied ? (
-                        <Check className="w-6 h-6 text-green-400" />
-                      ) : (
-                        <Copy className="w-6 h-6 text-red-400" />
-                      )}
-                    </div>
-                    <span className="text-sm font-black text-white uppercase tracking-wider">
-                      {copied ? 'Скопировано' : 'Копировать'}
-                    </span>
-                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-red-400 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </motion.button>
-                </div>
-
-                {/* URL Preview - Terminal style */}
-                <div className="mt-6 p-4 bg-black/40 border-2 border-cyan-500/30 rounded-lg relative overflow-hidden">
-                  {/* Scanline overlay */}
-                  <div className="absolute inset-0 bg-[linear-gradient(transparent_50%,rgba(0,255,255,0.05)_50%)] bg-[length:100%_2px] pointer-events-none" />
-                  
-                  <div className="relative z-10">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                      <p className="text-xs text-red-400 font-mono uppercase tracking-wider font-bold">
-                        ССЫЛКА:
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 p-2 bg-black/60 border border-cyan-500/20 rounded font-mono text-xs text-cyan-300 break-all">
-                        {shareUrl}
-                      </div>
-                    </div>
-                    <div className="mt-2 flex items-center gap-2 text-[10px] text-cyan-400/60 font-mono">
-                      <span className="animate-pulse">▶</span>
-                      <span>Готово к отправке</span>
-                    </div>
-                  </div>
-                </div>
+            <div className="relative z-10">
+              <label className="block text-xs text-light/40 mb-2 ml-1 uppercase tracking-wider font-bold">Прямая ссылка</label>
+              <div className="flex items-center gap-2 bg-black/30 border border-light/10 rounded-xl p-1.5 pl-4">
+                <input 
+                  type="text" 
+                  readOnly 
+                  value={url} 
+                  className="bg-transparent text-sm text-light/80 w-full outline-none"
+                />
+                <button 
+                  onClick={handleCopy}
+                  className={`p-2 rounded-lg transition-all ${copied ? 'bg-green-500/20 text-green-400' : 'bg-white/5 hover:bg-white/10 text-light'}`}
+                >
+                  {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                </button>
               </div>
             </div>
           </motion.div>
-        </>
+        </div>
       )}
     </AnimatePresence>
   );
