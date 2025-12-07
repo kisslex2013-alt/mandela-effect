@@ -28,12 +28,9 @@ interface GenerateResult {
   error?: string;
 }
 
-interface GenerateImageResult {
-  success: boolean;
-  imageUrl?: string;
-  usedModel?: string;
-  error?: string;
-}
+type GenerateImageResult = 
+  | { success: true; imageUrl: string; usedModel?: string }
+  | { success: false; error: string };
 
 function cleanJsonResponse(rawText: string): string {
   let text = rawText.trim();
@@ -236,5 +233,9 @@ export async function generateEffectImage(title: string, imagePrompt?: string): 
   return { success: true, imageUrl, usedModel: 'flux' };
 }
 
-export async function restyleImage(title: string, url: string) { return { success: false, error: 'Not implemented in Phase 3 yet' }; }
-export async function fitImageToFormat(title: string, url: string) { return { success: false, error: 'Not implemented in Phase 3 yet' }; }
+export async function restyleImage(title: string, url: string): Promise<GenerateImageResult> { 
+  return { success: false, error: 'Not implemented in Phase 3 yet' }; 
+}
+export async function fitImageToFormat(title: string, url: string): Promise<GenerateImageResult> { 
+  return { success: false, error: 'Not implemented in Phase 3 yet' }; 
+}

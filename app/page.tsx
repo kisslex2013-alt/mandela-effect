@@ -4,9 +4,10 @@ import { getHomeData } from '@/app/actions/effects';
 import HomeClient from './HomeClient';
 import Loading from '@/components/Loading';
 
-// ISR: Обновление раз в 1 секунду (предотвращает infinite loop в dev)
+// ISR: Обновление раз в 60 секунд.
+// Это критически важно для производительности (TTFB).
 export const dynamic = 'force-dynamic';
-export const revalidate = 1;
+export const revalidate = 60;
 
 export const metadata: Metadata = {
   title: 'Эффект Манделы | Главная',

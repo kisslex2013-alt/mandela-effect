@@ -176,6 +176,7 @@ export default function HomeClient({
                           src={effectOfDay.imageUrl} 
                           alt={effectOfDay.title} 
                           fill 
+                          priority={true} // <-- ВАЖНО: Приоритетная загрузка
                           className="object-cover transition-transform duration-1000 group-hover:scale-105" 
                         />
                         {/* Glitch Layers */}

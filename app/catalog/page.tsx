@@ -4,8 +4,9 @@ import { getCatalogData } from '@/app/actions/effects';
 import CatalogClient from './CatalogClient';
 import Loading from '@/components/Loading';
 
+// ISR: Кэшируем каталог на 1 минуту
 export const dynamic = 'force-dynamic';
-export const revalidate = 0; // Отключаем кэш для проверки просмотров
+export const revalidate = 60;
 
 export const metadata: Metadata = {
   title: 'Каталог | Эффект Манделы',
