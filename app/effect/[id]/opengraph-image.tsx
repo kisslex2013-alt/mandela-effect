@@ -237,7 +237,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
         })
         .toBuffer();
       
-      return new Response(finalBuffer, {
+      return new Response(new Uint8Array(finalBuffer), {
         headers: {
           'Content-Type': 'image/jpeg',
           'Cache-Control': 'public, max-age=31536000, immutable',
@@ -245,7 +245,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
       });
     }
     
-    return new Response(finalBuffer, {
+    return new Response(new Uint8Array(finalBuffer), {
       headers: {
         'Content-Type': 'image/png',
         'Cache-Control': 'public, max-age=31536000, immutable',
