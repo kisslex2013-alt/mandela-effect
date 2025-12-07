@@ -116,12 +116,12 @@ export default function HomeClient({
 
   return (
     <div className="pb-20 relative">
-      {/* Background Grid - вынесен на уровень основного контейнера для скролла */}
+      {/* Background Grid */}
       <div className="fixed inset-0 pointer-events-none z-0">
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]" />
       </div>
       
-      {/* Hero Section (Full Screen) */}
+      {/* Hero Section */}
       <section className="relative min-h-screen flex flex-col justify-center py-20 overflow-hidden">
         <div className="container mx-auto px-4 relative z-10 flex-1 flex flex-col justify-center items-center">
           
@@ -165,42 +165,63 @@ export default function HomeClient({
               transition={{ delay: 0.3 }}
               className="max-w-7xl w-full"
             >
-              <div className="relative h-[500px] md:h-[600px] w-full rounded-3xl overflow-hidden border border-white/10 shadow-2xl group glitch-wrapper">
+              <div className="relative w-full rounded-3xl overflow-hidden border border-white/10 shadow-2xl group min-h-[600px] md:aspect-video flex flex-col">
+                
+                {/* 1. BACKGROUND IMAGE LAYER */}
                 <div className="absolute inset-0 z-0">
                   <Link href={`/effect/${effectOfDay.id}`} className="block w-full h-full relative">
                     {effectOfDay.imageUrl ? (
                       <>
-                        <ImageWithSkeleton src={effectOfDay.imageUrl} alt={effectOfDay.title} fill className="object-cover transition-transform duration-1000 group-hover:scale-105 relative z-[1]" />
-                        <div className="glitch-layers absolute inset-0 z-[2] opacity-0 group-hover:opacity-100 transition-opacity">
-                          <div className="glitch-layer" style={{ backgroundImage: `url('${effectOfDay.imageUrl.replace(/'/g, '%27')}')` }} />
-                          <div className="glitch-layer" style={{ backgroundImage: `url('${effectOfDay.imageUrl.replace(/'/g, '%27')}')` }} />
-                          <div className="glitch-layer" style={{ backgroundImage: `url('${effectOfDay.imageUrl.replace(/'/g, '%27')}')` }} />
-                        </div>
+                        <ImageWithSkeleton 
+                          src={effectOfDay.imageUrl} 
+                          alt={effectOfDay.title} 
+                          fill 
+                          className="object-cover transition-transform duration-1000 group-hover:scale-105" 
+                        />
+                        {/* Glitch Layers */}
+                        <div className="absolute inset-0 bg-primary/20 mix-blend-overlay opacity-0 group-hover:opacity-100 transition-opacity duration-100 animate-pulse" />
+                        <div className="absolute inset-0 bg-red-500/10 mix-blend-color-dodge opacity-0 group-hover:opacity-30 transition-opacity duration-75" />
                       </>
-                    ) : <div className="w-full h-full bg-black/50 flex items-center justify-center"><span className="text-6xl">👾</span></div>}
+                    ) : (
+                      <div className="w-full h-full bg-black/50 flex items-center justify-center"><span className="text-6xl">👾</span></div>
+                    )}
                   </Link>
                 </div>
 
-                <div className="absolute inset-0 bg-gradient-to-r from-[#050505] via-[#050505]/90 to-transparent z-10" />
+                {/* 2. CINEMATIC GRADIENTS */}
+                <div className="absolute inset-0 bg-gradient-to-r from-[#050505] via-[#050505]/80 to-transparent z-10" />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-transparent to-transparent z-10" />
                 <div className="absolute inset-0 z-10 opacity-20 pointer-events-none bg-[url('https://grainy-gradients.vercel.app/noise.svg')] mix-blend-overlay" />
 
-                <div className="relative z-20 h-full flex flex-col justify-center p-6 md:p-12 max-w-3xl">
-                  <div className="flex flex-wrap items-center gap-4 mb-8">
-                    <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 text-xs font-bold uppercase tracking-widest shadow-[0_0_15px_rgba(234,179,8,0.2)]"><Sparkles className="w-3 h-3" /> Эффект дня</div>
+                {/* 3. CONTENT LAYER */}
+                <div className="relative z-30 p-6 md:p-12 max-w-3xl w-full flex flex-col justify-center flex-1">
+                  
+                  {/* Header: Badge + Timer */}
+                  <div className="flex flex-wrap items-center gap-4 mb-6">
+                    <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 text-xs font-bold uppercase tracking-widest shadow-[0_0_15px_rgba(234,179,8,0.2)]">
+                      <Sparkles className="w-3 h-3" /> Эффект дня
+                    </div>
                     {effectOfDay?.nextReset && (
                       <div className="flex items-center gap-2 text-[10px] font-mono text-cyan-400/80 bg-black/40 px-3 py-1 rounded-full border border-white/5 shadow-[0_0_15px_rgba(6,182,212,0.2)]">
-                        <Clock className="w-3 h-3" /><span className="animate-pulse tracking-widest">ДО СДВИГА РЕАЛЬНОСТИ:</span><span className="text-cyan-300 font-bold text-xs">{timeLeft}</span>
+                        <Clock className="w-3 h-3" />
+                        <span className="animate-pulse tracking-widest">ДО СДВИГА РЕАЛЬНОСТИ:</span>
+                        <span className="text-cyan-300 font-bold text-xs">{timeLeft}</span>
                       </div>
                     )}
                   </div>
 
+                  {/* Title & Desc */}
                   <Link href={`/effect/${effectOfDay.id}`} className="block group-hover:text-primary transition-colors">
-                    <h2 className="text-4xl md:text-7xl font-black text-white mb-6 leading-none tracking-tight drop-shadow-lg">{effectOfDay.title}</h2>
+                    <h2 className="text-4xl md:text-7xl font-black text-white mb-6 leading-none tracking-tight drop-shadow-lg">
+                      {effectOfDay.title}
+                    </h2>
                   </Link>
-                  <p className="text-base md:text-lg lg:text-xl text-light/80 md:text-light/80 mb-6 md:mb-10 leading-relaxed max-w-xl border-l-2 border-primary/50 pl-4 md:pl-6 line-clamp-2 md:line-clamp-3 font-semibold md:font-normal drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] md:drop-shadow-none">{effectOfDay.description}</p>
+                  <p className="relative z-30 text-lg md:text-xl text-light/90 mb-10 leading-relaxed max-w-xl border-l-2 border-primary/50 pl-6 drop-shadow-md">
+                    {effectOfDay.description}
+                  </p>
                   
-                  <div className="mb-10 max-w-xl">
+                  {/* Vote */}
+                  <div className="mb-8 max-w-xl">
                     <StrangerVote 
                       variantA={vA} 
                       variantB={vB} 
@@ -214,14 +235,18 @@ export default function HomeClient({
                     />
                   </div>
 
-                  {/* System Log */}
-                  <div className="flex items-center gap-2 text-[10px] font-mono text-green-500/60 mb-6">
-                    <Hash className="w-3 h-3" />
-                    <span className="uppercase tracking-wider">{systemLog}<span className="animate-pulse">_</span></span>
-                  </div>
-
-                  <div className="flex items-center gap-6 mt-auto">
-                    <Link href={`/effect/${effectOfDay.id}`} className="flex items-center gap-2 text-sm font-bold text-black bg-white hover:bg-primary hover:text-white transition-all px-6 py-3 rounded-full shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:shadow-[0_0_30px_rgba(6,182,212,0.4)]">Исследовать аномалию <ArrowRight className="w-4 h-4" /></Link>
+                  {/* Footer (Compact Button + Log) */}
+                  <div className="flex flex-wrap items-center gap-6 mt-auto">
+                    <Link 
+                      href={`/effect/${effectOfDay.id}`} 
+                      className="flex items-center gap-2 text-sm font-bold text-black bg-white hover:bg-primary hover:text-white transition-all px-6 py-3 rounded-full shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:shadow-[0_0_30px_rgba(6,182,212,0.4)] w-fit"
+                    >
+                      Исследовать аномалию <ArrowRight className="w-4 h-4" />
+                    </Link>
+                    <div className="flex items-center gap-2 text-[10px] font-mono text-green-500/60 bg-black/40 px-3 py-1.5 rounded-lg border border-white/5">
+                      <Hash className="w-3 h-3" />
+                      <span className="uppercase tracking-wider">{systemLog}<span className="animate-pulse">_</span></span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -236,17 +261,13 @@ export default function HomeClient({
             onClick={() => {
               const trendingSection = document.getElementById('trending-section');
               if (trendingSection) {
-                const headerHeight = 100; // Высота навигации + отступы
+                const headerHeight = 100;
                 const elementPosition = trendingSection.getBoundingClientRect().top + window.pageYOffset;
                 const offsetPosition = elementPosition - headerHeight;
-                window.scrollTo({
-                  top: offsetPosition,
-                  behavior: 'smooth'
-                });
+                window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
               }
             }}
-            className="absolute bottom-8 left-1/2 -translate-x-1/2 text-light/30 hover:text-light/60 transition-colors cursor-pointer animate-bounce"
-            aria-label="Прокрутить к разделу 'В тренде'"
+            className="mt-8 text-light/30 hover:text-light/60 transition-colors cursor-pointer animate-bounce flex items-center justify-center"
           >
             <ChevronDown className="w-8 h-8" />
           </motion.button>
@@ -290,16 +311,13 @@ export default function HomeClient({
           transition={{ duration: 0.5 }}
           className="relative bg-gradient-to-r from-red-500/10 via-orange-500/10 to-yellow-500/10 border-2 border-red-500/30 rounded-3xl p-8 md:p-12 overflow-hidden"
         >
-          {/* Animated Background */}
           <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.05)_50%,transparent_75%)] bg-[length:20px_20px] animate-[slide_20s_linear_infinite] opacity-20" />
-          
           <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center gap-6">
             <div className="flex-shrink-0">
               <div className="p-4 bg-red-500/20 rounded-full border-2 border-red-500/50 animate-pulse">
                 <AlertTriangle className="w-8 h-8 md:w-10 md:h-10 text-red-400" />
               </div>
             </div>
-            
             <div className="flex-1">
               <h3 className="text-2xl md:text-3xl font-black text-white mb-3 tracking-tight">
                 <span className="text-red-400">ВНИМАНИЕ:</span>{' '}
