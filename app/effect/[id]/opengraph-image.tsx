@@ -59,11 +59,11 @@ export default async function Image({ params }: { params: Promise<{ id: string }
           const imageBuffer = await imageRes.arrayBuffer();
 
           // АГРЕССИВНАЯ ОПТИМИЗАЦИЯ для WhatsApp (макс. 200 КБ с запасом)
-          // Сразу конвертируем в JPEG с качеством 75 для меньшего размера
+          // Сразу конвертируем в JPEG с качеством 60 для меньшего размера
           let optimizedBuffer = await sharp(Buffer.from(imageBuffer))
             .resize(1200, 675, { fit: 'cover' })
             .jpeg({ 
-              quality: 75, // Снижено с 80 до 75 для меньшего размера
+              quality: 60, // Снижаем качество для WhatsApp
               progressive: true,
               mozjpeg: true
             })
