@@ -165,7 +165,7 @@ export async function createEffect(
         historySource: data.historySource || null,
         yearDiscovered: data.yearDiscovered || null,
         interpretations: data.interpretations ? data.interpretations : Prisma.JsonNull,
-        isVisible: true, // По умолчанию видимый
+        isVisible: false, // ИЗМЕНЕНО: Скрыт по умолчанию
         votesFor: 0,
         votesAgainst: 0,
         views: 0,
@@ -347,7 +347,7 @@ export async function approveSubmission(
         historySource: data.historySource || null,
         yearDiscovered: data.yearDiscovered || null,
         interpretations: data.interpretations ? data.interpretations : Prisma.JsonNull,
-        isVisible: true, // По умолчанию видимый
+        isVisible: false, // ИЗМЕНЕНО: Скрыт по умолчанию
         votesFor: 0,
         votesAgainst: 0,
         views: 0,

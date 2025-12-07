@@ -143,10 +143,19 @@ export default function EffectEditorModal({ isOpen, onClose, onSave, initialData
           ...prev,
           category: result.data!.category || prev.category,
           currentState: result.data!.currentState || prev.currentState,
+          
           residue: result.data!.residue || prev.residue,
+          residueSource: result.data!.residueSource || prev.residueSource, // <-- ДОБАВЛЕНО
+          
           history: result.data!.history || prev.history,
+          historySource: result.data!.historySource || prev.historySource, // <-- ДОБАВЛЕНО
+          
           scientificInterpretation: result.data!.scientific || prev.scientificInterpretation,
+          scientificSource: result.data!.scientificSource || prev.scientificSource, // <-- ДОБАВЛЕНО
+          
           communityInterpretation: result.data!.community || prev.communityInterpretation,
+          communitySource: result.data!.communitySource || prev.communitySource, // <-- ДОБАВЛЕНО
+          
           sourceLink: result.data!.sourceLink || prev.sourceLink,
           imageUrl: result.data!.imageUrl || prev.imageUrl
         }));

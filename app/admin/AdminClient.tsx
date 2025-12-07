@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -8,20 +8,20 @@ import { updateEffect, deleteEffect, logout, approveSubmission, rejectSubmission
 import { moderateComment } from '@/app/actions/comments';
 import { generateEffectData, generateEffectImage, restyleImage, fitImageToFormat } from '@/app/actions/generate-content';
 import { findNewEffects } from '@/app/actions/find-new-effects';
-import { createCategory, updateCategory, deleteCategory, type Category } from '@/app/actions/category';
+import { SECTORS } from '@/lib/constants';
+import { createCategory, type Category } from '@/app/actions/category';
 import toast from 'react-hot-toast';
 import { 
   LayoutGrid, Inbox, Tags, Plus, LogOut, ArrowLeft, 
   Zap, ScanSearch, MessageSquare, ListChecks, Trash2, Eye, EyeOff, FileText, ImageIcon, Loader2, Check, X, Cpu, Database
 } from 'lucide-react';
 
-// Импорт компонентов
 import EffectsTab from '@/components/admin/tabs/EffectsTab';
 import EffectEditorModal from '@/components/admin/modals/EffectEditorModal';
 import ImageUploadModal from '@/components/admin/modals/ImageUploadModal';
 import NeuralLink from '@/components/admin/NeuralLink';
 
-// Типы (можно вынести в types.ts, но оставим здесь для совместимости)
+// Типы
 interface Effect { id: string; title: string; description: string; content: string; category: string; imageUrl: string | null; imageSourceType?: any; imageSourceValue?: string | null; votesFor: number; votesAgainst: number; views: number; residue: string | null; residueSource: string | null; history: string | null; historySource: string | null; interpretations: any; isVisible?: boolean; createdAt: string; updatedAt: string; }
 interface Submission { id: string; category: string; title: string; question: string; variantA: string; variantB: string; currentState: string | null; sourceLink: string | null; submitterEmail: string | null; interpretations: any; status: string; createdAt: string; }
 interface Comment { id: string; effectId: string; effectTitle: string; visitorId: string; type: 'WITNESS' | 'ARCHAEOLOGIST' | 'THEORIST'; text: string; imageUrl: string | null; videoUrl: string | null; audioUrl: string | null; theoryType: string | null; status: 'PENDING' | 'APPROVED' | 'REJECTED'; likes: number; reports: number; createdAt: string; moderatedAt: string | null; }
@@ -38,7 +38,6 @@ export default function AdminClient({ effects: initialEffects, submissions: init
   const [isMounted, setIsMounted] = useState(false);
   useEffect(() => { setIsMounted(true); }, []);
   
-  // State
   const [effects, setEffects] = useState<Effect[]>(initialEffects);
   const [submissions, setSubmissions] = useState<Submission[]>(initialSubmissions);
   const [categories, setCategories] = useState<Category[]>(initialCategories);
@@ -48,26 +47,24 @@ export default function AdminClient({ effects: initialEffects, submissions: init
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [quickLoading, setQuickLoading] = useState<{ id: string, type: string } | null>(null);
   
-  // Modals State
-  const [editorState, setEditorState] = useState<{ isOpen: boolean; effect: Effect | null }>({ isOpen: false, effect: null });
+  const [editorState, setEditorState] = useState<{ isOpen: boolean; effect: any | null }>({ isOpen: false, effect: null });
   const [imageModalState, setImageModalState] = useState<{ isOpen: boolean; effect: Effect | null; url: string }>({ isOpen: false, effect: null, url: '' });
   const [isFinderOpen, setIsFinderOpen] = useState(false);
   const [isBulkOpen, setIsBulkOpen] = useState(false);
   const [isNeuralLinkOpen, setIsNeuralLinkOpen] = useState(false);
   
-  // Bulk & Finder State
   const [finderLoading, setFinderLoading] = useState(false);
   const [foundEffects, setFoundEffects] = useState<any[]>([]);
+  const [selectedSector, setSelectedSector] = useState(SECTORS[0]);
+  
   const [bulkInput, setBulkInput] = useState('');
   const [bulkRunning, setBulkRunning] = useState(false);
   const [bulkLogs, setBulkLogs] = useState<string[]>([]);
   const [bulkLoading, setBulkLoading] = useState(false);
 
-  // Neural Link Logs
   const [neuralLogs, setNeuralLogs] = useState<string[]>([]);
   const addNeuralLog = (msg: string) => setNeuralLogs(prev => [...prev, msg]);
 
-  // --- HANDLERS: EFFECTS ---
   const handleSaveEffect = async (data: any) => {
     const interpretations: Record<string, string> = {};
     if (data.scientificInterpretation) interpretations.scientific = data.scientificInterpretation;
@@ -76,47 +73,33 @@ export default function AdminClient({ effects: initialEffects, submissions: init
     if (data.communitySource) interpretations.communitySource = data.communitySource;
     if (data.sourceLink) interpretations.sourceLink = data.sourceLink;
 
-    // Формируем контент для обратной совместимости
     const newContent = `Вариант А: ${data.variantA}\nВариант Б: ${data.variantB}${data.currentState ? `\nТекущее состояние: ${data.currentState}` : ''}`;
-    
     const payload = {
-      title: data.title, 
-      description: data.description, 
-      content: newContent, 
-      category: data.category,
+      title: data.title, description: data.description, content: newContent, category: data.category,
       imageUrl: data.imageUrl || undefined, 
-      
-      // ВАЖНО: Явно передаем currentState
       currentState: data.currentState || undefined,
-      
-      residue: data.residue || undefined, 
-      residueSource: data.residueSource || undefined,
-      history: data.history || undefined, 
-      historySource: data.historySource || undefined,
+      residue: data.residue || undefined, residueSource: data.residueSource || undefined,
+      history: data.history || undefined, historySource: data.historySource || undefined,
       interpretations: Object.keys(interpretations).length > 0 ? interpretations : undefined,
     };
 
     let result;
-    if (editorState.effect) result = await updateEffect(editorState.effect.id, payload);
-    else result = await createEffect(payload);
+    if (editorState.effect && editorState.effect.id) {
+      result = await updateEffect(editorState.effect.id, payload);
+    } else {
+      result = await createEffect(payload);
+    }
 
     if (result.success) {
-      if (editorState.effect) {
-        // Обновляем локальный стейт, включая currentState
-        setEffects(prev => prev.map(e => e.id === editorState.effect!.id ? { 
-          ...e, 
-          ...data, 
-          content: newContent, 
-          interpretations,
-          currentState: data.currentState // Явное обновление в стейте
-        } : e));
+      if (editorState.effect && editorState.effect.id) {
+        setEffects(prev => prev.map(e => e.id === editorState.effect!.id ? { ...e, ...data, content: newContent, interpretations, currentState: data.currentState } : e));
         addNeuralLog(`UPDATED EFFECT: ${data.title}`);
       } else {
         router.refresh();
         addNeuralLog(`CREATED EFFECT: ${data.title}`);
       }
       toast.success('Сохранено');
-      setEditorState({ isOpen: false, effect: null }); // Закрываем модалку
+      setEditorState({ isOpen: false, effect: null });
     } else toast.error(result.error || 'Ошибка');
   };
 
@@ -127,8 +110,7 @@ export default function AdminClient({ effects: initialEffects, submissions: init
       setEffects(prev => prev.filter(e => e.id !== id)); 
       toast.success('Удалено'); 
       addNeuralLog(`DELETED EFFECT ID: ${id}`);
-    } 
-    else toast.error('Ошибка');
+    } else toast.error('Ошибка');
   };
 
   const handleToggleVisibility = async (effect: Effect) => {
@@ -149,11 +131,54 @@ export default function AdminClient({ effects: initialEffects, submissions: init
         const contentLines = effect.content.split('\n');
         const vA = contentLines.find(l => l.startsWith('Вариант А:'))?.replace('Вариант А: ', '').trim() || '';
         const vB = contentLines.find(l => l.startsWith('Вариант Б:'))?.replace('Вариант Б: ', '').trim() || '';
+        
         const res = await generateEffectData(effect.title, effect.description, vA, vB, { generateImage: false });
-        if (res.success) {
-          toast.success('Данные обновлены (F5)');
-          addNeuralLog(`DATA GENERATED FOR: ${effect.title}`);
-        } else toast.error('Ошибка AI');
+        
+        if (res.success && res.data) {
+          await updateEffect(effect.id, {
+            category: res.data.category,
+            currentState: res.data.currentState,
+            residue: res.data.residue,
+            residueSource: res.data.residueSource,
+            history: res.data.history,
+            historySource: res.data.historySource,
+            interpretations: {
+              scientific: res.data.scientific,
+              scientificSource: res.data.scientificSource,
+              community: res.data.community,
+              communitySource: res.data.communitySource,
+              sourceLink: res.data.sourceLink,
+            },
+          });
+
+          setEffects(prev => prev.map(e => {
+            if (e.id === effect.id) {
+              return {
+                ...e,
+                category: res.data!.category || e.category,
+                currentState: res.data!.currentState,
+                residue: res.data!.residue,
+                residueSource: res.data!.residueSource,
+                history: res.data!.history,
+                historySource: res.data!.historySource,
+                interpretations: {
+                  ...(e.interpretations as any || {}),
+                  scientific: res.data!.scientific,
+                  scientificSource: res.data!.scientificSource,
+                  community: res.data!.community,
+                  communitySource: res.data!.communitySource,
+                  sourceLink: res.data!.sourceLink,
+                },
+              };
+            }
+            return e;
+          }));
+          
+          toast.success('Данные обновлены и сохранены');
+          addNeuralLog(`DATA GENERATED & SAVED FOR: ${effect.title}`);
+        } else {
+          toast.error('Ошибка AI');
+        }
       } else if (type === 'image') {
         const res = await generateEffectImage(effect.title);
         if (res.success && res.imageUrl) {
@@ -196,7 +221,6 @@ export default function AdminClient({ effects: initialEffects, submissions: init
     } else toast.error('Ошибка');
   };
 
-  // --- BULK ACTIONS ---
   const handleBulkProcess = async (type: 'data' | 'image' | 'restyle' | 'fit') => {
     if (selectedIds.size === 0 || !confirm(`Обработать ${selectedIds.size} шт?`)) return;
     setBulkLoading(true);
@@ -228,7 +252,6 @@ export default function AdminClient({ effects: initialEffects, submissions: init
     addNeuralLog(`BULK VISIBILITY SET TO: ${isVisible}`);
   };
 
-  // --- SUBMISSIONS & COMMENTS ---
   const handleApproveSubmission = async (sub: Submission) => {
     const content = `Вариант А: ${sub.variantA}\nВариант Б: ${sub.variantB}${sub.currentState ? `\nТекущее состояние: ${sub.currentState}` : ''}`;
     const result = await approveSubmission(sub.id, { title: sub.title, description: sub.question, content, category: sub.category, interpretations: sub.interpretations });
@@ -254,17 +277,44 @@ export default function AdminClient({ effects: initialEffects, submissions: init
     }
   };
 
-  // --- FINDER ---
   const handleFindNew = async () => {
     setFinderLoading(true);
-    addNeuralLog(`STARTING AGENT SEARCH...`);
+    addNeuralLog(`STARTING AGENT SEARCH IN SECTOR: ${selectedSector}...`);
     try {
-      const res = await findNewEffects(effects.map(e => e.title));
+      const res = await findNewEffects(effects.map(e => e.title), selectedSector);
       if (res.success && res.data) {
         setFoundEffects(res.data);
         addNeuralLog(`AGENT FOUND ${res.data.length} NEW EFFECTS`);
-      } else toast.error('Ничего не найдено');
+      } else {
+        toast.error(res.error || 'Ничего не найдено');
+        addNeuralLog(`SEARCH FAILED: ${res.error}`);
+      }
     } catch (e) { toast.error('Ошибка поиска'); } finally { setFinderLoading(false); }
+  };
+
+  // Функция для переноса найденного эффекта в редактор
+  const handleUseFoundEffect = (found: any) => {
+    // Формируем контент для парсера
+    const content = `Вариант А: ${found.variantA}\nВариант Б: ${found.variantB}`;
+    
+    // Открываем модалку с предзаполненными данными
+    setEditorState({
+      isOpen: true,
+      effect: {
+        title: found.title,
+        description: found.question,
+        content: content,
+        category: found.category,
+        residueSource: found.residueSource, // Передаем ссылку на остатки
+        interpretations: {
+          sourceLink: found.sourceUrl // Передаем источник
+        },
+        // Сохраняем visualPrompt во временное поле (если нужно будет использовать)
+        // В текущей реализации EffectEditorModal не имеет поля для visualPrompt, 
+        // но мы можем использовать его при генерации картинки позже
+      }
+    });
+    setIsFinderOpen(false); // Закрываем поиск
   };
 
   const handleMigration = async () => {
@@ -291,50 +341,24 @@ export default function AdminClient({ effects: initialEffects, submissions: init
   return (
     <div className="min-h-screen bg-dark py-6 px-4 font-sans text-light">
       <div className="max-w-[1600px] mx-auto">
-        
-        {/* HEADER & TOOLBAR (Unified) */}
         <div className="flex flex-col xl:flex-row items-center justify-between gap-4 mb-8 bg-darkCard/50 p-4 rounded-2xl border border-light/5 backdrop-blur-sm">
-          
-          {/* Logo & Title */}
           <div className="flex items-center gap-4 w-full xl:w-auto">
-            <div className="p-3 bg-primary/10 rounded-xl border border-primary/20">
-              <LayoutGrid className="text-primary w-6 h-6" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-white tracking-tight">Админ-панель</h1>
-              <p className="text-light/40 text-xs font-mono">MANDELA_EFFECT // CONTROL_CENTER</p>
-            </div>
+            <div className="p-3 bg-primary/10 rounded-xl border border-primary/20"><LayoutGrid className="text-primary w-6 h-6" /></div>
+            <div><h1 className="text-2xl font-bold text-white tracking-tight">Админ-панель</h1><p className="text-light/40 text-xs font-mono">MANDELA_EFFECT // CONTROL_CENTER</p></div>
           </div>
-
-          {/* Global Actions Toolbar */}
           <div className="flex items-center gap-2 w-full xl:w-auto overflow-x-auto pb-2 xl:pb-0">
-            <button onClick={() => setIsBulkOpen(true)} className="flex items-center gap-2 px-4 py-2.5 bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 rounded-lg text-sm font-medium transition-colors border border-purple-500/20 whitespace-nowrap">
-              <Zap className="w-4 h-4" /> Массовая
-            </button>
-            <button onClick={() => setIsFinderOpen(true)} className="flex items-center gap-2 px-4 py-2.5 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 rounded-lg text-sm font-medium transition-colors border border-cyan-500/20 whitespace-nowrap">
-              <ScanSearch className="w-4 h-4" /> Агент
-            </button>
-            <button onClick={handleMigration} className="flex items-center gap-2 px-4 py-2.5 bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 rounded-lg text-sm font-medium transition-colors border border-yellow-500/20 whitespace-nowrap">
-              <Database className="w-4 h-4" /> Миграция
-            </button>
+            <button onClick={() => setIsBulkOpen(true)} className="flex items-center gap-2 px-4 py-2.5 bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 rounded-lg text-sm font-medium transition-colors border border-purple-500/20 whitespace-nowrap"><Zap className="w-4 h-4" /> Массовая</button>
+            <button onClick={() => setIsFinderOpen(true)} className="flex items-center gap-2 px-4 py-2.5 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 rounded-lg text-sm font-medium transition-colors border border-cyan-500/20 whitespace-nowrap"><ScanSearch className="w-4 h-4" /> Агент</button>
+            <button onClick={handleMigration} className="flex items-center gap-2 px-4 py-2.5 bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 rounded-lg text-sm font-medium transition-colors border border-yellow-500/20 whitespace-nowrap"><Database className="w-4 h-4" /> Миграция</button>
             <div className="w-px h-8 bg-light/10 mx-2"></div>
-            <button onClick={() => setEditorState({ isOpen: true, effect: null })} className="flex items-center gap-2 px-4 py-2.5 bg-green-500/10 text-green-400 hover:bg-green-500/20 rounded-lg text-sm font-medium transition-colors border border-green-500/20 whitespace-nowrap">
-              <Plus className="w-4 h-4" /> Добавить
-            </button>
-            <button onClick={() => setIsNeuralLinkOpen(true)} className="flex items-center gap-2 px-4 py-2.5 bg-primary/10 text-primary hover:bg-primary/20 rounded-lg text-sm font-medium transition-colors border border-primary/20 whitespace-nowrap animate-pulse">
-              <Cpu className="w-4 h-4" /> Neural Link
-            </button>
+            <button onClick={() => setEditorState({ isOpen: true, effect: null })} className="flex items-center gap-2 px-4 py-2.5 bg-green-500/10 text-green-400 hover:bg-green-500/20 rounded-lg text-sm font-medium transition-colors border border-green-500/20 whitespace-nowrap"><Plus className="w-4 h-4" /> Добавить</button>
+            <button onClick={() => setIsNeuralLinkOpen(true)} className="flex items-center gap-2 px-4 py-2.5 bg-primary/10 text-primary hover:bg-primary/20 rounded-lg text-sm font-medium transition-colors border border-primary/20 whitespace-nowrap animate-pulse"><Cpu className="w-4 h-4" /> Neural Link</button>
             <div className="w-px h-8 bg-light/10 mx-2"></div>
-            <Link href="/" className="p-2.5 rounded-lg bg-white/5 hover:bg-white/10 text-light/60 hover:text-light transition-colors" title="На сайт">
-              <ArrowLeft className="w-5 h-5" />
-            </Link>
-            <button onClick={() => logout().then(() => router.refresh())} className="p-2.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors" title="Выйти">
-              <LogOut className="w-5 h-5" />
-            </button>
+            <Link href="/" className="p-2.5 rounded-lg bg-white/5 hover:bg-white/10 text-light/60 hover:text-light transition-colors" title="На сайт"><ArrowLeft className="w-5 h-5" /></Link>
+            <button onClick={() => logout().then(() => router.refresh())} className="p-2.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors" title="Выйти"><LogOut className="w-5 h-5" /></button>
           </div>
         </div>
 
-        {/* TABS */}
         <div className="flex gap-2 mb-6 border-b border-light/10 pb-1 overflow-x-auto items-center">
           <button onClick={() => setActiveTab('effects')} className={`flex items-center gap-2 px-6 py-3 rounded-t-lg transition-colors whitespace-nowrap font-medium text-sm ${activeTab === 'effects' ? 'bg-primary/10 text-primary border-b-2 border-primary' : 'text-light/60 hover:text-light hover:bg-white/5'}`}><LayoutGrid className="w-4 h-4" /> Эффекты <span className="text-xs bg-white/10 px-2 py-0.5 rounded-full ml-1">{effects.length}</span></button>
           <button onClick={() => setActiveTab('submissions')} className={`flex items-center gap-2 px-6 py-3 rounded-t-lg transition-colors whitespace-nowrap font-medium text-sm ${activeTab === 'submissions' ? 'bg-primary/10 text-primary border-b-2 border-primary' : 'text-light/60 hover:text-light hover:bg-white/5'}`}><Inbox className="w-4 h-4" /> Заявки <span className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full ml-1">{submissions.length}</span></button>
@@ -342,7 +366,6 @@ export default function AdminClient({ effects: initialEffects, submissions: init
           <button onClick={() => setActiveTab('categories')} className={`flex items-center gap-2 px-6 py-3 rounded-t-lg transition-colors whitespace-nowrap font-medium text-sm ${activeTab === 'categories' ? 'bg-primary/10 text-primary border-b-2 border-primary' : 'text-light/60 hover:text-light hover:bg-white/5'}`}><Tags className="w-4 h-4" /> Категории <span className="text-xs bg-white/10 px-2 py-0.5 rounded-full ml-1">{categories.length}</span></button>
         </div>
 
-        {/* CONTENT */}
         {activeTab === 'effects' && (
           <EffectsTab 
             effects={effects} 
@@ -401,7 +424,6 @@ export default function AdminClient({ effects: initialEffects, submissions: init
           <div className="text-center py-20 text-light/40">Управление категориями временно недоступно в этом режиме (используйте БД)</div>
         )}
 
-        {/* BULK ACTIONS BAR */}
         <AnimatePresence>
           {selectedIds.size > 0 && (
             <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }} className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-darkCard/90 backdrop-blur border border-light/20 rounded-full px-6 py-3 shadow-2xl flex items-center gap-4 z-40">
@@ -419,7 +441,6 @@ export default function AdminClient({ effects: initialEffects, submissions: init
           )}
         </AnimatePresence>
 
-        {/* MODALS */}
         <EffectEditorModal 
           isOpen={editorState.isOpen} 
           onClose={() => setEditorState({ isOpen: false, effect: null })} 
@@ -435,7 +456,6 @@ export default function AdminClient({ effects: initialEffects, submissions: init
           initialUrl={imageModalState.url} 
         />
 
-        {/* NEURAL LINK SIDEBAR */}
         <NeuralLink 
           isOpen={isNeuralLinkOpen} 
           onClose={() => setIsNeuralLinkOpen(false)} 
@@ -443,19 +463,81 @@ export default function AdminClient({ effects: initialEffects, submissions: init
           logs={neuralLogs}
         />
 
-        {/* FINDER MODAL */}
         {isFinderOpen && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setIsFinderOpen(false)}>
             <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="bg-darkCard w-full max-w-4xl rounded-2xl border border-light/10 p-6 h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
               <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2"><ScanSearch className="text-cyan-400" /> Агент-Поисковик</h2>
-              {!finderLoading && foundEffects.length === 0 && <div className="flex-1 flex items-center justify-center"><button onClick={handleFindNew} className="px-8 py-4 bg-cyan-500/20 text-cyan-400 rounded-xl font-bold hover:bg-cyan-500/30 transition-colors">Начать сканирование</button></div>}
-              {finderLoading && <div className="flex-1 flex items-center justify-center"><Loader2 className="w-12 h-12 text-cyan-400 animate-spin" /></div>}
-              {foundEffects.length > 0 && <div className="flex-1 overflow-y-auto grid gap-2">{foundEffects.map((ef, i) => <div key={i} className="p-3 bg-dark border border-light/10 rounded flex justify-between items-center"><div className="font-bold text-light">{ef.title}</div><button className="px-3 py-1 bg-white/10 rounded text-xs" onClick={() => { setBulkInput(JSON.stringify([ef])); setIsBulkOpen(true); setIsFinderOpen(false); }}>В генератор</button></div>)}</div>}
+              
+              {!finderLoading && foundEffects.length === 0 && (
+                <div className="mb-6">
+                  <label className="block text-xs text-light/50 mb-2 uppercase font-bold">Выберите сектор сканирования</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {SECTORS.map((sector) => (
+                      <button
+                        key={sector}
+                        onClick={() => setSelectedSector(sector)}
+                        className={`p-3 rounded-lg text-xs text-left transition-colors border ${
+                          selectedSector === sector 
+                            ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300' 
+                            : 'bg-white/5 border-transparent text-light/60 hover:bg-white/10'
+                        }`}
+                      >
+                        {sector}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {!finderLoading && foundEffects.length === 0 && (
+                <div className="flex-1 flex items-center justify-center">
+                  <button onClick={handleFindNew} className="px-8 py-4 bg-cyan-500/20 text-cyan-400 rounded-xl font-bold hover:bg-cyan-500/30 transition-colors border border-cyan-500/30 shadow-[0_0_20px_rgba(6,182,212,0.2)]">
+                    Начать сканирование
+                  </button>
+                </div>
+              )}
+              
+              {finderLoading && (
+                <div className="flex-1 flex items-center justify-center">
+                  <Loader2 className="w-12 h-12 text-cyan-400 animate-spin" />
+                </div>
+              )}
+              
+              {foundEffects.length > 0 && (
+                <div className="flex-1 overflow-y-auto grid gap-3 p-1">
+                  {foundEffects.map((ef, i) => (
+                    <div key={i} className="p-4 bg-dark border border-light/10 rounded-xl flex flex-col gap-3 hover:border-primary/30 transition-colors">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="font-bold text-white text-lg">{ef.title}</div>
+                          <div className="text-sm text-light/60">{ef.question}</div>
+                        </div>
+                        <button 
+                          className="px-4 py-2 bg-primary/20 text-primary hover:bg-primary/30 rounded-lg text-sm font-bold transition-colors" 
+                          onClick={() => handleUseFoundEffect(ef)}
+                        >
+                          Создать
+                        </button>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="p-2 bg-red-500/10 border border-red-500/20 rounded">
+                          <span className="text-red-400 font-bold block mb-1">ЛОЖЬ (А):</span>
+                          <span className="text-light/80">{ef.variantA}</span>
+                        </div>
+                        <div className="p-2 bg-cyan-500/10 border border-cyan-500/20 rounded">
+                          <span className="text-cyan-400 font-bold block mb-1">ПРАВДА (Б):</span>
+                          <span className="text-light/80">{ef.variantB}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </motion.div>
           </div>
         )}
 
-        {/* BULK GENERATOR MODAL */}
         {isBulkOpen && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setIsBulkOpen(false)}>
             <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="bg-darkCard w-full max-w-2xl rounded-2xl border border-light/10 p-6" onClick={e => e.stopPropagation()}>

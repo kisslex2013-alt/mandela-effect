@@ -25,3 +25,16 @@ export const getCategoryInfo = (slug: string): CategoryDef => {
   return CATEGORY_MAP[slug] || { ...CATEGORY_MAP.other, name: slug };
 };
 
+// Сектора для Агента-Охотника
+export const SECTORS = [
+  "Авто (Случайная тема)",
+  "Фильмы и сериалы",
+  "Мультфильмы и анимация",
+  "Бренды и логотипы",
+  "Знаменитости и люди",
+  "Цитаты и фразы",
+  "География и история",
+  "Искусство и книги",
+  "Технологии и игры"
+];
+

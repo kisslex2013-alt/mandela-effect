@@ -29,11 +29,20 @@ export default function EffectsTab({
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
-  const filteredEffects = effects.filter(e => {
-    const matchesSearch = e.title.toLowerCase().includes(searchQuery.toLowerCase()) || e.description.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' || e.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
+  const filteredEffects = effects
+    .filter(e => {
+      const matchesSearch = e.title.toLowerCase().includes(searchQuery.toLowerCase()) || e.description.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesCategory = selectedCategory === 'all' || e.category === selectedCategory;
+      return matchesSearch && matchesCategory;
+    })
+    .sort((a, b) => {
+      // Скрытые эффекты всегда первыми
+      const aHidden = a.isVisible === false || a.isVisible === null;
+      const bHidden = b.isVisible === false || b.isVisible === null;
+      if (aHidden && !bHidden) return -1;
+      if (!aHidden && bHidden) return 1;
+      return 0;
+    });
 
   return (
     <div className="space-y-4">
@@ -69,9 +78,17 @@ export default function EffectsTab({
               {/* Text Info */}
               <div className="flex-1 min-w-0 flex flex-col">
                 <div className="flex justify-between items-start mb-1">
-                  <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${getCategoryInfo(effect.category).color} bg-opacity-10 border border-opacity-20 truncate max-w-[100px]`}>
-                    {getCategoryInfo(effect.category).name}
-                  </span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${getCategoryInfo(effect.category).color} bg-opacity-10 border border-opacity-20 truncate max-w-[100px]`}>
+                      {getCategoryInfo(effect.category).name}
+                    </span>
+                    {/* ВОЗВРАЩАЕМ ПЛАШКУ СКРЫТО */}
+                    {(effect.isVisible === false || effect.isVisible === null) && (
+                      <span className="text-[10px] text-red-400 flex items-center gap-1 bg-red-500/20 px-1.5 py-0.5 rounded border border-red-500/40 font-bold animate-red-blink">
+                        <EyeOff className="w-3 h-3" /> Скрыт
+                      </span>
+                    )}
+                  </div>
                   <div className="flex gap-1">
                     <button onClick={() => onToggleVisibility(effect)} className={`p-1 rounded hover:bg-white/10 ${!effect.isVisible ? 'text-red-400' : 'text-light/30 hover:text-light'}`}>{!effect.isVisible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}</button>
                     <button onClick={() => onEdit(effect)} className="p-1 rounded hover:bg-white/10 text-blue-400/80 hover:text-blue-400"><Edit className="w-3.5 h-3.5" /></button>
