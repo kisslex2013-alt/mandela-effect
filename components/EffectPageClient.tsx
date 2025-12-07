@@ -11,7 +11,9 @@ import {
 import Link from 'next/link';
 import ImageWithSkeleton from '@/components/ui/ImageWithSkeleton';
 import StrangerVote from '@/components/ui/StrangerVote';
-import ShareModal from '@/components/ui/ShareModal';
+import dynamic from 'next/dynamic';
+
+const ShareModal = dynamic(() => import('@/components/ui/ShareModal'), { ssr: false });
 import { saveVote, getUserVote } from '@/app/actions/votes';
 import { createComment, toggleCommentLike } from '@/app/actions/comments';
 import { incrementViews, getNextUnvotedEffect, getPrevUnvotedEffect } from '@/app/actions/effects';

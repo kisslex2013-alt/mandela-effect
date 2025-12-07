@@ -17,9 +17,11 @@ import {
 } from 'lucide-react';
 
 import EffectsTab from '@/components/admin/tabs/EffectsTab';
-import EffectEditorModal from '@/components/admin/modals/EffectEditorModal';
-import ImageUploadModal from '@/components/admin/modals/ImageUploadModal';
-import NeuralLink from '@/components/admin/NeuralLink';
+import dynamic from 'next/dynamic';
+
+const EffectEditorModal = dynamic(() => import('@/components/admin/modals/EffectEditorModal'), { ssr: false });
+const ImageUploadModal = dynamic(() => import('@/components/admin/modals/ImageUploadModal'), { ssr: false });
+const NeuralLink = dynamic(() => import('@/components/admin/NeuralLink'), { ssr: false });
 
 // Типы
 interface Effect { id: string; title: string; description: string; content: string; category: string; imageUrl: string | null; imageSourceType?: any; imageSourceValue?: string | null; votesFor: number; votesAgainst: number; views: number; residue: string | null; residueSource: string | null; history: string | null; historySource: string | null; interpretations: any; isVisible?: boolean; createdAt: string; updatedAt: string; }

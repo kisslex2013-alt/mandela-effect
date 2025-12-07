@@ -9,11 +9,10 @@ import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import SoundToggle from "@/components/ui/SoundToggle";
 
-const inter = Inter({
-  subsets: ["latin", "cyrillic"],
-  variable: "--font-inter",
-  display: "swap",
-  preload: true,
+const inter = Inter({ 
+  subsets: ['latin', 'cyrillic'], // Добавлено 'cyrillic'
+  display: 'swap',
+  variable: '--font-inter',
 });
 
 export const metadata: Metadata = {
