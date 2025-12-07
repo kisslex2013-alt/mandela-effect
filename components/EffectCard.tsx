@@ -12,6 +12,20 @@ import { getCategoryInfo } from '@/lib/constants';
 import { votesStore } from '@/lib/votes-store';
 import toast from 'react-hot-toast';
 
+// VK Icon Component
+const VKIcon = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+    <path d="M15.07 2H8.93C3.33 2 2 3.33 2 8.93v6.14C2 20.67 3.33 22 8.93 22h6.14c5.6 0 6.93-1.33 6.93-6.93V8.93C22 3.33 20.67 2 15.07 2zM17.6 14.5c.3.44.76 1.18.95 1.5.17.28.15.42-.06.42h-2.1c-.72 0-1.05-.38-1.6-1.3-.2-.33-.45-.67-.6-.67-.13 0-.18.1-.18.6v1.37c0 .2-.06.33-.55.33-1.8 0-3.8-1.08-5.25-3.1-2.18-3.05-2.8-5.35-2.8-5.68 0-.15.06-.28.35-.28h2.1c.27 0 .37.12.47.4.52 1.5 1.4 2.8 1.75 2.8.13 0 .2-.06.2-.38V8.6c-.05-.85-.5-1.05-.5-1.4 0-.15.12-.3.32-.3h2c.27 0 .36.13.36.43v2.25c0 .25.1.33.17.33.14 0 .25-.08.5-.33 1-1.1 1.7-2.68 1.7-2.68.1-.2.25-.3.6-.3h2.1c.63 0 .76.32.62.75-.3.98-2.2 3.68-2.2 3.68-.18.28-.25.4 0 .75z"/>
+  </svg>
+);
+
+// WhatsApp Icon Component
+const WhatsAppIcon = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+  </svg>
+);
+
 interface EffectCardProps {
   effect?: {
     id: string;
@@ -199,7 +213,7 @@ export default function EffectCard(props: EffectCardProps) {
                   rel="noopener noreferrer"
                   className="w-10 h-10 rounded-full flex items-center justify-center text-white shadow-lg hover:scale-110 transition-transform bg-blue-600"
                 >
-                  <MessageSquare className="w-5 h-5" />
+                  <VKIcon className="w-5 h-5" />
                 </a>
                 {/* WhatsApp */}
                 <a
@@ -208,7 +222,7 @@ export default function EffectCard(props: EffectCardProps) {
                   rel="noopener noreferrer"
                   className="w-10 h-10 rounded-full flex items-center justify-center text-white shadow-lg hover:scale-110 transition-transform bg-green-500"
                 >
-                  <MessageSquare className="w-5 h-5" />
+                  <WhatsAppIcon className="w-5 h-5" />
                 </a>
                 {/* Twitter */}
                 <a
