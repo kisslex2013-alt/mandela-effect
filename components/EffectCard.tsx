@@ -3,12 +3,11 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
-import { MessageSquare, Share2, Eye, HelpCircle } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { MessageSquare, Share2, Eye, HelpCircle, X, Copy, Check, Send, Twitter } from 'lucide-react';
 import { saveVote } from '@/app/actions/votes';
 import ImageWithSkeleton from '@/components/ui/ImageWithSkeleton';
 import StrangerVote from '@/components/ui/StrangerVote';
-import ShareModal from '@/components/ui/ShareModal';
 import { getCategoryInfo } from '@/lib/constants';
 import { votesStore } from '@/lib/votes-store';
 import toast from 'react-hot-toast';
@@ -79,7 +78,8 @@ export default function EffectCard(props: EffectCardProps) {
   });
   const [isVoting, setIsVoting] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isShareOpen, setIsShareOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const categoryInfo = getCategoryInfo(effectData.category);
   const CategoryIcon = categoryInfo.icon;
@@ -172,6 +172,85 @@ export default function EffectCard(props: EffectCardProps) {
           ) : <div className="w-full h-full bg-white/5 flex items-center justify-center"><span className="text-4xl">👾</span></div>}
         </Link>
 
+        {/* INLINE SHARE OVERLAY */}
+        <AnimatePresence>
+          {isShareOpen && (
+            <motion.div
+              initial={{ opacity: 0, backdropFilter: "blur(0px)" }}
+              animate={{ opacity: 1, backdropFilter: "blur(12px)" }}
+              exit={{ opacity: 0, backdropFilter: "blur(0px)" }}
+              className="absolute inset-0 z-30 bg-dark/80 flex flex-col items-center justify-center p-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex gap-3 mb-4">
+                {/* Telegram */}
+                <a
+                  href={`https://t.me/share/url?url=${encodeURIComponent(typeof window !== 'undefined' ? `${window.location.origin}/effect/${effectData.id}` : '')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-10 h-10 rounded-full flex items-center justify-center text-white shadow-lg hover:scale-110 transition-transform bg-blue-500"
+                >
+                  <Send className="w-5 h-5" />
+                </a>
+                {/* VK */}
+                <a
+                  href={`https://vk.com/share.php?url=${encodeURIComponent(typeof window !== 'undefined' ? `${window.location.origin}/effect/${effectData.id}` : '')}&title=${encodeURIComponent(effectData.title)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-10 h-10 rounded-full flex items-center justify-center text-white shadow-lg hover:scale-110 transition-transform bg-blue-600"
+                >
+                  <MessageSquare className="w-5 h-5" />
+                </a>
+                {/* WhatsApp */}
+                <a
+                  href={`https://api.whatsapp.com/send?text=${encodeURIComponent(typeof window !== 'undefined' ? `${window.location.origin}/effect/${effectData.id}` : '')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-10 h-10 rounded-full flex items-center justify-center text-white shadow-lg hover:scale-110 transition-transform bg-green-500"
+                >
+                  <MessageSquare className="w-5 h-5" />
+                </a>
+                {/* Twitter */}
+                <a
+                  href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(effectData.title)}&url=${encodeURIComponent(typeof window !== 'undefined' ? `${window.location.origin}/effect/${effectData.id}` : '')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-10 h-10 rounded-full flex items-center justify-center text-white shadow-lg hover:scale-110 transition-transform bg-sky-500"
+                >
+                  <Twitter className="w-5 h-5" />
+                </a>
+              </div>
+              
+              <div className="flex items-center gap-2 w-full max-w-[240px] bg-black/40 border border-white/10 rounded-lg p-1 pl-3">
+                <input 
+                  type="text" 
+                  readOnly 
+                  value={typeof window !== 'undefined' ? `${window.location.origin}/effect/${effectData.id}` : ''} 
+                  className="bg-transparent text-xs text-light/80 w-full outline-none"
+                />
+                <button 
+                  onClick={() => {
+                    navigator.clipboard.writeText(`${window.location.origin}/effect/${effectData.id}`);
+                    setCopied(true);
+                    toast.success('Скопировано');
+                    setTimeout(() => setCopied(false), 2000);
+                  }}
+                  className={`p-1.5 rounded-md transition-all ${copied ? 'bg-green-500/20 text-green-400' : 'bg-white/10 hover:bg-white/20 text-light'}`}
+                >
+                  {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+
+              <button 
+                onClick={() => setIsShareOpen(false)}
+                className="absolute top-2 right-2 p-1.5 text-white/50 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <div className="absolute top-3 left-3 z-10 pointer-events-none">
           <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md backdrop-blur-md border border-white/10 ${categoryInfo.color} bg-opacity-20 text-xs font-bold uppercase tracking-wider shadow-lg`}>
             <CategoryIcon className="w-3 h-3" />{props.badge || categoryInfo.name}
@@ -201,9 +280,9 @@ export default function EffectCard(props: EffectCardProps) {
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            setIsShareModalOpen(true);
+            setIsShareOpen(!isShareOpen); // Toggle
           }}
-          className="absolute top-4 right-4 z-10 flex items-center justify-center w-6 h-6 text-white/70 hover:text-white transition-colors" 
+          className={`absolute top-4 right-4 z-10 flex items-center justify-center w-6 h-6 transition-colors ${isShareOpen ? 'text-white' : 'text-white/70 hover:text-white'}`}
           title="Поделиться"
         >
           <Share2 className="w-4 h-4" />
@@ -233,16 +312,6 @@ export default function EffectCard(props: EffectCardProps) {
           />
         </div>
       </div>
-
-      {/* Share Modal */}
-      <ShareModal
-        isOpen={isShareModalOpen}
-        onClose={() => setIsShareModalOpen(false)}
-        effectId={effectData.id}
-        effectTitle={effectData.title}
-        effectDescription={effectData.description}
-        effectImageUrl={effectData.imageUrl}
-      />
     </motion.div>
   );
 }

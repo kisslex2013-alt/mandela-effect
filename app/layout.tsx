@@ -6,6 +6,7 @@ import Footer from "@/components/Footer";
 import ScrollToTop from "@/components/ScrollToTop";
 import { Toaster } from "react-hot-toast";
 import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import SoundToggle from "@/components/ui/SoundToggle";
 
 const inter = Inter({
@@ -96,6 +97,7 @@ export default function RootLayout({
         <ScrollToTop />
         <SoundToggle />
         <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );

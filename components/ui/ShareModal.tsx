@@ -32,7 +32,7 @@ export default function ShareModal({
   isOpen, 
   onClose, 
   effectId, 
-  effectTitle,
+  effectTitle, 
   effectDescription 
 }: ShareModalProps) {
   const [copied, setCopied] = useState(false);
@@ -56,20 +56,22 @@ export default function ShareModal({
       name: 'Telegram',
       icon: Send,
       color: 'bg-blue-500',
-      // Telegram: Только URL, чтобы превью было чистым
-      href: `https://t.me/share/url?url=${encodeURIComponent(url)}`
+      // Telegram Markdown Hack: [Текст](Ссылка)
+      // Мы передаем это в параметр `url`, так как `text` часто игнорируется при превью
+      href: `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(`[mandela-effect.ru](${url})`)}`
     },
     {
       name: 'VK',
       icon: VKIcon,
       color: 'bg-blue-600',
-      href: `https://vk.com/share.php?url=${encodeURIComponent(url)}&title=${encodeURIComponent(effectTitle)}&image=${encodeURIComponent(`${url}/opengraph-image`)}`
+      // VK: Заголовок = Домен
+      href: `https://vk.com/share.php?url=${encodeURIComponent(url)}&title=${encodeURIComponent('mandela-effect.ru')}&image=${encodeURIComponent(`${url}/opengraph-image`)}`
     },
     {
       name: 'WhatsApp',
       icon: WhatsAppIcon,
       color: 'bg-green-500',
-      // WhatsApp: Только URL, чтобы не ломать парсинг картинки
+      // WhatsApp: Только ссылка (для надежности превью)
       href: `https://api.whatsapp.com/send?text=${encodeURIComponent(url)}`
     },
     {
