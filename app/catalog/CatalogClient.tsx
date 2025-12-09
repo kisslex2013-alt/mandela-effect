@@ -20,7 +20,7 @@ interface Category {
   slug: string;
   name: string;
   emoji: string;
-  color?: string;
+  color?: string | null;
 }
 
 interface Effect {
