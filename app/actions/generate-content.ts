@@ -239,5 +239,10 @@ export async function generateEffectImage(title: string, imagePrompt?: string, s
   return { success: true, imageUrl, usedModel: 'flux' };
 }
 
-export async function restyleImage(title: string, url: string) { return { success: false, error: 'Not implemented in Phase 3 yet' }; }
-export async function fitImageToFormat(title: string, url: string) { return { success: false, error: 'Not implemented in Phase 3 yet' }; }
+export async function restyleImage(title: string, url: string): Promise<GenerateImageResult> { 
+  return { success: false, error: 'Not implemented in Phase 3 yet' }; 
+}
+
+export async function fitImageToFormat(title: string, url: string): Promise<GenerateImageResult> { 
+  return { success: false, error: 'Not implemented in Phase 3 yet' }; 
+}
