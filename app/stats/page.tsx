@@ -2,7 +2,7 @@ import { Metadata } from 'next';
 
 import prisma from '@/lib/prisma';
 
-import StatsClient from './StatsClient';
+import StatsClientWrapper from './StatsClientWrapper';
 
 export const metadata: Metadata = {
   title: 'Статистика | Эффект Манделы',
@@ -29,7 +29,7 @@ export default async function StatsPage() {
   const data = await getData();
   return (
     <div className="min-h-screen bg-dark pt-32">
-      <StatsClient {...data} />
+      <StatsClientWrapper {...data} />
     </div>
   );
 }

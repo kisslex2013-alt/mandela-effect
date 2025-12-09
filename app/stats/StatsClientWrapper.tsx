@@ -10,16 +10,22 @@ const StatsClient = dynamic(() => import('./StatsClient'), {
   loading: () => <Loading />
 });
 
-interface StatsClientWrapperProps {
-  stats: {
-    totalEffects: number;
-    totalVotes: number;
-    totalViews: number;
-    totalParticipants: number;
-  };
+interface Effect {
+  id: string;
+  title: string;
+  category: string;
+  votesFor: number;
+  votesAgainst: number;
+  imageUrl: string | null;
 }
 
-export default function StatsClientWrapper({ stats }: StatsClientWrapperProps) {
-  return <StatsClient stats={stats} />;
+interface StatsClientWrapperProps {
+  effects: Effect[];
+  totalVotes: number;
+  totalParticipants: number;
+}
+
+export default function StatsClientWrapper({ effects, totalVotes, totalParticipants }: StatsClientWrapperProps) {
+  return <StatsClient effects={effects} totalVotes={totalVotes} totalParticipants={totalParticipants} />;
 }
 
