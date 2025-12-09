@@ -459,3 +459,44 @@ export async function migrateData() {
     return { success: false, error: String(e) };
   }
 }
+
+/**
+ * Исправить иконки категорий
+ * Проставляет правильные emoji для стандартных категорий
+ */
+export async function fixCategoryIcons() {
+  const mapping: Record<string, string> = {
+    'films': 'films',
+    'brands': 'brands',
+    'music': 'music',
+    'people': 'people',
+    'geography': 'geography',
+    'popculture': 'popculture',
+    'childhood': 'childhood',
+    'russian': 'russian',
+    'science': 'science',
+    'other': 'other'
+  };
+
+  try {
+    const categories = await prisma.category.findMany();
+    let count = 0;
+
+    for (const cat of categories) {
+      // Если emoji пустое или совпадает со slug, обновляем на правильный ID
+      if (!cat.emoji || cat.emoji === cat.slug) {
+        const newIcon = mapping[cat.slug] || 'other';
+        await prisma.category.update({
+          where: { id: cat.id },
+          data: { emoji: newIcon }
+        });
+        count++;
+      }
+    }
+    
+    revalidatePath('/admin');
+    return { success: true, count };
+  } catch (e) {
+    return { success: false, error: String(e) };
+  }
+}

@@ -1,27 +1,30 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { motion, AnimatePresence } from 'framer-motion';
-import { updateEffect, deleteEffect, logout, approveSubmission, rejectSubmission, createEffect, migrateData } from '@/app/actions/admin';
+import { m, AnimatePresence } from 'framer-motion';
+import { updateEffect, deleteEffect, logout, approveSubmission, rejectSubmission, createEffect, migrateData, fixCategoryIcons } from '@/app/actions/admin';
 import { moderateComment } from '@/app/actions/comments';
 import { generateEffectData, generateEffectImage, restyleImage, fitImageToFormat } from '@/app/actions/generate-content';
 import { findNewEffects } from '@/app/actions/find-new-effects';
 import { SECTORS } from '@/lib/constants';
-import { createCategory, type Category } from '@/app/actions/category';
+import { createCategory, updateCategory, deleteCategory, type Category } from '@/app/actions/category';
 import toast from 'react-hot-toast';
 import { 
   LayoutGrid, Inbox, Tags, Plus, LogOut, ArrowLeft, 
   Zap, ScanSearch, MessageSquare, ListChecks, Trash2, Eye, EyeOff, FileText, ImageIcon, Loader2, Check, X, Cpu, Database
 } from 'lucide-react';
 
-import EffectsTab from '@/components/admin/tabs/EffectsTab';
 import dynamic from 'next/dynamic';
+import EffectsTab from '@/components/admin/tabs/EffectsTab';
 
+// Динамические импорты
 const EffectEditorModal = dynamic(() => import('@/components/admin/modals/EffectEditorModal'), { ssr: false });
 const ImageUploadModal = dynamic(() => import('@/components/admin/modals/ImageUploadModal'), { ssr: false });
 const NeuralLink = dynamic(() => import('@/components/admin/NeuralLink'), { ssr: false });
+const CategoriesTab = dynamic(() => import('@/components/admin/tabs/CategoriesTab'), { ssr: false });
+const CategoryEditorModal = dynamic(() => import('@/components/admin/modals/CategoryEditorModal'), { ssr: false });
 
 // Типы
 interface Effect { id: string; title: string; description: string; content: string; category: string; imageUrl: string | null; imageSourceType?: any; imageSourceValue?: string | null; votesFor: number; votesAgainst: number; views: number; residue: string | null; residueSource: string | null; history: string | null; historySource: string | null; interpretations: any; isVisible?: boolean; createdAt: string; updatedAt: string; }
@@ -50,6 +53,7 @@ export default function AdminClient({ effects: initialEffects, submissions: init
   const [quickLoading, setQuickLoading] = useState<{ id: string, type: string } | null>(null);
   
   const [editorState, setEditorState] = useState<{ isOpen: boolean; effect: any | null }>({ isOpen: false, effect: null });
+  const [categoryEditorState, setCategoryEditorState] = useState<{ isOpen: boolean; category: Category | null }>({ isOpen: false, category: null });
   const [imageModalState, setImageModalState] = useState<{ isOpen: boolean; effect: Effect | null; url: string }>({ isOpen: false, effect: null, url: '' });
   const [isFinderOpen, setIsFinderOpen] = useState(false);
   const [isBulkOpen, setIsBulkOpen] = useState(false);
@@ -67,6 +71,49 @@ export default function AdminClient({ effects: initialEffects, submissions: init
   const [neuralLogs, setNeuralLogs] = useState<string[]>([]);
   const addNeuralLog = (msg: string) => setNeuralLogs(prev => [...prev, msg]);
 
+  // Подсчет количества эффектов по категориям
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    effects.forEach(e => { counts[e.category] = (counts[e.category] || 0) + 1; });
+    return counts;
+  }, [effects]);
+
+  // --- CATEGORIES HANDLERS ---
+  const handleSaveCategory = async (data: any) => {
+    let result;
+    if (categoryEditorState.category) {
+      result = await updateCategory(categoryEditorState.category.id, data);
+    } else {
+      result = await createCategory(data);
+    }
+
+    if (result.success && result.category) {
+      if (categoryEditorState.category) {
+        setCategories(prev => prev.map(c => c.id === result.category!.id ? result.category! : c));
+        toast.success('Категория обновлена');
+      } else {
+        setCategories(prev => [...prev, result.category!]);
+        toast.success('Категория создана');
+      }
+      setCategoryEditorState({ isOpen: false, category: null });
+      router.refresh();
+    } else {
+      toast.error(result.error || 'Ошибка');
+    }
+  };
+
+  const handleDeleteCategory = async (id: string) => {
+    if (!confirm('Удалить категорию?')) return;
+    const result = await deleteCategory(id);
+    if (result.success) {
+      setCategories(prev => prev.filter(c => c.id !== id));
+      toast.success('Категория удалена');
+    } else {
+      toast.error(result.error || 'Ошибка');
+    }
+  };
+
+  // --- EFFECTS HANDLERS ---
   const handleSaveEffect = async (data: any) => {
     const interpretations: Record<string, string> = {};
     if (data.scientificInterpretation) interpretations.scientific = data.scientificInterpretation;
@@ -294,12 +341,8 @@ export default function AdminClient({ effects: initialEffects, submissions: init
     } catch (e) { toast.error('Ошибка поиска'); } finally { setFinderLoading(false); }
   };
 
-  // Функция для переноса найденного эффекта в редактор
   const handleUseFoundEffect = (found: any) => {
-    // Формируем контент для парсера
     const content = `Вариант А: ${found.variantA}\nВариант Б: ${found.variantB}`;
-    
-    // Открываем модалку с предзаполненными данными
     setEditorState({
       isOpen: true,
       effect: {
@@ -307,16 +350,13 @@ export default function AdminClient({ effects: initialEffects, submissions: init
         description: found.question,
         content: content,
         category: found.category,
-        residueSource: found.residueSource, // Передаем ссылку на остатки
+        residueSource: found.residueSource,
         interpretations: {
-          sourceLink: found.sourceUrl // Передаем источник
+          sourceLink: found.sourceUrl
         },
-        // Сохраняем visualPrompt во временное поле (если нужно будет использовать)
-        // В текущей реализации EffectEditorModal не имеет поля для visualPrompt, 
-        // но мы можем использовать его при генерации картинки позже
       }
     });
-    setIsFinderOpen(false); // Закрываем поиск
+    setIsFinderOpen(false);
   };
 
   const handleMigration = async () => {
@@ -330,6 +370,23 @@ export default function AdminClient({ effects: initialEffects, submissions: init
         router.refresh();
       } else {
         toast.error('Ошибка миграции', { id: toastId });
+      }
+    } catch (e) {
+      toast.error('Ошибка', { id: toastId });
+    }
+  };
+
+  const handleFixCategoryIcons = async () => {
+    if (!confirm('Исправить иконки категорий? Это обновит emoji для всех категорий, у которых оно пустое или совпадает со slug.')) return;
+    const toastId = toast.loading('Исправление иконок...');
+    try {
+      const res = await fixCategoryIcons();
+      if (res.success) {
+        toast.success(`Обновлено категорий: ${res.count}`, { id: toastId });
+        addNeuralLog(`FIX CATEGORY ICONS COMPLETE. UPDATED: ${res.count}`);
+        router.refresh();
+      } else {
+        toast.error(res.error || 'Ошибка', { id: toastId });
       }
     } catch (e) {
       toast.error('Ошибка', { id: toastId });
@@ -352,6 +409,7 @@ export default function AdminClient({ effects: initialEffects, submissions: init
             <button onClick={() => setIsBulkOpen(true)} className="flex items-center gap-2 px-4 py-2.5 bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 rounded-lg text-sm font-medium transition-colors border border-purple-500/20 whitespace-nowrap"><Zap className="w-4 h-4" /> Массовая</button>
             <button onClick={() => setIsFinderOpen(true)} className="flex items-center gap-2 px-4 py-2.5 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 rounded-lg text-sm font-medium transition-colors border border-cyan-500/20 whitespace-nowrap"><ScanSearch className="w-4 h-4" /> Агент</button>
             <button onClick={handleMigration} className="flex items-center gap-2 px-4 py-2.5 bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 rounded-lg text-sm font-medium transition-colors border border-yellow-500/20 whitespace-nowrap"><Database className="w-4 h-4" /> Миграция</button>
+            <button onClick={handleFixCategoryIcons} className="flex items-center gap-2 px-4 py-2.5 bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 rounded-lg text-sm font-medium transition-colors border border-orange-500/20 whitespace-nowrap"><Tags className="w-4 h-4" /> Иконки</button>
             <div className="w-px h-8 bg-light/10 mx-2"></div>
             <button onClick={() => setEditorState({ isOpen: true, effect: null })} className="flex items-center gap-2 px-4 py-2.5 bg-green-500/10 text-green-400 hover:bg-green-500/20 rounded-lg text-sm font-medium transition-colors border border-green-500/20 whitespace-nowrap"><Plus className="w-4 h-4" /> Добавить</button>
             <button onClick={() => setIsNeuralLinkOpen(true)} className="flex items-center gap-2 px-4 py-2.5 bg-primary/10 text-primary hover:bg-primary/20 rounded-lg text-sm font-medium transition-colors border border-primary/20 whitespace-nowrap animate-pulse"><Cpu className="w-4 h-4" /> Neural Link</button>
@@ -423,12 +481,18 @@ export default function AdminClient({ effects: initialEffects, submissions: init
         )}
 
         {activeTab === 'categories' && (
-          <div className="text-center py-20 text-light/40">Управление категориями временно недоступно в этом режиме (используйте БД)</div>
+          <CategoriesTab 
+            categories={categories} 
+            counts={categoryCounts}
+            onEdit={(cat) => setCategoryEditorState({ isOpen: true, category: cat })}
+            onDelete={handleDeleteCategory}
+            onCreate={() => setCategoryEditorState({ isOpen: true, category: null })}
+          />
         )}
 
         <AnimatePresence>
           {selectedIds.size > 0 && (
-            <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }} className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-darkCard/90 backdrop-blur border border-light/20 rounded-full px-6 py-3 shadow-2xl flex items-center gap-4 z-40">
+            <m.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }} className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-darkCard/90 backdrop-blur border border-light/20 rounded-full px-6 py-3 shadow-2xl flex items-center gap-4 z-40">
               <span className="text-sm font-bold text-primary">{selectedIds.size} выбрано</span>
               <div className="h-4 w-px bg-light/20"></div>
               <button onClick={() => setSelectedIds(new Set(effects.map(e => e.id)))} className="text-xs hover:text-light flex gap-1 items-center"><ListChecks className="w-3 h-3" /> Все</button>
@@ -439,7 +503,7 @@ export default function AdminClient({ effects: initialEffects, submissions: init
               <div className="h-4 w-px bg-light/20"></div>
               <button onClick={() => setSelectedIds(new Set())} className="text-xs text-light/60 hover:text-light">Сброс</button>
               <button onClick={handleBulkDelete} className="text-xs text-red-400 hover:text-red-300 font-bold flex items-center gap-1"><Trash2 className="w-3 h-3" /> Удалить</button>
-            </motion.div>
+            </m.div>
           )}
         </AnimatePresence>
 
@@ -449,6 +513,13 @@ export default function AdminClient({ effects: initialEffects, submissions: init
           onSave={handleSaveEffect} 
           initialData={editorState.effect} 
           categories={categoryOptions} 
+        />
+        
+        <CategoryEditorModal 
+          isOpen={categoryEditorState.isOpen} 
+          onClose={() => setCategoryEditorState({ isOpen: false, category: null })} 
+          onSave={handleSaveCategory} 
+          initialData={categoryEditorState.category} 
         />
         
         <ImageUploadModal 
@@ -467,7 +538,7 @@ export default function AdminClient({ effects: initialEffects, submissions: init
 
         {isFinderOpen && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setIsFinderOpen(false)}>
-            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="bg-darkCard w-full max-w-4xl rounded-2xl border border-light/10 p-6 h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <m.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="bg-darkCard w-full max-w-4xl rounded-2xl border border-light/10 p-6 h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
               <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2"><ScanSearch className="text-cyan-400" /> Агент-Поисковик</h2>
               
               {!finderLoading && foundEffects.length === 0 && (
@@ -536,18 +607,18 @@ export default function AdminClient({ effects: initialEffects, submissions: init
                   ))}
                 </div>
               )}
-            </motion.div>
+            </m.div>
           </div>
         )}
 
         {isBulkOpen && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setIsBulkOpen(false)}>
-            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="bg-darkCard w-full max-w-2xl rounded-2xl border border-light/10 p-6" onClick={e => e.stopPropagation()}>
+            <m.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="bg-darkCard w-full max-w-2xl rounded-2xl border border-light/10 p-6" onClick={e => e.stopPropagation()}>
               <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2"><Zap className="text-purple-400" /> Массовая генерация</h2>
               <textarea value={bulkInput} onChange={e => setBulkInput(e.target.value)} rows={10} className="w-full bg-dark border border-light/10 rounded-lg p-3 text-sm font-mono text-light mb-4" placeholder='[{"title": "Effect 1", "variantA": "..."}]' />
               <div className="flex justify-end gap-3"><button onClick={async () => { setBulkRunning(true); setBulkLogs(['🚀 Старт...']); try { const items = JSON.parse(bulkInput); for (const item of items) { setBulkLogs(prev => [...prev, `Генерируем: ${item.title}...`]); await createEffect({ title: item.title, description: item.question, content: `Вариант А: ${item.variantA}\nВариант Б: ${item.variantB}`, category: item.category }); await new Promise(r => setTimeout(r, 1000)); } setBulkLogs(prev => [...prev, '✅ Готово!']); router.refresh(); } catch (e) { setBulkLogs(prev => [...prev, '❌ Ошибка JSON']); } setBulkRunning(false); }} disabled={bulkRunning} className="px-6 py-2 bg-primary text-white rounded-lg font-bold">{bulkRunning ? 'Генерация...' : 'Запуск'}</button></div>
               {bulkLogs.length > 0 && <div className="mt-4 p-4 bg-black/30 rounded-lg max-h-40 overflow-y-auto text-xs font-mono text-light/70">{bulkLogs.map((l, i) => <div key={i}>{l}</div>)}</div>}
-            </motion.div>
+            </m.div>
           </div>
         )}
       </div>

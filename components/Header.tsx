@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence } from 'framer-motion';
 import { Menu, X, Sparkles } from 'lucide-react';
 
 export default function Header() {
@@ -11,42 +11,39 @@ export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Скрываем Header на странице админки
-  if (pathname?.startsWith('/admin')) {
-    return null;
-  }
-
-  // Отслеживаем скролл для микро-эффектов (опционально)
+  // Отслеживаем скролл
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 20);
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Скрываем Header на странице админки
+  // Важно: проверка внутри рендера, но не блокирует хуки
+  const isAdmin = pathname?.startsWith('/admin');
+  if (isAdmin) return null;
+
   const navItems = [
     { name: 'Главная', path: '/' },
     { name: 'Каталог', path: '/catalog' },
     { name: 'Моя память', path: '/my-memory' },
     { name: 'Статистика', path: '/stats' },
-    { name: 'Добавить', path: '/submit' }, // Убрали "эффект", чтобы короче
+    { name: 'Добавить', path: '/submit' },
   ];
 
   return (
     <>
-      <header className="fixed top-4 left-0 right-0 z-50 flex justify-center px-4">
-        <motion.div 
-          initial={{ y: -100, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ type: 'spring', stiffness: 100, damping: 20 }}
-          className={`
+      <header className="fixed top-4 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none">
+        <div className={`
+            pointer-events-auto
             relative flex items-center justify-between 
             w-full max-w-5xl px-6 py-3 
             bg-black/60 backdrop-blur-xl border border-white/10 
             rounded-full shadow-2xl shadow-purple-500/5
             transition-all duration-300
             ${mobileMenuOpen ? 'rounded-2xl' : ''} 
-          `}
-        >
+          `}>
+          
           {/* Логотип */}
           <Link href="/" className="group relative flex items-center gap-2 z-50" onClick={() => setMobileMenuOpen(false)}>
             <div className="relative w-8 h-8 flex items-center justify-center bg-gradient-to-br from-primary to-purple-600 rounded-lg overflow-hidden group-hover:animate-pulse">
@@ -65,7 +62,7 @@ export default function Header() {
           {/* Десктоп Меню */}
           <nav className="hidden md:flex items-center gap-1">
             {navItems.map((item) => {
-              const isActive = pathname === item.path || (item.path !== '/' && pathname.startsWith(item.path));
+              const isActive = pathname === item.path || (item.path !== '/' && pathname?.startsWith(item.path));
               
               return (
                 <Link 
@@ -80,13 +77,6 @@ export default function Header() {
                   `}
                 >
                   {item.name}
-                  {isActive && (
-                    <motion.div
-                      layoutId="nav-glow"
-                      className="absolute inset-0 rounded-full border border-white/20"
-                      transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
-                    />
-                  )}
                 </Link>
               );
             })}
@@ -103,11 +93,11 @@ export default function Header() {
           {/* Мобильное Меню (Выпадающее) */}
           <AnimatePresence>
             {mobileMenuOpen && (
-              <motion.div
+              <m.div
                 initial={{ opacity: 0, height: 0, marginTop: 0 }}
                 animate={{ opacity: 1, height: 'auto', marginTop: 16 }}
                 exit={{ opacity: 0, height: 0, marginTop: 0 }}
-                className="absolute top-full left-0 right-0 bg-darkCard/90 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden md:hidden shadow-2xl flex flex-col p-2 mx-2"
+                className="absolute top-full left-0 right-0 bg-darkCard/95 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden md:hidden shadow-2xl flex flex-col p-2 mx-2"
               >
                 {navItems.map((item) => (
                   <Link
@@ -125,15 +115,12 @@ export default function Header() {
                     {item.name}
                   </Link>
                 ))}
-              </motion.div>
+              </m.div>
             )}
           </AnimatePresence>
 
-        </motion.div>
+        </div>
       </header>
-      
-      {/* Компенсатор высоты (чтобы контент не уезжал под хедер, так как он fixed) */}
-      {/* Мы не добавляем его здесь, так как хедер "парящий" и прозрачный, контент должен красиво уходить под него */}
     </>
   );
 }

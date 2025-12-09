@@ -9,7 +9,9 @@ import { hasNewComments, getReadCommentsData } from '@/lib/comments-tracker';
 import { 
   Search, Filter, SortAsc, Terminal, FileWarning, 
   Film, Music, Tag, User, Globe, Gamepad2, Baby, Ghost, HelpCircle,
-  Flame, Scale, Clock, ArrowDownAZ, LayoutGrid, X
+  Flame, Scale, Clock, ArrowDownAZ, LayoutGrid, X,
+  Atom, Landmark, Cpu, Utensils, Tv, Brain, Zap, Star, AlertTriangle,
+  Camera, Video, Mic
 } from 'lucide-react';
 import { CATEGORY_MAP } from '@/lib/constants';
 
@@ -18,6 +20,7 @@ interface Category {
   slug: string;
   name: string;
   emoji: string;
+  color?: string;
 }
 
 interface Effect {
@@ -33,7 +36,7 @@ interface Effect {
   history?: string | null;
   commentsCount?: number;
   commentsWithMediaCount?: number;
-  views: number; // <-- ДОБАВЛЕНО
+  views: number;
 }
 
 interface CatalogClientProps {
@@ -93,15 +96,12 @@ export default function CatalogClient({ initialEffects, categories }: CatalogCli
     loadReadComments();
     setMounted(true);
     
-    // Слушаем событие обновления прочитанных комментариев
     const handleCommentsRead = (event: Event) => {
-      // Обновляем данные о прочитанных комментариях из localStorage
       loadReadComments();
-      // Принудительно обновляем компонент для пересчета hasNewComments
       setMounted(false);
       setTimeout(() => {
         setMounted(true);
-        loadReadComments(); // Повторно загружаем данные после обновления mounted
+        loadReadComments();
       }, 10);
     };
     
@@ -113,19 +113,20 @@ export default function CatalogClient({ initialEffects, categories }: CatalogCli
     };
   }, []);
 
-  const getCategoryIcon = (slug: string) => {
-    const props = { className: "w-5 h-5 shrink-0" }; // shrink-0 важен
-    switch (slug) {
-      case 'films': return <Film {...props} />;
-      case 'music': return <Music {...props} />;
-      case 'brands': return <Tag {...props} />;
-      case 'people': return <User {...props} />;
-      case 'geography': return <Globe {...props} />;
-      case 'popculture': return <Gamepad2 {...props} />;
-      case 'childhood': return <Baby {...props} />;
-      case 'russian': return <Ghost {...props} />;
-      default: return <HelpCircle {...props} />;
-    }
+  const getCategoryIcon = (cat: Category) => {
+    const props = { className: "w-5 h-5 shrink-0" };
+    const id = cat.emoji || cat.slug;
+    
+    const icons: Record<string, any> = {
+      films: Film, music: Music, brands: Tag, people: User, geography: Globe,
+      games: Gamepad2, science: Atom, history: Landmark, tech: Cpu, food: Utensils,
+      popculture: Tv, childhood: Baby, russian: Ghost, other: HelpCircle,
+      brain: Brain, zap: Zap, star: Star, alert: AlertTriangle,
+      camera: Camera, video: Video, audio: Mic
+    };
+
+    const Icon = icons[id] || icons[id.toLowerCase()] || HelpCircle;
+    return <Icon {...props} />;
   };
 
   const filteredEffects = useMemo(() => {
@@ -207,10 +208,9 @@ export default function CatalogClient({ initialEffects, categories }: CatalogCli
                 </div>
             </div>
 
-            {/* ЛЕНТА КАТЕГОРИЙ (Smart Pills) + Чекбокс "Скрыть исследованные" */}
+            {/* ЛЕНТА КАТЕГОРИЙ */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div className="flex flex-wrap items-center justify-center gap-2">
-                    {/* Кнопка ВСЕ (статичная) */}
                     <button
                         onClick={() => setSelectedCategory('all')}
                         className={`flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-bold transition-all border whitespace-nowrap
@@ -223,12 +223,23 @@ export default function CatalogClient({ initialEffects, categories }: CatalogCli
                         Все сектора
                     </button>
 
-                    {/* Динамические кнопки категорий */}
                     {Array.isArray(categories) && categories.map(cat => {
-                        const colorKey = CAT_COLORS[cat.slug] || 'gray';
+                        const colorKey = cat.color || CAT_COLORS[cat.slug] || 'gray';
                         const isActive = selectedCategory === cat.slug;
-                        const activeClass = COLOR_CLASSES[colorKey];
-                        const displayName = CATEGORY_MAP[cat.slug]?.name || cat.name;
+                        const activeClass = COLOR_CLASSES[colorKey] || COLOR_CLASSES.gray;
+                        
+                        // Классы для ховера
+                        const hoverClass = {
+                          blue: 'hover:bg-blue-500/10 hover:text-blue-400 hover:border-blue-500/30',
+                          orange: 'hover:bg-orange-500/10 hover:text-orange-400 hover:border-orange-500/30',
+                          purple: 'hover:bg-purple-500/10 hover:text-purple-400 hover:border-purple-500/30',
+                          pink: 'hover:bg-pink-500/10 hover:text-pink-400 hover:border-pink-500/30',
+                          yellow: 'hover:bg-yellow-500/10 hover:text-yellow-400 hover:border-yellow-500/30',
+                          cyan: 'hover:bg-cyan-500/10 hover:text-cyan-400 hover:border-cyan-500/30',
+                          green: 'hover:bg-green-500/10 hover:text-green-400 hover:border-green-500/30',
+                          red: 'hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30',
+                          gray: 'hover:bg-gray-500/10 hover:text-gray-400 hover:border-gray-500/30',
+                        }[colorKey] || 'hover:bg-white/5 hover:text-light';
 
                         return (
                             <motion.button
@@ -240,10 +251,10 @@ export default function CatalogClient({ initialEffects, categories }: CatalogCli
                                 className={`flex items-center justify-center px-3 py-2.5 rounded-full text-sm font-bold transition-all border whitespace-nowrap h-10
                                     ${isActive 
                                         ? activeClass
-                                        : 'bg-darkCard border-light/10 text-light/50 hover:border-light/30 hover:text-light'
+                                        : `bg-darkCard border-light/10 text-light/50 ${hoverClass}`
                                     }`}
                             >
-                                {getCategoryIcon(cat.slug)}
+                                {getCategoryIcon(cat)}
                                 <motion.span
                                     variants={{
                                         collapsed: { width: 0, opacity: 0, marginLeft: 0, display: 'none' },
@@ -252,14 +263,13 @@ export default function CatalogClient({ initialEffects, categories }: CatalogCli
                                     transition={{ duration: 0.2 }}
                                     className="overflow-hidden"
                                 >
-                                    {displayName}
+                                    {cat.name}
                                 </motion.span>
                             </motion.button>
                         );
                     })}
                 </div>
                 
-                {/* Чекбокс "Скрыть исследованные" - справа на десктопе, под кнопками на мобильных */}
                 <label className="flex items-center gap-2 cursor-pointer group bg-darkCard/95 backdrop-blur-sm border border-light/10 rounded-lg px-3 py-2 shadow-lg shrink-0 self-center md:self-auto">
                     <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all shrink-0 ${hideVoted ? 'bg-primary border-primary' : 'border-light/30 group-hover:border-light/60'}`}>
                         {hideVoted && <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}><div className="w-2 h-2 bg-black rounded-sm" /></motion.div>}

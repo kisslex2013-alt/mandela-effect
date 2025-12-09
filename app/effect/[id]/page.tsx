@@ -2,9 +2,9 @@ import { notFound } from 'next/navigation';
 import prisma from '@/lib/prisma';
 import EffectPageClient from '@/components/EffectPageClient';
 
-// ISR: Обновление раз в 1 секунду
+// ISR: Обновление раз в 60 секунд
 export const dynamic = 'force-dynamic';
-export const revalidate = 1;
+export const revalidate = 60;
 
 export default async function EffectPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

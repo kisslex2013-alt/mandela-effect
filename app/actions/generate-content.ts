@@ -2,6 +2,8 @@
 
 import OpenAI from 'openai';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { STYLE_PRESETS } from '@/lib/constants';
+import { searchResidue } from '@/lib/exa';
 
 // Интерфейс для результата генерации
 interface GeneratedEffectInfo {
@@ -28,9 +30,12 @@ interface GenerateResult {
   error?: string;
 }
 
-type GenerateImageResult = 
-  | { success: true; imageUrl: string; usedModel?: string }
-  | { success: false; error: string };
+interface GenerateImageResult {
+  success: boolean;
+  imageUrl?: string;
+  usedModel?: string;
+  error?: string;
+}
 
 function cleanJsonResponse(rawText: string): string {
   let text = rawText.trim();
@@ -48,21 +53,14 @@ function cleanJsonResponse(rawText: string): string {
   return text;
 }
 
-// Нормализация данных (массивы -> строки)
 function normalizeToString(val: any): string {
-  if (Array.isArray(val)) {
-    return val.join('\n\n');
-  }
-  if (val === null || val === undefined) {
-    return '';
-  }
+  if (Array.isArray(val)) return val.join('\n\n');
+  if (val === null || val === undefined) return '';
   return String(val);
 }
 
-// Генерация ссылок (ПРИНУДИТЕЛЬНАЯ)
 function ensureUrl(url: string | undefined, title: string, suffix: string): string {
   if (url && url.startsWith('http') && url.length > 10) return url;
-  // Если ссылки нет или она битая - генерируем Google Search
   return `https://www.google.com/search?q=${encodeURIComponent(title + ' ' + suffix)}`;
 }
 
@@ -78,10 +76,7 @@ async function generateWithDeepSeek(systemPrompt: string, userPrompt: string): P
 
     const completion = await openai.chat.completions.create({
       model: 'deepseek/deepseek-chat',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
+      messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
       temperature: 0.7,
       max_tokens: 3000,
     });
@@ -115,11 +110,30 @@ export async function generateEffectData(
   question: string,
   variantA: string,
   variantB: string,
-  options?: { generateImage?: boolean }
+  options?: { generateImage?: boolean; style?: string }
 ): Promise<GenerateResult> {
   const shouldGenerateImage = options?.generateImage !== false;
+  const style = options?.style || 'cinematic';
   
   console.log(`[generateEffectData] Generating for: ${title}`);
+
+  // 1. Ищем реальные доказательства (RAG)
+  let residueContext = "";
+  let foundResidueLink = "";
+  
+  try {
+    const searchResults = await searchResidue(title);
+    if (searchResults.length > 0) {
+      residueContext = `
+      REAL FOUND EVIDENCE (Use this to write the 'residue' section):
+      ${searchResults.map(r => `- [${r.publishedDate || 'Unknown Date'}] ${r.title}: ${r.text}`).join('\n')}
+      `;
+      foundResidueLink = searchResults[0].url;
+      console.log(`[generateEffectData] Found ${searchResults.length} residue links`);
+    }
+  } catch (e) {
+    console.warn('[generateEffectData] Exa search failed, proceeding without RAG');
+  }
 
   const systemPrompt = `
 ТЫ — ЭКСПЕРТ ПО ЭФФЕКТУ МАНДЕЛЫ.
@@ -129,13 +143,19 @@ export async function generateEffectData(
 2. Написать тексты для карточки.
 3. Сгенерировать VISUAL PROFILER (imagePrompt).
 
+${residueContext ? 'ВАЖНО: Используй предоставленные "REAL FOUND EVIDENCE" для написания раздела "residue". Это реальные факты.' : ''}
+
 ПРАВИЛА ДЛЯ ТЕКСТА (Русский):
-- residue: Приводи конкретные примеры (фильмы, эпизоды).
+- residue: Приводи конкретные примеры.
+- scientific: Объясни работу памяти.
+
+ПРАВИЛА ДЛЯ ССЫЛОК:
+- Если у тебя есть реальная ссылка из контекста, используй её.
+- Иначе генерируй Google Search.
 
 ПРАВИЛА ДЛЯ VISUAL PROFILER (English):
 - Описывай ЛОЖНОЕ ВОСПОМИНАНИЕ (Вариант А).
 - НЕ используй имена. Описывай внешность.
-- Стиль: "documentary photography, 1990s footage style, slightly grainy, realistic lighting".
 
 ВЕРНИ ТОЛЬКО JSON:
 {
@@ -149,38 +169,26 @@ export async function generateEffectData(
   "scientificSource": "...",
   "communitySource": "...",
   "historySource": "...",
-  "residueSource": "...",
+  "residueSource": "${foundResidueLink || '...'}", 
   "imagePrompt": "..."
 }`;
 
-  const userPrompt = `
-ОБЪЕКТ: "${title}"
-ВОПРОС: "${question}"
-ВАРИАНТ А (МИФ): "${variantA}"
-ВАРИАНТ Б (ФАКТ): "${variantB}"
-`;
+  const userPrompt = `ОБЪЕКТ: "${title}"\nВОПРОС: "${question}"\nВАРИАНТ А: "${variantA}"\nВАРИАНТ Б: "${variantB}"`;
 
-  let rawText: string | null = null;
-  let usedModel = '';
-
-  rawText = await generateWithDeepSeek(systemPrompt, userPrompt);
-  if (rawText) usedModel = 'deepseek/v3';
+  let rawText = await generateWithDeepSeek(systemPrompt, userPrompt);
+  let usedModel = 'deepseek/v3';
 
   if (!rawText) {
-    console.warn('[generateEffectData] DeepSeek failed, trying Google...');
     rawText = await generateWithGoogle(systemPrompt, userPrompt);
-    if (rawText) usedModel = 'google/gemini-1.5';
+    usedModel = 'google/gemini-1.5';
   }
 
-  if (!rawText) {
-    return { success: false, error: 'Все AI модели недоступны.' };
-  }
+  if (!rawText) return { success: false, error: 'Все AI модели недоступны.' };
 
   try {
     const cleanedText = cleanJsonResponse(rawText);
     const parsed: any = JSON.parse(cleanedText);
 
-    // Нормализация полей и ПРИНУДИТЕЛЬНАЯ генерация ссылок
     const normalizedData: GeneratedEffectInfo = {
       currentState: normalizeToString(parsed.currentState),
       scientific: normalizeToString(parsed.scientific),
@@ -188,20 +196,21 @@ export async function generateEffectData(
       history: normalizeToString(parsed.history),
       residue: normalizeToString(parsed.residue),
       
-      // Генерируем ссылки, если их нет
       sourceLink: ensureUrl(parsed.sourceLink, title, 'Mandela Effect'),
       scientificSource: ensureUrl(parsed.scientificSource, title, 'scientific explanation'),
       communitySource: ensureUrl(parsed.communitySource, title, 'reddit theory'),
       historySource: ensureUrl(parsed.historySource, title, 'history'),
-      residueSource: ensureUrl(parsed.residueSource, title, 'residue proof'),
+      // Если Exa нашла ссылку, используем её, иначе то, что дал AI, иначе Google
+      residueSource: foundResidueLink || ensureUrl(parsed.residueSource, title, 'residue proof'),
       
       category: parsed.category || 'other',
       imagePrompt: parsed.imagePrompt,
     };
 
-    // Генерация картинки
     if (shouldGenerateImage && normalizedData.imagePrompt) {
-      const promptEncoded = encodeURIComponent(normalizedData.imagePrompt);
+      const styleModifiers = STYLE_PRESETS[style] || STYLE_PRESETS.cinematic;
+      const fullPrompt = `${normalizedData.imagePrompt}, ${styleModifiers}`;
+      const promptEncoded = encodeURIComponent(fullPrompt);
       const timestamp = Date.now();
       normalizedData.imageUrl = `https://image.pollinations.ai/prompt/${promptEncoded}?model=flux&width=1280&height=720&nologo=true&seed=${timestamp}`;
     }
@@ -213,29 +222,22 @@ export async function generateEffectData(
   }
 }
 
-export async function generateEffectImage(title: string, imagePrompt?: string): Promise<GenerateImageResult> {
+export async function generateEffectImage(title: string, imagePrompt?: string, style: string = 'cinematic'): Promise<GenerateImageResult> {
   let finalPrompt = imagePrompt;
 
   if (!finalPrompt) {
-    const systemPrompt = `You are a Visual Profiler. Create a detailed image prompt for Flux AI based on the title. 
-    Describe the FALSE MEMORY version of the Mandela Effect.
-    Do not use proper names if possible, describe physical appearance.
-    Style: documentary photography, 1990s footage style, slightly grainy, realistic lighting.`;
-    
-    const generatedPrompt = await generateWithDeepSeek(systemPrompt, `Title: ${title}`);
-    finalPrompt = generatedPrompt || `${title} mandela effect, cinematic, high detail`;
+    const systemPrompt = `Create a visual description for Flux AI based on title: "${title}". Describe the FALSE MEMORY version. No names.`;
+    finalPrompt = await generateWithDeepSeek(systemPrompt, title) || `${title} mandela effect`;
   }
 
-  const promptEncoded = encodeURIComponent(finalPrompt);
+  const styleModifiers = STYLE_PRESETS[style] || STYLE_PRESETS.cinematic;
+  const fullPrompt = `${finalPrompt}, ${styleModifiers}`;
+  const promptEncoded = encodeURIComponent(fullPrompt);
   const timestamp = Date.now();
   const imageUrl = `https://image.pollinations.ai/prompt/${promptEncoded}?model=flux&width=1280&height=720&nologo=true&seed=${timestamp}`;
 
   return { success: true, imageUrl, usedModel: 'flux' };
 }
 
-export async function restyleImage(title: string, url: string): Promise<GenerateImageResult> { 
-  return { success: false, error: 'Not implemented in Phase 3 yet' }; 
-}
-export async function fitImageToFormat(title: string, url: string): Promise<GenerateImageResult> { 
-  return { success: false, error: 'Not implemented in Phase 3 yet' }; 
-}
+export async function restyleImage(title: string, url: string) { return { success: false, error: 'Not implemented in Phase 3 yet' }; }
+export async function fitImageToFormat(title: string, url: string) { return { success: false, error: 'Not implemented in Phase 3 yet' }; }
