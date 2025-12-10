@@ -2,304 +2,97 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Плавный скролл */
-html {
-  scroll-behavior: smooth;
+/* --- CSS VARIABLES --- */
+:root {
+  --vote-a-bg: #3b82f6;
+  --vote-b-bg: #f59e0b;
 }
 
-/* Fade-in анимация для секций */
-.fade-in-section {
-  opacity: 0;
-  transform: translateY(20px);
-  transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+.mode-upside-down {
+  /* ИЗНАНКА: Инверсия цветов относительно реальности */
+  /* В Реальности A=Синий, B=Оранжевый. */
+  /* В Изнанке делаем наоборот или используем агрессивные цвета */
+  
+  --vote-a-bg: #dc2626; /* A теперь КРАСНЫЙ (red-600) */
+  --vote-a-text: #fecaca; /* red-200 */
+  
+  --vote-b-bg: #06b6d4; /* B теперь ЦИАН/СИНИЙ (cyan-500) */
+  --vote-b-text: #cffafe; /* cyan-100 */
+  
+  --card-border-hover: rgba(220, 38, 38, 0.6);
 }
 
-.fade-in-section.is-visible {
-  opacity: 1;
-  transform: translateY(0);
+/* Принудительный черный фон в Изнанке */
+.mode-upside-down body {
+  background-color: #020202 !important;
+  color: #e0e0e0;
 }
 
-/* Reduced motion для пользователей с ограниченными возможностями */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
+/* --- FORCED COLOR OVERRIDES FOR UPSIDE DOWN MODE --- */
+/* Это заставит кнопки внутри StrangerVote поменять цвет */
+.mode-upside-down .bg-blue-500 { background-color: #06b6d4 !important; } /* A -> Cyan */
+.mode-upside-down .text-blue-400 { color: #22d3ee !important; }
+.mode-upside-down .border-blue-500 { border-color: #06b6d4 !important; }
+.mode-upside-down .bg-blue-500\/10 { background-color: rgba(6, 182, 212, 0.1) !important; }
+
+.mode-upside-down .bg-amber-500 { background-color: #dc2626 !important; } /* B -> Red */
+.mode-upside-down .text-amber-400 { color: #f87171 !important; }
+.mode-upside-down .border-amber-500 { border-color: #dc2626 !important; }
+.mode-upside-down .bg-amber-500\/10 { background-color: rgba(220, 38, 38, 0.1) !important; }
+
+/* Переопределения для StrangerVote (использует red/cyan) */
+.mode-upside-down .bg-red-600 { background-color: #06b6d4 !important; } /* A: Red -> Cyan */
+.mode-upside-down .bg-red-500 { background-color: #06b6d4 !important; }
+.mode-upside-down .text-red-500 { color: #22d3ee !important; }
+.mode-upside-down .border-red-500 { border-color: #06b6d4 !important; }
+.mode-upside-down .bg-red-950\/40 { background-color: rgba(6, 182, 212, 0.4) !important; }
+.mode-upside-down .hover\:bg-red-950\/20:hover { background-color: rgba(6, 182, 212, 0.2) !important; }
+.mode-upside-down .hover\:border-red-500\/60:hover { border-color: rgba(6, 182, 212, 0.6) !important; }
+/* Переопределения градиентов для StrangerVote (более специфичный селектор) */
+.mode-upside-down .bg-gradient-to-r.from-red-900 {
+  --tw-gradient-from: rgba(6, 182, 212, 0.9) !important;
+  --tw-gradient-to: rgba(6, 182, 212, 0.9) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+}
+.mode-upside-down .bg-gradient-to-r.to-red-600 {
+  --tw-gradient-to: rgba(6, 182, 212, 0.9) !important;
 }
 
-/* Скрыть скроллбар в карусели */
-.scrollbar-hide::-webkit-scrollbar {
-  display: none;
+.mode-upside-down .bg-cyan-600 { background-color: #dc2626 !important; } /* B: Cyan -> Red */
+.mode-upside-down .bg-cyan-500 { background-color: #dc2626 !important; }
+.mode-upside-down .text-cyan-500 { color: #f87171 !important; }
+.mode-upside-down .text-cyan-300 { color: #fecaca !important; }
+.mode-upside-down .border-cyan-500 { border-color: #dc2626 !important; }
+.mode-upside-down .bg-cyan-950\/40 { background-color: rgba(220, 38, 38, 0.4) !important; }
+.mode-upside-down .hover\:bg-cyan-950\/20:hover { background-color: rgba(220, 38, 38, 0.2) !important; }
+.mode-upside-down .hover\:border-cyan-500\/60:hover { border-color: rgba(220, 38, 38, 0.6) !important; }
+.mode-upside-down .bg-gradient-to-r.from-cyan-900 {
+  --tw-gradient-from: rgba(220, 38, 38, 0.9) !important;
+  --tw-gradient-to: rgba(220, 38, 38, 0.9) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+}
+.mode-upside-down .bg-gradient-to-r.to-cyan-600 {
+  --tw-gradient-to: rgba(220, 38, 38, 0.9) !important;
 }
 
-.scrollbar-hide {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+/* Инверсия скроллбара */
+.mode-upside-down ::-webkit-scrollbar-thumb {
+  background: #dc2626;
+  border-radius: 0;
 }
 
-/* Плавная прокрутка для карусели */
-.snap-x {
-  scroll-snap-type: x mandatory;
+/* Красные акценты */
+.mode-upside-down .text-primary { color: #ef4444 !important; text-shadow: 0 0 10px rgba(239, 68, 68, 0.8); }
+.mode-upside-down .bg-primary { background-color: #dc2626 !important; box-shadow: 0 0 15px rgba(220, 38, 38, 0.4); }
+.mode-upside-down .border-primary\/30 { border-color: rgba(220, 38, 38, 0.6) !important; }
+
+/* Подсветка карточек (Красная в Изнанке) */
+.mode-upside-down .group:hover {
+  border-color: rgba(220, 38, 38, 0.6) !important;
+  box-shadow: 0 0 30px rgba(220, 38, 38, 0.15) !important;
 }
 
-.snap-center {
-  scroll-snap-align: center;
-}
-
-/* Screen reader only класс */
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border-width: 0;
-}
-
-.sr-only:focus {
-  position: static;
-  width: auto;
-  height: auto;
-  padding: inherit;
-  margin: inherit;
-  overflow: visible;
-  clip: auto;
-  white-space: normal;
-}
-
-/* Focus states для keyboard navigation */
-*:focus-visible {
-  outline: 2px solid #3b82f6;
-  outline-offset: 2px;
-  border-radius: 0.25rem;
-}
-
-/* Улучшенные touch targets (минимум 44x44px) */
-button,
-a[role="button"],
-input[type="button"],
-input[type="submit"] {
-  min-height: 44px;
-  min-width: 44px;
-}
-
-/* Улучшенная видимость для интерактивных элементов */
-@media (hover: hover) {
-  button:hover,
-  a:hover {
-    opacity: 0.9;
-  }
-}
-
-/* Улучшенный контраст для текста */
-.text-light\/60 {
-  color: rgba(224, 224, 224, 0.7);
-}
-
-.text-light\/80 {
-  color: rgba(224, 224, 224, 0.85);
-}
-
-/* Анимация fadeIn для интерпретаций */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-fadeIn {
-  animation: fadeIn 0.3s ease-out;
-}
-
-/* Анимация появления баров (GPU-accelerated) */
-@keyframes barSlideIn {
-  from {
-    opacity: 0;
-    transform: scaleX(0);
-    transform-origin: left center;
-  }
-  to {
-    opacity: 1;
-    transform: scaleX(1);
-  }
-}
-
-.bar-animate {
-  animation: barSlideIn 0.5s ease-out forwards;
-  will-change: transform, opacity;
-}
-
-/* Staggered delay для баров */
-.bar-animate-delay-0 { animation-delay: 0.4s; }
-.bar-animate-delay-1 { animation-delay: 0.5s; }
-.bar-animate-delay-2 { animation-delay: 0.6s; }
-.bar-animate-delay-3 { animation-delay: 0.7s; }
-.bar-animate-delay-4 { animation-delay: 0.8s; }
-.bar-animate-delay-5 { animation-delay: 0.9s; }
-.bar-animate-delay-6 { animation-delay: 1.0s; }
-
-/* Tech Scrollbar */
-::-webkit-scrollbar {
-  width: 6px; /* Тонкий */
-}
-
-::-webkit-scrollbar-track {
-  background: #050505; /* Почти черный */
-}
-
-::-webkit-scrollbar-thumb {
-  background: #333; /* Темный в покое */
-  border-radius: 0px; /* Квадратные края (техно-стиль) */
-  border: 1px solid transparent;
-  background-clip: content-box;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #3b82f6; /* Синий неон при наведении */
-  box-shadow: 0 0 10px rgba(59, 130, 246, 0.5); /* Свечение */
-}
-
-/* Плавные transitions для всех интерактивных элементов */
-button,
-a,
-input,
-select,
-textarea {
-  transition: all 0.2s ease-out;
-}
-
-/* Glitch Animations */
-@keyframes glitch-1 {
-  0% { clip-path: inset(20% 0 80% 0); transform: translate(-4px, 2px); }
-  20% { clip-path: inset(60% 0 10% 0); transform: translate(4px, -2px); }
-  40% { clip-path: inset(40% 0 50% 0); transform: translate(-4px, 4px); }
-  60% { clip-path: inset(80% 0 5% 0); transform: translate(4px, -4px); }
-  80% { clip-path: inset(10% 0 70% 0); transform: translate(-2px, 2px); }
-  100% { clip-path: inset(30% 0 50% 0); transform: translate(2px, -2px); }
-}
-
-@keyframes glitch-2 {
-  0% { clip-path: inset(10% 0 60% 0); transform: translate(4px, -2px); }
-  20% { clip-path: inset(30% 0 20% 0); transform: translate(-4px, 2px); }
-  40% { clip-path: inset(70% 0 10% 0); transform: translate(4px, -4px); }
-  60% { clip-path: inset(20% 0 50% 0); transform: translate(-4px, 4px); }
-  80% { clip-path: inset(50% 0 30% 0); transform: translate(2px, -2px); }
-  100% { clip-path: inset(0% 0 80% 0); transform: translate(-2px, 2px); }
-}
-
-.animate-glitch-1 {
-  animation: glitch-1 0.4s infinite linear alternate-reverse;
-}
-
-.animate-glitch-2 {
-  animation: glitch-2 0.4s infinite linear alternate-reverse;
-}
-
-.glitch-hover {
-  position: relative;
-}
-
-.glitch-hover::before,
-.glitch-hover::after {
-  content: attr(data-text);
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  background: #0f0f0f; /* Цвет фона карточки, чтобы перекрывать */
-  pointer-events: none;
-}
-
-.group:hover .glitch-hover::before {
-  opacity: 0.5;
-  color: #ff00ff;
-  z-index: -1;
-  animation: glitch-anim-1 0.4s infinite linear alternate-reverse;
-}
-
-.group:hover .glitch-hover::after {
-  opacity: 0.5;
-  color: #00ffff;
-  z-index: -2;
-  animation: glitch-anim-2 0.4s infinite linear alternate-reverse;
-}
-
-/* Кнопка "Reality Shake" */
-@keyframes reality-shake {
-  0% { transform: translate(0, 0); box-shadow: 2px 2px 0px rgba(59, 130, 246, 0.8); } /* Blue */
-  25% { transform: translate(-1px, 1px); box-shadow: -2px 2px 0px rgba(249, 115, 22, 0.8); } /* Orange */
-  50% { transform: translate(1px, -1px); box-shadow: 2px -2px 0px rgba(59, 130, 246, 0.8); }
-  75% { transform: translate(-1px, -1px); box-shadow: -2px -2px 0px rgba(249, 115, 22, 0.8); }
-  100% { transform: translate(0, 0); box-shadow: 2px 2px 0px rgba(59, 130, 246, 0.8); }
-}
-
-.btn-glitch {
-  position: relative;
-  transition: all 0.2s ease;
-}
-
-.btn-glitch:hover {
-  animation: reality-shake 0.2s infinite linear;
-  border-color: transparent; /* Скрываем рамку, чтобы тень работала лучше */
-  z-index: 10;
-}
-
-/* --- COMPLEX GLITCH EFFECT --- */
-
-.glitch-wrapper {
-  position: relative;
-  overflow: hidden;
-}
-
-/* Слои глитча скрыты по умолчанию */
-.glitch-layer {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  z-index: 2;
-  opacity: 0;
-  pointer-events: none;
-}
-
-/* При наведении на карточку (.group) активируем слои */
-.group:hover .glitch-layers .glitch-layer:nth-child(1) {
-  opacity: 1;
-  transform: translateX(-5%);
-  animation: glitch-anim-1 2s infinite linear alternate;
-}
-
-.group:hover .glitch-layers .glitch-layer:nth-child(2) {
-  opacity: 1;
-  transform: translateX(3%) translateY(3%);
-  animation: glitch-anim-2 2.3s -0.8s infinite linear alternate;
-}
-
-.group:hover .glitch-layers .glitch-layer:nth-child(3) {
-  opacity: 1;
-  transform: translateX(5%);
-  animation: glitch-anim-flash 1s infinite linear;
-}
-
-/* Анимации clip-path */
+/* --- GLITCH ANIMATIONS (RESTORED) --- */
 @keyframes glitch-anim-1 {
   0% { clip-path: polygon(0 0%, 100% 0%, 100% 5%, 0 5%); }
   10% { clip-path: polygon(0 15%, 100% 15%, 100% 15%, 0 15%); }
@@ -328,140 +121,102 @@ textarea {
   100% { clip-path: polygon(0 11%, 100% 11%, 100% 15%, 0 15%); }
 }
 
-@keyframes glitch-anim-flash {
-  0% { opacity: 0.2; }
-  30%, 100% { opacity: 0; }
-}
+.animate-glitch-1 { animation: glitch-anim-1 2.5s infinite linear alternate-reverse; }
+.animate-glitch-2 { animation: glitch-anim-2 3s infinite linear alternate-reverse; }
 
-/* Вечный глитч-эффект после голосования */
-.force-active .glitch-layers .glitch-layer:nth-child(1),
-.force-active.group .glitch-layers .glitch-layer:nth-child(1),
-.group.force-active .glitch-layers .glitch-layer:nth-child(1) {
-  opacity: 0.3 !important;
-  transform: translateX(-5%) !important;
-  animation: glitch-anim-1 4s infinite linear alternate !important;
-}
-
-.force-active .glitch-layers .glitch-layer:nth-child(2),
-.force-active.group .glitch-layers .glitch-layer:nth-child(2),
-.group.force-active .glitch-layers .glitch-layer:nth-child(2) {
-  opacity: 0.3 !important;
-  transform: translateX(3%) translateY(3%) !important;
-  animation: glitch-anim-2 5s -0.8s infinite linear alternate !important;
-}
-
-.force-active .glitch-layers .glitch-layer:nth-child(3),
-.force-active.group .glitch-layers .glitch-layer:nth-child(3),
-.group.force-active .glitch-layers .glitch-layer:nth-child(3) {
-  opacity: 0.2 !important;
-  transform: translateX(5%) !important;
-  animation: glitch-anim-flash 1.5s infinite linear !important;
-}
-
-/* Отключаем hover эффект для force-active элементов */
-.force-active.group:hover .glitch-layers .glitch-layer:nth-child(1),
-.group.force-active:hover .glitch-layers .glitch-layer:nth-child(1) {
-  opacity: 0.3 !important;
-  animation: glitch-anim-1 4s infinite linear alternate !important;
-}
-
-.force-active.group:hover .glitch-layers .glitch-layer:nth-child(2),
-.group.force-active:hover .glitch-layers .glitch-layer:nth-child(2) {
-  opacity: 0.3 !important;
-  animation: glitch-anim-2 5s -0.8s infinite linear alternate !important;
-}
-
-.force-active.group:hover .glitch-layers .glitch-layer:nth-child(3),
-.group.force-active:hover .glitch-layers .glitch-layer:nth-child(3) {
-  opacity: 0.2 !important;
-  animation: glitch-anim-flash 1.5s infinite linear !important;
-}
-
-/* Glitch Text Effect */
-.glitch-text {
-  position: relative;
-}
-
-.glitch-text::before,
-.glitch-text::after {
-  content: attr(data-text);
+/* Слои глитча */
+.glitch-layer {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background-size: cover; background-position: center;
+  opacity: 0.6; mix-blend-mode: hard-light;
 }
 
-.glitch-text::before {
-  left: 2px;
-  text-shadow: -1px 0 #ff00c1;
-  clip: rect(44px, 450px, 56px, 0);
-  animation: glitch-anim 5s infinite linear alternate-reverse;
+.glitch-layers .glitch-layer:nth-child(1) {
+  transform: translateX(-5%);
+  animation: glitch-anim-1 2s infinite linear alternate-reverse;
+  filter: hue-rotate(90deg);
+}
+.glitch-layers .glitch-layer:nth-child(2) {
+  transform: translateX(3%) translateY(3%);
+  animation: glitch-anim-2 2.3s infinite linear alternate-reverse;
+  filter: hue-rotate(-90deg);
+}
+.glitch-layers .glitch-layer:nth-child(3) {
+  transform: translateX(5%);
+  animation: glitch-anim-1 1s infinite linear alternate-reverse;
+  filter: invert(1);
 }
 
-.glitch-text::after {
-  left: -2px;
-  text-shadow: -1px 0 #00fff9;
-  clip: rect(44px, 450px, 56px, 0);
-  animation: glitch-anim2 5s infinite linear alternate-reverse;
+/* Зеркальный глитч для Изнанки */
+.glitch-mirror .glitch-layer {
+  transform: scale(-1, 1) !important; /* Отражение по горизонтали */
+  filter: hue-rotate(180deg) !important; /* Инверсия цветов */
 }
 
-@keyframes glitch-anim {
-  0% { clip: rect(21px, 9999px, 86px, 0); }
-  20% { clip: rect(69px, 9999px, 12px, 0); }
-  40% { clip: rect(1px, 9999px, 66px, 0); }
-  60% { clip: rect(55px, 9999px, 11px, 0); }
-  80% { clip: rect(31px, 9999px, 92px, 0); }
-  100% { clip: rect(81px, 9999px, 34px, 0); }
+/* Чистый глитч для Реальности (без отражения и RGB сдвига) */
+.glitch-reality .glitch-layer {
+  transform: none !important; /* Без отражения */
+  filter: none !important; /* Без RGB сдвига */
 }
 
-@keyframes glitch-anim2 {
-  0% { clip: rect(11px, 9999px, 56px, 0); }
-  20% { clip: rect(9px, 9999px, 2px, 0); }
-  40% { clip: rect(91px, 9999px, 16px, 0); }
-  60% { clip: rect(55px, 9999px, 11px, 0); }
-  80% { clip: rect(21px, 9999px, 92px, 0); }
-  100% { clip: rect(31px, 9999px, 14px, 0); }
+/* --- SPORES (FASTER & CHAOTIC) --- */
+.spores-container {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  width: 100vw;
+  height: 100vh;
 }
 
-/* Shimmer animation for skeleton loaders */
-@keyframes shimmer {
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(100%);
-  }
+.spore {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  /* Ускоряем и добавляем ease-in-out для естественности */
+  animation: spore-float 12s ease-in-out infinite alternate;
 }
 
-/* Slow spin animation for decorative elements */
-@keyframes spin-slow {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+/* Разные размеры и траектории */
+.spore:nth-child(1) { width: 3px; height: 3px; left: 10%; top: 20%; animation-duration: 15s; box-shadow: 0 0 4px rgba(255,255,255,0.8); }
+.spore:nth-child(2) { width: 4px; height: 4px; left: 80%; top: 10%; animation-duration: 18s; animation-delay: -5s; opacity: 0.7; }
+.spore:nth-child(3) { width: 2px; height: 2px; left: 40%; top: 60%; animation-duration: 10s; animation-delay: -2s; }
+.spore:nth-child(4) { width: 3px; height: 3px; left: 70%; top: 80%; animation-duration: 20s; animation-delay: -10s; opacity: 0.5; }
+.spore:nth-child(5) { width: 5px; height: 5px; left: 20%; top: 50%; animation-duration: 25s; filter: blur(1px); opacity: 0.4; }
+.spore:nth-child(6) { width: 2px; height: 2px; left: 90%; top: 30%; animation-duration: 12s; }
+.spore:nth-child(7) { width: 4px; height: 4px; left: 50%; top: 90%; animation-duration: 16s; animation-delay: -8s; }
+
+@keyframes spore-float {
+  0% { transform: translate(0, 0) rotate(0deg); }
+  25% { transform: translate(20px, -30px) rotate(90deg); }
+  50% { transform: translate(-10px, -60px) rotate(180deg); }
+  75% { transform: translate(30px, -30px) rotate(270deg); }
+  100% { transform: translate(0, 0) rotate(360deg); }
 }
 
-.animate-spin-slow {
-  animation: spin-slow 8s linear infinite;
+/* Частицы для LockedContent (Ярче и активнее) */
+.spore-locked {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 50%;
+  width: 3px;
+  height: 3px;
+  animation: spore-float-locked 8s ease-in-out infinite;
+  pointer-events: none;
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.9); /* Сильное свечение */
 }
 
-/* Анимация мигания красным для плашки "Скрыт" */
-@keyframes red-blink {
-  0%, 100% {
-    background-color: rgba(239, 68, 68, 0.2);
-    border-color: rgba(239, 68, 68, 0.4);
-    box-shadow: 0 0 8px rgba(239, 68, 68, 0.2);
-  }
-  50% {
-    background-color: rgba(239, 68, 68, 0.5);
-    border-color: rgba(239, 68, 68, 0.8);
-    box-shadow: 0 0 16px rgba(239, 68, 68, 0.6);
-  }
+@keyframes spore-float-locked {
+  0% { transform: translateY(0) translateX(0); opacity: 0; }
+  10% { opacity: 1; }
+  50% { transform: translateY(-30px) translateX(20px); opacity: 0.8; }
+  100% { transform: translateY(-60px) translateX(-20px); opacity: 0; }
 }
 
-.animate-red-blink {
-  animation: red-blink 1.5s ease-in-out infinite;
-}
+/* Стандартные стили */
+html { scroll-behavior: smooth; }
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #050505; }
+::-webkit-scrollbar-thumb { background: #333; border-radius: 0px; }
+::-webkit-scrollbar-thumb:hover { background: #3b82f6; }

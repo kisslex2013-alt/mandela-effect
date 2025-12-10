@@ -8,9 +8,12 @@ import { ArrowRight, Sparkles, Flame, Activity, Zap, Users, CheckCircle, Clock, 
 import EffectCard from '@/components/EffectCard';
 import ImageWithSkeleton from '@/components/ui/ImageWithSkeleton';
 import StrangerVote from '@/components/ui/StrangerVote';
+import UserContribution from '@/components/home/UserContribution';
 import { votesStore } from '@/lib/votes-store';
 import { saveVote, getUserVote } from '@/app/actions/votes';
 import { generateSystemLog } from '@/lib/system-logs';
+import { useReality } from '@/lib/context/RealityContext';
+import { getClientVisitorId } from '@/lib/client-visitor';
 import toast from 'react-hot-toast';
 
 interface HomeClientProps {
@@ -29,12 +32,12 @@ export default function HomeClient({
   effectOfDay 
 }: HomeClientProps) {
   const router = useRouter();
+  const { incrementVotes, isUpsideDown } = useReality(); // Получаем режим
   const [mounted, setMounted] = useState(false);
   
   const [dayVote, setDayVote] = useState<'A' | 'B' | null>(null);
   const [dayVotes, setDayVotes] = useState({ for: 0, against: 0 });
   const [isDayVoting, setIsDayVoting] = useState(false);
-  const [userContribution, setUserContribution] = useState(0);
   const [timeLeft, setTimeLeft] = useState<string>('');
   
   const systemLog = effectOfDay ? generateSystemLog(effectOfDay.title) : '';
@@ -42,13 +45,12 @@ export default function HomeClient({
   useEffect(() => {
     setMounted(true);
     const localVotes = votesStore.get();
-    setUserContribution(Object.keys(localVotes).length);
     
     if (effectOfDay) {
       setDayVotes({ for: effectOfDay.votesFor, against: effectOfDay.votesAgainst });
       if (localVotes[effectOfDay.id]) setDayVote(localVotes[effectOfDay.id]);
 
-      const visitorId = localStorage.getItem('visitorId');
+      const visitorId = getClientVisitorId();
       if (visitorId) {
         getUserVote(visitorId, effectOfDay.id).then(result => {
           if (result && result.variant) {
@@ -82,15 +84,21 @@ export default function HomeClient({
   const handleDayVote = async (variant: 'A' | 'B') => {
     if (!effectOfDay || isDayVoting || dayVote) return;
 
+    // Проверяем, голосовал ли пользователь за этот эффект ДО установки нового голоса
+    const hasVoted = !!votesStore.get()[effectOfDay.id];
+
     setIsDayVoting(true);
     setDayVote(variant);
     setDayVotes(prev => ({ for: variant === 'A' ? prev.for + 1 : prev.for, against: variant === 'B' ? prev.against + 1 : prev.against }));
     votesStore.set(effectOfDay.id, variant);
-    setUserContribution(prev => prev + 1);
+
+    // Если пользователь еще не голосовал за этот эффект, обновляем счетчик
+    if (!hasVoted) {
+      incrementVotes();
+    }
 
     try {
-      let visitorId = localStorage.getItem('visitorId');
-      if (!visitorId) { visitorId = crypto.randomUUID(); localStorage.setItem('visitorId', visitorId); }
+      const visitorId = getClientVisitorId();
       const result = await saveVote({ visitorId, effectId: effectOfDay.id, variant });
       if (!result.success) {
         if (result.vote) { setDayVote(result.vote.variant as 'A' | 'B'); toast.success('Вы уже голосовали'); }
@@ -149,10 +157,8 @@ export default function HomeClient({
                   <div className="flex items-center gap-2 mb-1 text-yellow-400"><Activity className="w-4 h-4" /><span className="text-xl font-mono font-bold text-white">{globalStats.totalVotes}</span></div>
                   <span className="text-[10px] text-light/40 uppercase font-bold tracking-wider">Голосов</span>
                 </div>
-                <div className="p-4 flex flex-col items-center justify-center group hover:bg-white/5 transition-colors">
-                  <div className="flex items-center gap-2 mb-1 text-red-400"><CheckCircle className="w-4 h-4" /><span className="text-xl font-mono font-bold text-white">{userContribution}</span></div>
-                  <span className="text-[10px] text-red-400/60 uppercase font-bold tracking-wider">Твой вклад</span>
-                </div>
+                {/* 4-я карточка: Твой вклад */}
+                <UserContribution />
               </div>
             </motion.div>
           </div>
@@ -168,20 +174,32 @@ export default function HomeClient({
               <div className="relative w-full rounded-3xl overflow-hidden border border-white/10 shadow-2xl group min-h-[600px] md:aspect-video flex flex-col">
                 
                 {/* 1. BACKGROUND IMAGE LAYER */}
-                <div className="absolute inset-0 z-0">
+                <div className={`absolute inset-0 z-0 glitch-wrapper ${isUpsideDown ? 'glitch-mirror' : ''}`}>
                   <Link href={`/effect/${effectOfDay.id}`} className="block w-full h-full relative">
                     {effectOfDay.imageUrl ? (
                       <>
-                        <ImageWithSkeleton 
-                          src={effectOfDay.imageUrl} 
-                          alt={effectOfDay.title} 
-                          fill 
-                          priority={true} // <-- ВАЖНО: Приоритетная загрузка
-                          className="object-cover transition-transform duration-1000 group-hover:scale-105" 
-                        />
-                        {/* Glitch Layers */}
-                        <div className="absolute inset-0 bg-primary/20 mix-blend-overlay opacity-0 group-hover:opacity-100 transition-opacity duration-100 animate-pulse" />
-                        <div className="absolute inset-0 bg-red-500/10 mix-blend-color-dodge opacity-0 group-hover:opacity-30 transition-opacity duration-75" />
+                        {(() => {
+                          const safeImageUrl = effectOfDay.imageUrl.replace(/'/g, '%27');
+                          return (
+                            <>
+                              <ImageWithSkeleton 
+                                src={effectOfDay.imageUrl} 
+                                alt={effectOfDay.title} 
+                                fill 
+                                priority={true}
+                                className="object-cover transition-transform duration-1000 group-hover:scale-105 relative z-[1]" 
+                              />
+                              <div className="absolute inset-0 bg-gradient-to-t from-dark via-transparent to-transparent lg:bg-gradient-to-r lg:from-transparent lg:to-dark opacity-80 z-[1]"></div>
+                              
+                              {/* ГЛИТЧ СЛОИ (Добавлены) */}
+                              <div className={`glitch-layers absolute inset-0 z-[2] opacity-0 group-hover:opacity-100 transition-opacity ${isUpsideDown ? 'glitch-mirror' : ''}`}>
+                                <div className="glitch-layer" style={{ backgroundImage: `url('${safeImageUrl}')` }} />
+                                <div className="glitch-layer" style={{ backgroundImage: `url('${safeImageUrl}')` }} />
+                                <div className="glitch-layer" style={{ backgroundImage: `url('${safeImageUrl}')` }} />
+                              </div>
+                            </>
+                          );
+                        })()}
                       </>
                     ) : (
                       <div className="w-full h-full bg-black/50 flex items-center justify-center"><span className="text-6xl">👾</span></div>

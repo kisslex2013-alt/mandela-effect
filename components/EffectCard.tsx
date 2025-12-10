@@ -10,6 +10,8 @@ import ImageWithSkeleton from '@/components/ui/ImageWithSkeleton';
 import StrangerVote from '@/components/ui/StrangerVote';
 import { getCategoryInfo } from '@/lib/constants';
 import { votesStore } from '@/lib/votes-store';
+import { useReality } from '@/lib/context/RealityContext';
+import { getClientVisitorId } from '@/lib/client-visitor'; // ИМПОРТ
 import toast from 'react-hot-toast';
 
 // VK Icon Component
@@ -63,6 +65,9 @@ interface EffectCardProps {
 
 export default function EffectCard(props: EffectCardProps) {
   const router = useRouter();
+  // Получаем функцию из контекста
+  const { incrementVotes, isUpsideDown } = useReality(); // ПОЛУЧАЕМ isUpsideDown
+  
   const effectData = props.effect || {
     id: props.id!,
     title: props.title!,
@@ -131,14 +136,22 @@ export default function EffectCard(props: EffectCardProps) {
 
   const handleVote = async (variant: 'A' | 'B') => {
     if (isVoting || userVote) return;
+    
+    // Проверяем, голосовал ли пользователь за этот эффект ДО установки нового голоса
+    const hasVoted = !!votesStore.get()[effectData.id];
+    
     setIsVoting(true);
     setUserVote(variant);
     setVotes(prev => ({ for: variant === 'A' ? prev.for + 1 : prev.for, against: variant === 'B' ? prev.against + 1 : prev.against }));
     votesStore.set(effectData.id, variant);
 
+    // Если пользователь еще не голосовал за этот эффект, обновляем счетчик
+    if (!hasVoted) {
+      incrementVotes();
+    }
+
     try {
-      let visitorId = localStorage.getItem('visitorId');
-      if (!visitorId) { visitorId = crypto.randomUUID(); localStorage.setItem('visitorId', visitorId); }
+      const visitorId = getClientVisitorId(); // ИСПОЛЬЗУЕМ ЕДИНУЮ ФУНКЦИЮ
       const result = await saveVote({ visitorId, effectId: effectData.id, variant });
       if (!result.success) { 
         if (result.vote) {
@@ -161,6 +174,8 @@ export default function EffectCard(props: EffectCardProps) {
     } finally { setIsVoting(false); }
   };
 
+  const safeImageUrl = effectData.imageUrl ? effectData.imageUrl.replace(/'/g, '%27') : null;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -171,17 +186,21 @@ export default function EffectCard(props: EffectCardProps) {
       onMouseLeave={() => setIsHovered(false)}
     >
       {/* Контейнер картинки */}
-      <div className="block relative aspect-video overflow-hidden shrink-0 glitch-wrapper">
+      <div className={`block relative aspect-video overflow-hidden shrink-0 glitch-wrapper ${isUpsideDown ? 'glitch-mirror' : ''}`}>
         <Link href={`/effect/${effectData.id}`} className="absolute inset-0 z-0">
           {effectData.imageUrl ? (
             <>
               <ImageWithSkeleton src={effectData.imageUrl} alt={effectData.title} fill className={`object-cover transition-transform duration-700 ${isHovered ? 'scale-105' : 'scale-100'} relative z-[1]`} priority={props.priority} />
               <div className={`absolute inset-0 bg-gradient-to-t from-dark via-transparent to-transparent opacity-60 z-[1]`} />
-              <div className="glitch-layers absolute inset-0 z-[2] opacity-0 group-hover:opacity-100 transition-opacity">
-                <div className="glitch-layer" style={{ backgroundImage: `url('${effectData.imageUrl.replace(/'/g, '%27')}')` }} />
-                <div className="glitch-layer" style={{ backgroundImage: `url('${effectData.imageUrl.replace(/'/g, '%27')}')` }} />
-                <div className="glitch-layer" style={{ backgroundImage: `url('${effectData.imageUrl.replace(/'/g, '%27')}')` }} />
-              </div>
+              
+              {/* ГЛИТЧ СЛОИ: Рендерим всегда, стиль меняется через CSS класс родителя */}
+              {safeImageUrl && (
+                <div className="glitch-layers absolute inset-0 z-[2] opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="glitch-layer" style={{ backgroundImage: `url('${safeImageUrl}')` }} />
+                  <div className="glitch-layer" style={{ backgroundImage: `url('${safeImageUrl}')` }} />
+                  <div className="glitch-layer" style={{ backgroundImage: `url('${safeImageUrl}')` }} />
+                </div>
+              )}
             </>
           ) : <div className="w-full h-full bg-white/5 flex items-center justify-center"><span className="text-4xl">👾</span></div>}
         </Link>

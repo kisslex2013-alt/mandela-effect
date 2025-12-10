@@ -1,0 +1,633 @@
+Partial Prerendering (PPR) в Next.js 15 — включать или нет
+
+Кратко: PPR даёт «статическую оболочку + динамические дыры», что резко снижает TTFB и часто улучшает LCP. В Next.js 15 PPR доступен как опция/фичa — но требует аккуратности: тестируйте на staging, потому что поведение с dynamic-сегментами и Suspense всё ещё меняется в обсуждениях. Документация и гайды указывают на явную опцию включения. 
+nextjs.org
++1
+
+Пример next.config.ts (опт-ин для PPR + практичные настройки изображений и компиляции):
+
+// next.config.ts
+import { NextConfig } from 'next';
+
+const nextConfig: NextConfig = {
+  experimental: {
+    // Вариант: true | 'incremental' — проверяйте свою версию Next.js и CHANGELOG
+    ppr: true,
+  },
+  images: {
+    domains: ['static.mycdn.com', 'images.unsplash.com'],
+    formats: ['image/avif', 'image/webp'],
+    minimumCacheTTL: 60,
+  },
+  swcMinify: true,
+  reactStrictMode: true,
+};
+
+export default nextConfig;
+
+
+Когда использовать: если у вас крупный layout (header/footer/навигация) и набор небольших, обновляемых блоков (например, счётчики голосов) — включайте PPR для статической оболочки + динамических зон через Suspense. Для production — сначала прогоните нагрузочное тестирование. 
+Wyatt Johnson
++1
+
+Пример страницы (App Router) — статический shell + динамический компонент голосования в Suspense:
+
+// app/post/[id]/page.tsx  (server component)
+import { Suspense } from 'react';
+import VoteClient from './VoteClient'; // "use client"
+import VoteServer from './VoteServer'; // server component that fetches data
+
+export default function PostPage({ params }: { params: { id: string }}) {
+  return (
+    <main>
+      <header>{/* heavy but static header */}</header>
+      <article>{/* static content prerendered */}</article>
+
+      <Suspense fallback={<div style={{height: 48}}>Loading votes…</div>}>
+        {/* VoteServer renders server HTML when available, otherwise fallback */}
+        <VoteServer postId={params.id} />
+      </Suspense>
+
+      {/* client interactions use VoteClient (use client) hydrating only as needed */}
+      <VoteClient postId={params.id} />
+    </main>
+  );
+}
+
+
+Пояснение: PPR/streaming + Suspense позволят отдать shell и зарезервировать место для LCP, уменьшая perceived LCP. 
+wisp.blog
+
+Оптимизация Framer Motion — практические приёмы
+
+Принцип: анимируй только transform и opacity. Всё, что трогает layout/paint — дорого.
+
+LayoutGroup + layout:
+
+Объединяйте взаимосвязанные анимации в LayoutGroup и помечайте элементы layout для согласованных плавных переходов. LayoutGroup координирует расчёт позиций, но сам по себе может вызвать reflow при большом количестве элементов — используйте селективно. 
+motion.dev
++1
+
+Пример:
+
+import { LayoutGroup, motion } from "framer-motion";
+
+export default function Gallery({ items }) {
+  return (
+    <LayoutGroup>
+      <div className="grid">
+        {items.map(item => (
+          <motion.div key={item.id} layout className="card"
+            style={{ willChange: 'transform, opacity' }}>
+            <motion.img src={item.src} alt="" />
+          </motion.div>
+        ))}
+      </div>
+    </LayoutGroup>
+  );
+}
+
+
+CSS: card { will-change: transform; transform: translateZ(0); } — подсказка браузеру использовать композитный слой. Но не ставьте will-change навечно: добавляйте/убирайте динамически или применяйте только для видимых элементов. 
+motion.dev
+
+will-change и слои GPU
+
+will-change: transform, opacity + translateZ(0) помогают, но злоупотребление создаёт лишние слои и ухудшит память/paint. Нельзя ставить на сотни элементов одновременно.
+
+FLIP вручную vs Framer Motion
+
+Framer Motion автоматизирует FLIP для layout анимаций. За маленький набор элементов это удобно. Но при массовых изменениях (сотни строк в каталоге) ручной FLIP даёт контроль и меньшую нагрузку: вы сами делаете минимальные перерисовки и анимируете только transform без лишней логики React.
+
+Ручной FLIP: snapshot bounding boxes (getBoundingClientRect), вычислить delta, применить обратную трансформацию (inverse), затем анимировать transform → это минимизирует layout thrashing.
+
+Пример ручного FLIP (упрощённый):
+
+// before DOM update
+const first = el.getBoundingClientRect();
+
+// apply DOM update (e.g., reorder list)
+applyDOMChange();
+
+// after update
+const last = el.getBoundingClientRect();
+const dx = first.left - last.left;
+const dy = first.top - last.top;
+
+el.style.transform = `translate(${dx}px, ${dy}px)`;
+el.style.transition = 'transform 0s';
+
+// force paint
+el.getBoundingClientRect();
+
+el.style.transition = 'transform 300ms cubic-bezier(.2,.8,.2,1)';
+el.style.transform = 'translate(0,0)';
+
+// optional: cleanup after transition
+el.addEventListener('transitionend', ()=> {
+  el.style.transition = '';
+  el.style.transform = '';
+});
+
+
+Почему так быстрее: вы избегаете перерасчётов layout в цикле React/Framer и гарантируете, что браузер будет анимировать compositor-only transform. Для больших списков — выигрываете. Используйте Web Animations API вместо CSS-transition для более точного off-main-thread планирования, но не ждите волшебства: всё равно важно анимировать только преобразования. 
+motion.dev
+
+content-visibility: auto — стратегия для длинных списков
+
+Принцип: не рендерить оффскрин DOM до тех пор, пока элемент не близок к viewport. Всегда указывайте contain-intrinsic-size чтобы избежать CLS.
+
+Пример:
+
+.catalog-list > .item {
+  contain: layout style paint;
+  content-visibility: auto;
+  contain-intrinsic-size: 200px; /* примерно высота айтема */
+}
+
+
+Для списков с переменной высотой — вычисляйте и выставляйте приблизительный contain-intrinsic-size на уровне группы или используйте placeholder высоты. content-visibility экономит layout/paint сильно; на старых Safari fallback оставьте обычный рендер. 
+web.dev
++1
+
+fetchpriority / decoding / LCP-изображения — как правильно
+
+Принцип: пометьте LCP-изображение как high-priority и убедитесь, что оно предварительно загружается и не декодируется «слишком асинхронно», если вы хотите минимизировать LCP.
+
+Next/Image (рекомендуется)
+
+import Image from 'next/image';
+
+export default function Hero() {
+  return (
+    <Image
+      src="/hero.webp"
+      width={1200}
+      height={700}
+      priority // Next.js добавит preloads/opt для LCP
+      alt="Hero"
+    />
+  );
+}
+
+
+priority у next/image приводит к preload и улучшает LCP. Также вручную можно добавить <link rel="preload" as="image" href="..." fetchpriority="high" /> в head, если нужен контроль. 
+nextjs.org
++1
+
+Нативный <img>:
+
+<link rel="preload" href="/hero.webp" as="image" fetchpriority="high">
+<img src="/hero.webp" fetchpriority="high" decoding="async" width="1200" height="700" alt="">
+
+
+Практическая хитрость: decoding="async" может помочь, но иногда мешает LCP (браузер решает когда декодить). Если LCP тормозит — уберите decoding="async" для именно LCP-изображения и ставьте fetchpriority="high". MDN и Web.dev описывают эти атрибуты и поведение. 
+MDN Web Docs
++2
+web.dev
++2
+
+Доп. практики для LCP и рендера
+
+Preload fonts: link rel="preload" as="font" type="font/woff2" crossorigin + font-display: swap — но для LCP заголовков лучше preload.
+
+Reserve space: всегда задавайте width/height или aspect-ratio для LCP-элементов, чтобы избежать CLS. Next/Image автоматизирует это. 
+nextjs.org
+
+Defer non-critical scripts: async/defer, и вынос аналитики вкрайне лениво.
+
+Use edge/server caching: static shell + edge cache уменьшает TTFB, что даёт выигрыш в LCP (PPR помогает). 
+Vercel
+
+Конкретные сниппеты и утилиты
+
+Preload LCP image в _document (Next.js App Router — app/head или root layout):
+
+// app/head.tsx
+export default function Head() {
+  return (
+    <>
+      <link rel="preload" href="/hero-1200.avif" as="image" fetchpriority="high" />
+      <link rel="preload" href="/fonts/Inter-Variable.woff2" as="font" type="font/woff2" crossorigin />
+    </>
+  );
+}
+
+
+Dynamic will-change toggling (React hook) — включать will-change только на время анимации:
+
+import { useEffect } from 'react';
+export function useTempWillChange(ref: React.RefObject<HTMLElement>, props = 'transform,opacity') {
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.willChange = props;
+    const id = setTimeout(() => { el.style.willChange = ''; }, 500); // очистить
+    return () => { clearTimeout(id); el.style.willChange = ''; };
+  }, [ref]);
+}
+
+
+Web Animations API для FLIP (пример анимации transform off-main thread friendly):
+
+const anim = el.animate(
+  [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'translate(0,0)' }],
+  { duration: 300, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'both' }
+);
+anim.onfinish = () => { /* cleanup */ };
+
+"Вредные советы" — чего категорически НЕЛЬЗЯ делать в Next.js 15
+
+Не анимируйте top/left/width/height на видимых элементах — это бьёт layout и убьёт LCP.
+
+Не используйте will-change на всех карточках каталога одновременно — это создаст сотни слоёв и OOM/слишком много paint.
+
+Не вставляйте большое количество тяжёлых эффекторных библиотек в head (внешние скрипты, аналитика) без defer/async.
+
+Не lazy-load LCP-изображение. Не делайте decoding="async" и loading="lazy" одновременно для LCP.
+
+Не превращайте весь page bundle в client-side bundle: избегайте массового use client для больших участков UI. Это уничтожает main thread.
+
+Не полагайтесь на «автоматическое» оптимизирование изображений без установки width/height или aspect-ratio — браузер не сможет зарезервировать место → CLS.
+
+Не включайте PPR в production без тестов: неконтролируемые Suspense-holes + сторонние middleware могут привести к странному поведению. (включайте постепенно и мониторьте). 
+nextjs.org
++1
+
+Краткий чек-лист для внедрения и проверки (практический)
+
+Объявить LCP-элемент, пометить priority / preload + fetchpriority="high". 
+nextjs.org
++1
+
+Перенести все неважные скрипты в defer/async и аудио/видео лениво.
+
+Включить PPR на staging + посадить shell + обернуть динамические зоны в Suspense. Проверить TTFB и LCP. 
+nextjs.org
+
+Пройти по анимациям: оставить только transform/opacity; заменить layout анимации Framer Motion на ручной FLIP для больших списков. 
+motion.dev
+
+Включить content-visibility: auto для тяжёлых off-screen секций + contain-intrinsic-size. 
+web.dev
++1
+
+Замерять Web Vitals (Real User Monitoring). Прежде чем катать в production — A/B.
+
+Источники и чтение (важнейшие ссылки): Next.js PPR docs, Framer Motion performance, content-visibility (web.dev), fetchpriority/MDN и Next/Image docs
+Вынесу дополнительные техники. Без цветочков. Просто вещи, которые обычно никто не делает, а зря.
+
+1. Урезание React-реконсиляции через сегментацию дерева
+
+Разделяйте интерфейс на независимые зоны, чтобы React не проходил по всему дереву при любой смене стейта:
+
+вынос интерактивных блоков в изолированные клиентские компоненты;
+
+всё статичное держите серверными компонентами, чтобы они выпилили из бандла лишний JS;
+
+используйте мемоизацию не наугад, а там, где компонент получает тяжёлые пропсы.
+
+Это уменьшает время до First Input, снижает нагрузку на главный поток и косвенно сокращает LCP.
+
+2. Прерывание долгих рендеров через idle tasks
+
+Тяжёлые вычисления или подготовку данных разбивайте на микропорции в requestIdleCallback. Это освобождает основной поток под критичный рендеринг.
+
+Не надо использовать таймеры или Promises как замену. Браузер сам выбирает удачный момент.
+
+3. Предзагрузка критичного CSS через inlining
+
+CSS для hero-секции инлайните прямо в <head> как маленький фрагмент:
+
+меньше блокировки;
+
+меньше задержек загрузки стилей;
+
+меньше скачков при рендере.
+
+Остальное CSS можно подгружать асинхронно.
+
+4. Снижение размера React Server Component payload
+
+Любой JSON-пейлоад RSC влияет на время восстановления состояния. Уменьшайте количество данных, которые прокидываете через RSC:
+
+нормализуйте серверные структуры;
+
+передавайте только актуальные поля;
+
+избегайте больших вложенных структур.
+
+Это реально сокращает время отрисовки первого контента.
+
+5. Минимизация влияния Framer Motion на layout
+
+Если анимации только в небольших местах, вынесите эти зоны в отдельные клиентские компоненты, чтобы Motion не заставлял пересчитывать остальное дерево.
+
+Компонент с анимацией изолирован. Остальная страница рендерится чисто.
+
+6. Image placeholders без JS
+
+Переход от серого плейсхолдера к полноценному изображению делайте через:
+
+CSS gradient;
+
+простую blur-картинку, сжатую до 20–40px.
+
+Это снимает зависимость от client hydration, убирает скачки, уменьшает CPU.
+
+Не надо тянуть JS-лоадеры для этого.
+
+7. Аппаратный кэш изображений
+
+Используйте одинаковые размеры и однажды декодированные изображения для повторных секций:
+
+браузер повторно не декодирует одинаковые изображения;
+
+reduce decode cost;
+
+reduce paint cost.
+
+Подгоняйте изображения под реальное отображение, а не растягивайте.
+
+8. Ленивая отрисовка тяжелых SVG
+
+Если у вас в hero висит SVG с большим количеством path:
+
+перенесите его отрисовку после LCP;
+
+замените на PNG/AVIF в hero, а SVG подгрузите потом, если нужен интерактив.
+
+SVG способен раздувать и render, и style, и layout.
+
+9. Расчёт layout вне React
+
+Всё, что касается измерений:
+
+высоты блоков;
+
+позиций элементов;
+
+размеров контейнеров.
+
+Выносите за пределы рендера. Используйте ResizeObserver вне компонента, а не в хуке, который дергает рендер. Реактивность делайте через крошечное состояние, которое не заставляет пересчитывать всё.
+
+10. Грубое, но эффективное: «фальшивый LCP»
+
+Если реальный LCP тяжёлый:
+
+ставите placeholder-блок той же высоты;
+
+отдаёте его как LCP;
+
+настоящий контент приходите и заменяете после стабилизации.
+
+Чистая манипуляция, но улучшающая метрику в реальном мире. Только не злоупотребляйте.
+
+11. Экономия через отказ от layout animations
+
+Не анимируйте изменения размеров. Только transform. Это дисциплина, которую нарушают все и потом жалуются на LCP.
+
+12. Предсказуемые размеры через aspect-ratio
+
+Даже если изображение динамическое:
+
+ставите контейнеру разумный aspect-ratio;
+
+браузер резервирует место.
+
+Это почти всегда режет CLS и ускоряет рендер.
+
+13. Реплика DOM перед дорогостоящей заменой
+
+При удалении/перестановке больших блоков:
+
+сначала вставьте новый скрытый фрагмент (visibility hidden, но место занимает);
+
+после layout-стабилизации замените старый.
+
+Это снижает скачки и layout thrashing.
+
+14. Проверка очереди GPU
+
+Если используете множество анимаций:
+
+ограничьте количество одновременно работающих кадров;
+
+отключите по мере ухода элементов из viewport.
+
+GPU не бесконечный ресурс. Перегружается легко.
+
+15. Вырезание client-side логики из root layout
+
+layout.tsx должен быть максимально server-side:
+
+никакого use client;
+
+никакого стейта;
+
+только HTML-структура и статические включения.
+
+Client hydration должен происходить ниже в дереве.
+
+16. Критическое: избегать hydration задержанного контента
+
+React ждёт JS, чтобы гидратировать интерактивные зоны. Если у вас внутри hero есть клиентская логика, LCP будет позже. Уберите интерактивность из LCP-зоны.
+
+17. Ленивая загрузка CSS-модулей
+
+В App Router можно грузить CSS модулей по сегментам. Это снижает FCP и LCP, если ваши сегменты изолированы.
+
+18. Сегментация import-графа
+
+Разделяйте client components в отдельные директории, используйте dynamic imports. Next.js деревом ходит лучше, бандл меньше, hydration быстрее.
+
+19. Контроль числа Render Phases
+
+Любые вызовы:
+
+console.log внутри компонента,
+
+тяжелые вычисления в рендере,
+
+лишние эффекты.
+
+Каждый из них убивает троттлинг рендеринга. Почистите.
+
+20. Shadow DOM для тяжёлых интерактивных зон
+
+Если у вас есть интерактивная панель, которая часто обновляется:
+
+оформляйте её через Web Component;
+
+рендерите React вокруг, а не внутри.
+
+Shadow DOM отгораживает стили и layout.
+Есть. Хватит распыляться, перечислю только то, что реально даёт прирост и не тонет в теории.
+
+21. Принудительная стабилизация layout до загрузки шрифтов
+
+Шрифты часто смещают текст и LCP уезжает. Решение:
+
+включить font-display: optional или swap;
+
+задать fallback с максимально похожей метрикой;
+
+зафиксировать размеры контейнеров под текст.
+
+Шрифт подменится без скачков, LCP не страдает.
+
+22. Чистка hydration-водопада
+
+Если цепочка клиентских компонентов вызывает каскадную загрузку JS:
+
+вынесите зависимости на уровень выше;
+
+используйте use для серверных данных;
+
+реорганизуйте дерево так, чтобы клиентский код подгружался параллельно, а не ступенчато.
+
+Hydration-waterfall способен съедать 200–700 мс на ровном месте.
+
+23. Статический рендер интерактивных зон с поздней активацией
+
+Некоторые клиентские блоки можно отрисовать статически, а JS прикрутить позже:
+
+рендер на сервере без интерактивности;
+
+hydrate-on-interaction (Next пока не делает из коробки, но паттерн применим);
+
+уменьшение initial JS.
+
+LCP фиксируется до появления интерактивности.
+
+24. Снижение стоимости прокрутки в hero
+
+Если hero высокий и пользователь сразу скроллит:
+
+запретите тяжёлые эффекты, scroll handlers, parallax и т.п.;
+
+используйте passive listeners;
+
+переносите всё тяжёлое в idle.
+
+Скролл может блокировать отрисовку кадров, LCP от этого тоже плывёт.
+
+25. Предварительная декомпрессия hero-изображений на сервере
+
+Некоторые форматы (например, большие AVIF) могут долго декодироваться:
+
+используйте preprocessed JPEG/WEBP с более предсказуемой декомпрессией;
+
+избегайте сверхсложных AVIF на LCP.
+
+Иногда старый добрый WEBP быстрее любых новомодных оптимизаций.
+
+26. Избегание server waterfall перед RSC-payload
+
+Если у вас несколько async-функций, вызывающих базу или API, объединяйте их:
+
+один батчированный запрос;
+
+один round trip;
+
+меньше задержек перед первым отрисованным HTML.
+
+RSC-пейлоад приходит раньше, LCP раньше.
+
+27. Локализация тяжёлых частей HTML после LCP
+
+Если страница толстая:
+
+рендерить верхнюю часть максимально быстро;
+
+остальной HTML доклеивать после LCP через progressive rendering.
+
+Похоже на streaming, но контролируемый: Prioritize top-of-page.
+
+28. Ленивая загрузка фонов
+
+CSS background-image в hero часто тормозит:
+
+не используйте фоны как LCP-изображение;
+
+если фон декоративный, подгружайте его после LCP;
+
+ставьте solid color или gradient в качестве первого слоя.
+
+Браузер не считает background-image как LCP, но он мешает paint.
+
+29. Предварительное вычисление layout на сервере
+
+Для предсказуемых блоков (карточки, гриды, hero):
+
+задавайте точные размеры заранее;
+
+высчитывайте aspect ratio и padding server-side.
+
+Браузеру остаётся только нарисовать, а не пересчитывать.
+
+30. Принудительное отключение ненужной анимации в viewport до LCP
+
+CSS prefers-reduced-motion никак не связан с перформансом, но вы можете вручную:
+
+отключить анимации для верхних блоков до LCP;
+
+включить после.
+
+Меньше нагрузки на GPU, быстрее первый paint.
+
+31. Снижение количества реэкспортов в client components
+
+Громоздкие barrel-файлы и повторные реэкспорты:
+
+увеличивают бандл;
+
+препятствуют tree shaking;
+
+создают больше hydration-вызовов.
+
+Уберите лишние index.ts, особенно для клиентской логики.
+
+32. Применение notFound() и redirect() вне критической зоны
+
+Если эти функции вызываются слишком поздно, HTML не отдаётся вовремя:
+
+делайте проверки данных в layout/loader заранее;
+
+отдавайте финальный HTML как можно раньше.
+
+Это уменьшает задержку TTFB, а следом и LCP.
+
+33. Чистка «динамических» импортов ради самого импорта
+
+Динамический импорт нужен только для дорогого JS. Если разбили код на мелкие куски ради красоты:
+
+браузер создаёт лишние запросы;
+
+hydration может тормозить из-за мелкой гранулярности.
+
+Использовать только там, где реальная экономия.
+
+34. Предзагрузка DNS и соединений
+
+Если LCP зависит от CDN или стороннего хоста:
+
+добавьте <link rel="preconnect">;
+
+в редких случаях <dns-prefetch">.
+
+Даёт 50–150 мс в зависимости от географии.
+
+35. Принудительное размещение critical script ближе к top-of-head
+
+Если у вас есть критичный JS, без которого не строится LCP:
+
+поднимите тег выше, ближе к началу head;
+
+браузер начнет загрузку раньше.
+
+Да, это грязно, но работает.
+
+36. Снижение размера inline RSC payload через remove-undefined
+
+Удаляйте undefined-поля и null-поля, которые не несут смысла. RSC-пейлоад может уменьшиться на десятки килобайт.

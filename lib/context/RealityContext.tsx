@@ -1,0 +1,205 @@
+'use client';
+
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { getUserVoteCount } from '@/app/actions/user-stats';
+import { getClientVisitorId } from '@/lib/client-visitor'; // ИМПОРТ
+import { getUserVotedEffects, migrateLocalVotes } from '@/app/actions/votes';
+import { votesStore } from '@/lib/votes-store';
+
+interface RealityContextType {
+  isUpsideDown: boolean;
+  toggleReality: () => void;
+  isUnlocked: boolean;
+  voteCount: number;
+  requiredVotes: number;
+  refreshVotes: () => Promise<void>;
+  incrementVotes: () => void;
+  isTransitioning: boolean; // Новое состояние
+}
+
+const RealityContext = createContext<RealityContextType | undefined>(undefined);
+
+export function RealityProvider({ children }: { children: React.ReactNode }) {
+  // Инициализация isUpsideDown с синхронным чтением sessionStorage для предотвращения hydration mismatch
+  const [isUpsideDown, setIsUpsideDown] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    const saved = sessionStorage.getItem('reality-mode');
+    return saved === 'upside-down';
+  });
+  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [voteCount, setVoteCount] = useState(0);
+  const [isTransitioning, setIsTransitioning] = useState(false); // Новое состояние
+  const [mounted, setMounted] = useState(false);
+  const REQUIRED_VOTES = 25;
+
+  const checkStatus = async () => {
+    const vid = getClientVisitorId(); // ИСПОЛЬЗУЕМ ЕДИНУЮ ФУНКЦИЮ
+    if (!vid) {
+      setVoteCount(0);
+      setIsUnlocked(false);
+      return;
+    }
+
+    try {
+      console.log('[RealityContext] Начало синхронизации...');
+      
+      // 1. Получаем голоса с сервера (источник правды)
+      let serverVotes = await getUserVotedEffects(vid);
+      console.log(`[RealityContext] Голосов на сервере: ${serverVotes.length}`);
+      const serverVotesMap = new Map(
+        serverVotes.map(v => [v.effectId, v.variant])
+      );
+
+      // 2. Получаем голоса из localStorage
+      const localVotes = votesStore.get();
+      const localVotesArray = Object.entries(localVotes).map(([effectId, variant]) => ({
+        effectId,
+        variant,
+      }));
+      console.log(`[RealityContext] Голосов в localStorage: ${localVotesArray.length}`);
+
+      // 3. Находим голоса в localStorage, которых нет на сервере (для миграции)
+      const localVotesToMigrate: Array<{ effectId: string; variant: 'A' | 'B' }> = [];
+      for (const localVote of localVotesArray) {
+        if (!serverVotesMap.has(localVote.effectId)) {
+          localVotesToMigrate.push(localVote);
+        }
+      }
+
+      // 4. Мигрируем локальные голоса на сервер (если есть)
+      if (localVotesToMigrate.length > 0) {
+        console.log(`[RealityContext] Миграция ${localVotesToMigrate.length} голосов с localStorage на сервер...`);
+        const migrationResult = await migrateLocalVotes(vid, localVotesToMigrate);
+        console.log(`[RealityContext] Миграция завершена: ${migrationResult.migrated} мигрировано, ${migrationResult.errors} ошибок`);
+        
+        // После миграции перезагружаем список серверных голосов
+        if (migrationResult.migrated > 0) {
+          serverVotes = await getUserVotedEffects(vid);
+          serverVotesMap.clear();
+          serverVotes.forEach(v => {
+            serverVotesMap.set(v.effectId, v.variant);
+          });
+        }
+      }
+
+      // 5. Синхронизируем localStorage с сервером (обновляем локальный стор)
+      // Используем актуальный список серверных голосов (после миграции, если была)
+      const finalServerVotes = serverVotesMap.size > 0 
+        ? Array.from(serverVotesMap.entries()).map(([effectId, variant]) => ({ effectId, variant }))
+        : serverVotes;
+      
+      // Получаем актуальный localStorage (на случай, если он изменился во время миграции)
+      const currentLocalVotes = votesStore.get();
+      
+      // Добавляем голоса, которые есть на сервере, но отсутствуют в localStorage
+      let syncedCount = 0;
+      for (const serverVote of finalServerVotes) {
+        if (!currentLocalVotes[serverVote.effectId]) {
+          votesStore.set(serverVote.effectId, serverVote.variant);
+          syncedCount++;
+        }
+      }
+      
+      if (syncedCount > 0) {
+        console.log(`[RealityContext] Синхронизировано ${syncedCount} голосов с сервера в localStorage`);
+      }
+
+      // 6. Получаем финальный счетчик голосов (после синхронизации)
+      const count = serverVotesMap.size > 0 ? serverVotesMap.size : await getUserVoteCount(vid);
+      setVoteCount(count);
+      setIsUnlocked(count >= REQUIRED_VOTES);
+      
+      console.log(`[RealityContext] Синхронизация завершена. Всего голосов: ${count}`);
+      
+      // Проверка на выход из Изнанки, если голоса сбросились
+      if (count < REQUIRED_VOTES && isUpsideDown) {
+        setIsUpsideDown(false);
+        sessionStorage.setItem('reality-mode', 'normal');
+      }
+
+      // При первой загрузке восстанавливаем без анимации (только если mounted)
+      // Не перезаписываем состояние, если оно уже установлено из useState инициализатора
+      if (mounted && !isTransitioning) {
+          const savedState = sessionStorage.getItem('reality-mode');
+          if (savedState === 'upside-down' && count >= REQUIRED_VOTES && !isUpsideDown) {
+            setIsUpsideDown(true);
+          } else if (savedState !== 'upside-down' && isUpsideDown) {
+            setIsUpsideDown(false);
+          }
+      }
+    } catch (error) {
+      console.error('[RealityContext] Ошибка при синхронизации:', error);
+      // В случае ошибки используем только локальный счетчик
+      const localCount = Object.keys(votesStore.get()).length;
+      setVoteCount(localCount);
+      setIsUnlocked(localCount >= REQUIRED_VOTES);
+    }
+  };
+
+  // Загружаем данные ТОЛЬКО ОДИН РАЗ при старте
+  useEffect(() => {
+    setMounted(true);
+    checkStatus();
+  }, []);
+
+  useEffect(() => {
+    if (isUpsideDown) {
+      document.documentElement.classList.add('mode-upside-down');
+    } else {
+      document.documentElement.classList.remove('mode-upside-down');
+    }
+  }, [isUpsideDown]);
+
+  const toggleReality = async () => {
+    if (!isUnlocked || isTransitioning) return;
+    
+    // 1. Запускаем анимацию (короткую)
+    setIsTransitioning(true);
+
+    // 2. Ждем 1.2 секунды (время RGB-сдвига)
+    await new Promise(resolve => setTimeout(resolve, 1200));
+
+    // 3. Переключаем реальность
+    const newState = !isUpsideDown;
+    setIsUpsideDown(newState);
+    sessionStorage.setItem('reality-mode', newState ? 'upside-down' : 'normal');
+
+    // 4. Выключаем анимацию
+    setIsTransitioning(false);
+  };
+
+  // Мгновенное обновление (Optimistic UI)
+  const incrementVotes = () => {
+    console.log("Incrementing votes...");
+    setVoteCount(prev => {
+      const newCount = prev + 1;
+      if (newCount >= REQUIRED_VOTES && !isUnlocked) {
+        setIsUnlocked(true);
+      }
+      return newCount;
+    });
+  };
+
+  return (
+    <RealityContext.Provider value={{ 
+      isUpsideDown, 
+      toggleReality, 
+      isUnlocked, 
+      voteCount,
+      requiredVotes: REQUIRED_VOTES,
+      refreshVotes: checkStatus,
+      incrementVotes,
+      isTransitioning
+    }}>
+      {children}
+    </RealityContext.Provider>
+  );
+}
+
+export function useReality() {
+  const context = useContext(RealityContext);
+  if (context === undefined) {
+    throw new Error('useReality must be used within a RealityProvider');
+  }
+  return context;
+}

@@ -1,0 +1,533 @@
+OSINT Strategy: Mandela Effect Residue Hunter
+Архитектура системы автоматического поиска визуальных доказательств
+
+1. 🗄️ Поиск по архивам (Internet Archive + альтернативы)
+Internet Archive Wayback Machine API
+CDX Server API (индекс всех снимков)
+bash# Базовый endpoint
+https://web.archive.org/cdx/search/cdx?url=domain.com&matchType=prefix&output=json
+
+# Поиск логотипов конкретного бренда
+https://web.archive.org/cdx/search/cdx?url=cocacola.com&from=1996&to=2005&filter=mimetype:image/jpeg&output=json
+Параметры для Mandela Effect research:
+python# Python example
+import requests
+
+def search_wayback_images(domain, start_year, end_year, keyword="logo"):
+    params = {
+        'url': f'{domain}/*{keyword}*',
+        'matchType': 'prefix',
+        'from': start_year,
+        'to': end_year,
+        'filter': ['mimetype:image/jpeg', 'mimetype:image/png', 'mimetype:image/gif'],
+        'output': 'json',
+        'fl': 'timestamp,original,mimetype,statuscode',
+        'collapse': 'digest'  # Убирает дубликаты
+    }
+    
+    response = requests.get('https://web.archive.org/cdx/search/cdx', params=params)
+    return response.json()
+
+# Пример: искать старые логотипы KitKat
+results = search_wayback_images('kitkat.com', '19960101', '20051231', 'logo')
+Wayback Machine Availability API
+bash# Проверка наличия снимка конкретной страницы
+https://archive.org/wayback/available?url=example.com/logo.png&timestamp=20000101
+
+# Response:
+{
+  "archived_snapshots": {
+    "closest": {
+      "available": true,
+      "url": "https://web.archive.org/web/20000315.../logo.png",
+      "timestamp": "20000315",
+      "status": "200"
+    }
+  }
+}
+Archive.org Images Search API
+pythonimport internetarchive as ia
+
+# Поиск через коллекции
+search = ia.search_items('collection:vintage_advertisements AND kitkat')
+
+for item in search:
+    metadata = ia.get_item(item['identifier'])
+    print(f"Found: {metadata.metadata['title']}")
+    
+    # Скачивание оригиналов
+    for file in metadata.files:
+        if file['format'] in ['JPEG', 'PNG']:
+            file.download(destdir='./residue_evidence/')
+Ключевые коллекции для Mandela Effect:
+
+vintage_advertisements — реклама 50-90х
+ephemera — временные материалы (флаеры, упаковки)
+television — скриншоты ТВ-программ
+magazine_rack — журналы и каталоги
+prelinger — промо-материалы и документальные кадры
+
+
+2. 🖼️ Визуальный поиск (Reverse Image Search APIs)
+Google Lens / Vision API (официальный, но ограниченный)
+pythonfrom google.cloud import vision
+
+client = vision.ImageAnnotatorClient()
+
+def find_similar_logos(image_path):
+    with open(image_path, 'rb') as image_file:
+        content = image_file.read()
+    
+    image = vision.Image(content=content)
+    
+    # Web Detection для поиска похожих
+    response = client.web_detection(image=image)
+    
+    results = {
+        'exact_matches': [img.url for img in response.web_detection.full_matching_images],
+        'partial_matches': [img.url for img in response.web_detection.partial_matching_images],
+        'visually_similar': [img.url for img in response.web_detection.visually_similar_images]
+    }
+    
+    return results
+Limitations:
+
+❌ Нет доступа к "Google Lens" через API
+✅ Vision API находит похожие изображения
+💰 $1.50 за 1000 запросов (первые 1000 бесплатно)
+
+
+TinEye API (лучший для reverse search)
+pythonfrom pytineye import TinEyeAPIRequest
+
+# Commercial API (платный, но эффективный)
+api = TinEyeAPIRequest(
+    api_url='https://api.tineye.com/rest/',
+    public_key='YOUR_PUBLIC_KEY',
+    private_key='YOUR_PRIVATE_KEY'
+)
+
+def search_logo_variations(image_url):
+    # Поиск с сортировкой по дате (старые первые!)
+    results = api.search_url(
+        url=image_url,
+        sort='crawl_date',
+        order='asc',
+        offset=0,
+        limit=100
+    )
+    
+    # Фильтрация старых сайтов (1990-2005)
+    old_results = [
+        match for match in results['matches']
+        if '1999' in match['crawl_date'] or '2000' in match['crawl_date']
+    ]
+    
+    return old_results
+Pricing: $200/месяц за 5000 поисков (есть trial)
+
+Альтернативы (Free/Open-Source):
+Bing Visual Search API
+pythonimport requests
+
+def bing_visual_search(image_url):
+    endpoint = "https://api.bing.microsoft.com/v7.0/images/visualsearch"
+    
+    headers = {'Ocp-Apim-Subscription-Key': 'YOUR_KEY'}
+    params = {'imgUrl': image_url}
+    
+    response = requests.post(endpoint, headers=headers, params=params)
+    
+    # Фильтр по дате (старые сайты)
+    results = response.json()
+    return [
+        img for img in results.get('tags', [])[0].get('actions', [])
+        if 'webpage' in img and '1999' in img['webpage'].get('datePublished', '')
+    ]
+Yandex Images API (работает с кириллицей!)
+bash# Reverse Image Search
+https://yandex.com/images/search?rpt=imageview&url=IMAGE_URL
+
+# Не имеет официального API, но есть парсеры:
+# https://github.com/mvasilkov/yandex-images-api
+```
+
+---
+
+## 3. 🎯 Промпт-инжиниринг и Search Dorks
+
+### **Google Dorks для Mandela Effect Evidence**
+
+#### **Поиск любительских фото упаковок:**
+```
+# Старые фото на форумах
+site:reddit.com "kitkat" "wrapper" "1990s" filetype:jpg
+
+# Ebay listings со старыми упаковками
+site:ebay.com "vintage" "kitkat" "packaging" "original"
+
+# Pinterest boards с архивными фото
+site:pinterest.com "retro" "logo" "90s" -modern
+
+# Flickr группы коллекционеров
+site:flickr.com/groups "vintage advertising" "kitkat OR monopoly OR fruit loops"
+
+# Internet Archive uploads
+site:archive.org "vintage" "commercial" "1990" filetype:mp4
+```
+
+#### **Временные фильтры Google:**
+```
+# Поиск ТОЛЬКО контента, опубликованного до 2000 года
+"kitkat logo" before:2000-01-01
+
+# Диапазон дат
+"fruit loops" OR "froot loops" after:1995-01-01 before:2005-01-01
+
+# Комбинация с dorks
+site:geocities.ws "coca cola" "logo" before:1999-12-31
+```
+
+#### **Специфичные для Mandela Effect:**
+```
+# Поиск "ошибок" в написании (residue)
+"berenstein bears" -"berenstain" site:amazon.com
+
+# VHS covers
+"vhs" "original" "cover" "shazaam" OR "kazaam" filetype:jpg
+
+# Newspaper scans
+"newspaper" "1990" "monopoly man" "monocle" filetype:pdf
+
+Reddit API для поиска residue:
+pythonimport praw
+
+reddit = praw.Reddit(
+    client_id='YOUR_CLIENT_ID',
+    client_secret='YOUR_SECRET',
+    user_agent='MandelaResidueBot/1.0'
+)
+
+def search_reddit_residue(keyword, subreddits=['MandelaEffect', 'nostalgia', 'vintage']):
+    results = []
+    
+    for subreddit_name in subreddits:
+        subreddit = reddit.subreddit(subreddit_name)
+        
+        # Поиск постов с картинками
+        for submission in subreddit.search(keyword, limit=100, time_filter='all'):
+            if submission.url.endswith(('.jpg', '.png', '.gif')):
+                results.append({
+                    'title': submission.title,
+                    'url': submission.url,
+                    'created': submission.created_utc,
+                    'score': submission.score,
+                    'subreddit': subreddit_name
+                })
+    
+    # Сортировка по дате (старые первые)
+    return sorted(results, key=lambda x: x['created'])
+
+# Пример
+evidence = search_reddit_residue("kitkat logo 90s")
+
+Pinterest API workaround:
+Pinterest не имеет публичного API, но есть неофициальный парсер:
+pythonfrom pinterest_scraper import PinterestScraper
+
+scraper = PinterestScraper()
+
+def scrape_vintage_boards(query):
+    # Поиск boards с винтажным контентом
+    boards = scraper.search_boards(query + " vintage retro 90s")
+    
+    images = []
+    for board in boards[:10]:  # Топ-10 boards
+        pins = scraper.get_board_pins(board['id'])
+        images.extend([
+            pin['image_url'] 
+            for pin in pins 
+            if '1990' in pin.get('description', '') or 'vintage' in pin.get('description', '').lower()
+        ])
+    
+    return images
+```
+
+---
+
+## 4. 📚 Специализированные источники архивов
+
+### **Базы данных рекламы и упаковок:**
+
+#### **1. AdForum Archive**
+```
+https://www.adforum.com/creative-work/archive
+```
+- 🎬 ТВ-реклама с 1950х
+- 🔍 Поиск по бренду + году
+- 💰 Частично платный
+
+#### **2. Duke's AdAccess**
+```
+https://repository.duke.edu/dc/adaccess
+```
+- 📰 7000+ рекламных объявлений (1911-1955)
+- ✅ Бесплатный доступ
+- 📥 Высокое разрешение
+
+#### **3. Vintage Ad Browser**
+```
+https://www.vintageadbrowser.com/
+```
+- 🗓️ Реклама по десятилетиям
+- 🔎 Поиск по категориям (food, toys, etc.)
+- ✅ Бесплатно
+
+#### **4. Museum of Brands (Searchable Database)**
+```
+https://www.museumofbrands.com/
+```
+- 📦 12,000+ упаковок товаров
+- 🎯 Фокус на UK/US brands
+- ⚠️ Требуется email registration
+
+#### **5. NYPL Digital Collections**
+```
+https://digitalcollections.nypl.org/
+python# API доступ
+import requests
+
+def search_nypl_ads(keyword):
+    url = "https://api.repo.nypl.org/api/v2/items/search"
+    params = {
+        'q': f'{keyword} advertisement',
+        'field': 'title,date',
+        'per_page': 100
+    }
+    
+    response = requests.get(url, params=params)
+    return response.json()
+```
+
+---
+
+### **VHS/TV Archives:**
+
+#### **1. TV Tropes Screenshot Archive**
+```
+https://tvtropes.org/pmwiki/pmwiki.php/Main/Screenshots
+```
+
+#### **2. RetroVision Archive**
+```
+https://archive.org/details/retrovision
+```
+- 📼 Оцифрованные VHS
+- 🎥 Включает рекламу и титры
+
+#### **3. Everything Is Terrible! Archive**
+```
+https://archive.org/details/everythingisterrible
+
+🎬 Странные VHS-находки
+🔥 Популярен среди Mandela Effect researchers
+
+
+🛡️ Стратегия фильтрации фейков
+Признаки подлинности residue:
+✅ Критерии ДОСТОВЕРНОСТИ:
+
+Метаданные изображения:
+
+pythonfrom PIL import Image
+from PIL.ExifTags import TAGS
+
+def check_image_authenticity(image_path):
+    image = Image.open(image_path)
+    exifdata = image.getexif()
+    
+    metadata = {}
+    for tag_id, value in exifdata.items():
+        tag = TAGS.get(tag_id, tag_id)
+        metadata[tag] = value
+    
+    # Red flags
+    red_flags = []
+    
+    # 1. Дата создания позже чем "событие Mandela Effect"
+    if 'DateTime' in metadata:
+        if int(metadata['DateTime'][:4]) > 2010:
+            red_flags.append("Image created after ME event")
+    
+    # 2. Следы Photoshop
+    if 'Software' in metadata:
+        if 'Adobe Photoshop' in metadata['Software']:
+            red_flags.append("Edited in Photoshop")
+    
+    # 3. Слишком высокое разрешение для 90-х
+    if image.width > 1920 or image.height > 1080:
+        red_flags.append("Resolution too high for era")
+    
+    return {
+        'metadata': metadata,
+        'red_flags': red_flags,
+        'authenticity_score': 100 - (len(red_flags) * 30)
+    }
+
+Источник:
+
+✅ Старые форумы (phpBB, 2000-2005)
+✅ Wayback Machine snapshots
+✅ eBay listings с фото реальных товаров
+❌ Недавно созданные сайты
+❌ Имиджборды без модерации
+
+
+Контекст:
+
+✅ Случайное фото (семейный альбом, фон)
+✅ Низкое качество (VHS, сканы)
+❌ Профессиональное качество
+❌ Фото "специально" показывает спорный элемент
+
+
+Цифровой след:
+
+pythondef check_reverse_image_history(image_url):
+    # Используем TinEye для проверки истории
+    results = tineye_api.search_url(image_url, sort='crawl_date', order='asc')
+    
+    first_appearance = results['matches'][0]['crawl_date'] if results['matches'] else None
+    
+    # Если первое появление ПОСЛЕ начала дебатов о Mandela Effect — suspicious
+    if first_appearance and int(first_appearance[:4]) > 2010:
+        return {
+            'status': 'suspicious',
+            'reason': 'First appeared online after ME discussions began'
+        }
+    
+    return {'status': 'potentially_authentic'}
+
+Machine Learning для валидации:
+pythonimport tensorflow as tf
+from transformers import CLIPProcessor, CLIPModel
+
+# CLIP model для семантического анализа
+model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
+processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+
+def detect_anachronisms(image, claimed_era):
+    """Определяет объекты, не соответствующие заявленной эпохе"""
+    
+    # Объекты, которых не было в 90-х
+    modern_objects = [
+        "smartphone", "iphone", "modern car", "LED screen", 
+        "QR code", "USB drive", "modern laptop"
+    ]
+    
+    inputs = processor(text=modern_objects, images=image, return_tensors="pt", padding=True)
+    outputs = model(**inputs)
+    
+    logits_per_image = outputs.logits_per_image
+    probs = logits_per_image.softmax(dim=1)
+    
+    # Если вероятность современных объектов > 30% — фейк
+    if probs.max() > 0.3:
+        detected = modern_objects[probs.argmax()]
+        return {
+            'authentic': False,
+            'reason': f'Detected anachronism: {detected}'
+        }
+    
+    return {'authentic': True}
+
+🤖 Автоматизированный pipeline
+Полная система поиска residue:
+pythonclass MandelaResidueHunter:
+    def __init__(self):
+        self.sources = {
+            'wayback': WaybackSearcher(),
+            'tineye': TinEyeSearcher(),
+            'reddit': RedditScraper(),
+            'archive_org': ArchiveOrgSearcher()
+        }
+    
+    def hunt(self, mandela_effect_case):
+        """
+        mandela_effect_case = {
+            'item': 'KitKat logo',
+            'disputed_element': 'hyphen',
+            'era': '1990-2005',
+            'keywords': ['kitkat', 'kit-kat', 'wrapper']
+        }
+        """
+        
+        all_evidence = []
+        
+        # 1. Поиск по всем источникам
+        for source_name, searcher in self.sources.items():
+            results = searcher.search(
+                keywords=mandela_effect_case['keywords'],
+                date_range=mandela_effect_case['era']
+            )
+            
+            for result in results:
+                # 2. Проверка подлинности
+                authenticity = self.validate_evidence(result)
+                
+                # 3. Визуальная верификация
+                if authenticity['score'] > 70:
+                    visual_match = self.check_disputed_element(
+                        result['image_url'],
+                        mandela_effect_case['disputed_element']
+                    )
+                    
+                    if visual_match:
+                        all_evidence.append({
+                            'source': source_name,
+                            'url': result['url'],
+                            'image_url': result['image_url'],
+                            'date': result['date'],
+                            'authenticity_score': authenticity['score'],
+                            'confidence': visual_match['confidence']
+                        })
+        
+        # 4. Ранжирование по достоверности
+        return sorted(all_evidence, key=lambda x: x['authenticity_score'], reverse=True)
+    
+    def validate_evidence(self, result):
+        """Комплексная проверка"""
+        checks = [
+            self.check_metadata(result['image_url']),
+            self.check_source_age(result['url']),
+            self.check_reverse_image_history(result['image_url']),
+            self.detect_anachronisms(result['image_url'], result.get('claimed_era'))
+        ]
+        
+        total_score = sum(check['score'] for check in checks) / len(checks)
+        return {'score': total_score, 'checks': checks}
+
+📊 Сравнительная таблица API
+API/ToolCostRate LimitBest ForDate FilterWayback Machine CDXFreeNoneСтарые сайты✅ Точные датыTinEye$200/mo5000/moReverse search✅ Crawl dateGoogle Vision$1.50/1K1800/minПохожие изображения❌ НетBing VisualFree tier1000/moReverse search⚠️ ОграниченноReddit APIFree60/minUser-generated✅ Post dateArchive.org ImagesFreeNoneVintage content✅ Точные даты
+
+🎯 Приоритетная стратегия для начала:
+Week 1: Setup Infrastructure
+
+✅ Wayback Machine CDX API (free, unlimited)
+✅ Archive.org Collections API (free)
+✅ Reddit PRAW (free, 60 req/min)
+
+Week 2: Add Paid Services (if budget allows)
+
+💰 TinEye API trial ($200/mo)
+💰 Google Vision API (free tier: 1000/mo)
+
+Week 3: Automation
+
+🤖 Scheduled scraping (daily)
+🔍 ML-based validation
+📊 Evidence dashboard
+
+
+Total setup cost: $0-200/month
+Expected residue finds: 50-200/month (depending on ME case popularity)

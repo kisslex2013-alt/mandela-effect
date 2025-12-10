@@ -1,0 +1,485 @@
+Технический отчет: Стратегии глубокой оптимизации производительности веб-приложений на базе Next.js 15
+Архитектурные решения для улучшения LCP и INP в медиа-насыщенных интерфейсах с использованием Framer Motion
+Дата: 9 декабря 2025 г. Подготовлено для: Senior Engineering Team, Lead Frontend Architects Предмет: Комплексный анализ и план внедрения Partial Prerendering (PPR), аппаратного ускорения анимаций и оркестрации ресурсов.
+
+1. Исполнительное резюме (Executive Summary)
+Настоящий отчет представляет собой исчерпывающее техническое руководство, разработанное в ответ на критические показатели Core Web Vitals (CWV), зафиксированные в высоконагруженном медиа-приложении на стеке Next.js 15 App Router. Текущая архитектура, использующая интенсивные визуальные эффекты на базе Framer Motion и массивные изображения, столкнулась с деградацией метрики Largest Contentful Paint (LCP) и Interaction to Next Paint (INP).
+
+В ходе анализа выявлены три фундаментальных вектора проблем:
+
+Блокировка основного потока (Main Thread Blocking): Конкуренция между гидратацией React, инициализацией Framer Motion и декодированием изображений приводит к задержкам в отрисовке первого кадра.
+
+Неэффективная стратегия рендеринга: Использование стандартного SSR или полностью статической генерации (SSG) создает дихотомию между скоростью TTFB (Time to First Byte) и динамичностью контента.
+
+Layout Thrashing (Отказ макета): Неоптимизированные анимации макета вызывают принудительные перерасчеты геометрии (reflow) на каждом кадре, снижая FPS и увеличивая время отклика.
+
+Предлагаемое решение базируется на внедрении Partial Prerendering (PPR) — новой парадигмы Next.js 15, позволяющей объединить мгновенную отдачу статической оболочки (Static Shell) с потоковой передачей динамического контента. В сочетании с агрессивной оптимизацией анимаций через Shared Layout Transitions и Compositor-Only Properties, а также точечной настройкой приоритетов загрузки ресурсов (fetchpriority, content-visibility), данный подход способен сократить LCP на 40-60% и стабилизировать INP в пределах "зеленой зоны" (менее 200 мс).
+
+2. Фундаментальный анализ производительности в экосистеме Next.js 15
+Прежде чем переходить к имплементации, необходимо детально разобрать, как именно архитектурные изменения в Next.js 15 влияют на метрики производительности. Версия 15 знаменует собой отход от агрессивного кэширования по умолчанию, характерного для версии 14, и переход к модели, где динамика и статика сосуществуют в рамках одного HTTP-ответа.
+
+2.1. Эволюция рендеринга: От SSR к PPR
+Традиционный Server-Side Rendering (SSR) в Next.js имеет фундаментальный недостаток: сервер не может отправить ни байта HTML, пока не завершатся все асинхронные операции получения данных (блокирующий рендеринг данных). В медиа-тяжелых приложениях это означает, что пользователь видит пустой экран ровно столько, сколько отвечает самый медленный API-запрос (например, персонализированная лента изображений).
+
+Streaming SSR (введенный ранее) частично решил эту проблему, позволяя отправлять HTML чанками. Однако Partial Prerendering (PPR) идет дальше. PPR изменяет саму природу сборки: во время билда Next.js определяет "статическую оболочку" (Static Shell) маршрута — навигацию, футер, общие лейауты, которые не зависят от данных запроса. Эта оболочка пре-рендерится и сохраняется на Edge-сети Vercel.
+
+Ключевое отличие PPR: При запросе пользователя Edge-сеть немедленно отдает статическую оболочку (TTFB стремится к нулю, как у SSG). Параллельно с этим сервер начинает выполнение динамических компонентов (обернутых в Suspense), стримя их содержимое в "дырки" статической оболочки. Это де-факто устраняет компромисс между статикой и динамикой.   
+
+2.2. Core Web Vitals в контексте анимаций
+Метрика LCP (Largest Contentful Paint) в приложениях с Framer Motion часто страдает не из-за скорости сети, а из-за задержки рендеринга (Render Delay). Если LCP-элемент (например, Hero-изображение) анимируется при появлении (fade-in, slide-up), браузер не может зафиксировать момент LCP до завершения анимации или до первого кадра появления элемента.
+
+Кроме того, тяжелые вычисления JS на старте (инициализация анимационных библиотек) конкурируют за ресурсы процессора с декодированием изображений. Если основной поток занят расчетом физики пружин (spring physics) Framer Motion, декодирование LCP-изображения откладывается.   
+
+3. Partial Prerendering (PPR): Стратегия внедрения и конфигурация
+PPR в Next.js 15 является экспериментальной фичей, требующей точной настройки. Неправильная конфигурация может привести к деоптимизации (весь маршрут становится динамическим) или ошибкам сборки.
+
+3.1. Глобальная и сегментированная конфигурация
+В Next.js 15 конфигурация PPR вынесена в файл next.config.ts. Рекомендуется использовать стратегию incremental, которая позволяет включать PPR постранично, минимизируя риски для стабильных разделов приложения.
+
+Таблица 1. Сравнение режимов PPR
+
+Режим	Описание	Применимость	Риски
+false (Default)	Стандартное поведение (SSR или SSG).	Легаси-проекты, простые сайты.	Отсутствие преимуществ PPR.
+incremental	Явное включение PPR для конкретных маршрутов.	Сложные приложения, миграция.	Требует ручной настройки каждого layout.tsx или page.tsx.
+true	Принудительный PPR для всего приложения.	Новые проекты (Greenfield).	Высокий риск ошибок несовместимости с библиотеками.
+Конфигурация next.config.ts: Для активации функции необходимо использовать флаг experimental.ppr. Обратите внимание, что API активно меняется, и в последних Canary-версиях могут потребоваться дополнительные флаги совместимости.
+
+TypeScript
+// next.config.ts
+import type { NextConfig } from 'next';
+
+const nextConfig: NextConfig = {
+  experimental: {
+    // Включаем инкрементальный режим PPR
+    ppr: 'incremental',
+    // Опционально: контроль кэширования компонентов (Next.js 16 preview)
+    // cacheComponents: true,
+  },
+  // Строгий режим React важен для корректной работы Suspense и гидратации
+  reactStrictMode: true,
+  images: {
+    // Оптимизация форматов для LCP
+    formats: ['image/avif', 'image/webp'],
+  },
+};
+
+export default nextConfig;
+3.2. Активация на уровне маршрута (Route Segment Config)
+Для включения PPR на конкретной странице (например, /dashboard или /gallery) необходимо экспортировать константу experimental_ppr в файле макета или страницы.
+
+TypeScript
+// app/gallery/layout.tsx или app/gallery/page.tsx
+
+// Включение PPR для данного сегмента маршрута
+export const experimental_ppr = true;
+
+export default function Layout({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="gallery-layout">
+      {/* Статическая навигация (часть Static Shell) */}
+      <nav className="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-md">
+        <Logo />
+        <Menu />
+      </nav>
+      {children}
+    </div>
+  );
+}
+3.3. Границы Suspense и Динамические "Дырки"
+Суть оптимизации PPR — правильное расположение границ Suspense. Все, что находится вне Suspense, должно быть статичным. Все, что требует доступа к кукам, заголовкам или параметрам поиска (searchParams), должно быть обернуто в Suspense.
+
+Антипаттерн: Деоптимизация Static Shell Если вы обратитесь к динамическим данным (например, cookies()) в компоненте, который не обернут в Suspense, Next.js не сможет сгенерировать статическую оболочку, и страница откатится к стандартному динамическому рендерингу (SSR), нивелируя преимущества PPR.   
+
+Правильная реализация с searchParams: В приложениях галерей часто используются параметры URL для фильтрации. Передача searchParams в качестве пропа в клиентский компонент или чтение их в серверном компоненте делает его динамическим.
+
+TypeScript
+// app/gallery/page.tsx
+import { Suspense } from 'react';
+import { GalleryGrid } from '@/components/GalleryGrid';
+import { GallerySkeleton } from '@/components/skeletons';
+
+// Указываем, что PPR включен
+export const experimental_ppr = true;
+
+// Page компонент в App Router получает searchParams как проп
+export default function GalleryPage({
+  searchParams,
+}: {
+  searchParams: { q?: string; category?: string };
+}) {
+  // ВАЖНО: Не "await" searchParams здесь, если вы хотите, чтобы оболочка страницы (заголовок и т.д.)
+  // осталась статической. Передайте их в компонент, обернутый в Suspense.
+  
+  return (
+    <main className="pt-20 px-4">
+      <h1 className="text-4xl font-bold mb-8">Визуальная коллекция</h1>
+      
+      {/* Граница Suspense определяет "дырку" для динамического контента */}
+      <Suspense fallback={<GallerySkeleton />}>
+        {/* GalleryGrid - это серверный компонент, который выполняет fetch */}
+        <GalleryGrid query={searchParams} />
+      </Suspense>
+    </main>
+  );
+}
+3.4. Обработка ошибок и "CanaryOnlyError"
+В процессе внедрения вы можете столкнуться с ошибкой ``. Это связано с тем, что стабильные релизы (например, 15.0.0) могут временно отключать экспериментальные флаги, если в них найдены критические баги. Решение: либо обновиться до последней canary версии (npm install next@canary), либо ждать стабилизации фичи в минорных апдейтах 15.x.   
+
+4. Глубокая оптимизация Framer Motion
+Framer Motion — мощный инструмент, но он работает в основном в JavaScript-потоке (Main Thread). При большом количестве изображений и сложной верстке наивная реализация анимаций приводит к катастрофическому падению производительности.
+
+4.1. Техника FLIP и проблема Layout Thrashing
+Framer Motion использует технику FLIP (First, Last, Invert, Play) для анимации изменений макета (layout animations).
+
+Measure (First): Измеряет положение элемента.
+
+Mutate: Применяет изменения DOM (например, пересортировка списка).
+
+Measure (Last): Измеряет новое положение.
+
+Invert & Play: Вычисляет разницу и запускает трансформацию.
+
+Проблема возникает, когда множество элементов (например, сетка изображений) анимируются одновременно. Если каждый элемент пытается измерить себя (getBoundingClientRect) и изменить DOM независимо, браузер вынужден пересчитывать макет (Layout) многократно в одном кадре. Это называется Layout Thrashing.   
+
+Решение: Компонент <LayoutGroup> Оборачивание группы анимируемых компонентов в <LayoutGroup> заставляет Framer Motion пакетировать (batch) операции чтения и записи. Все измерения происходят за один проход, и все изменения DOM — за другой.
+
+TypeScript
+import { LayoutGroup, motion } from 'framer-motion';
+
+export const OptimizedGrid = ({ items }) => (
+  // Группировка предотвращает множественные reflow
+  <LayoutGroup>
+    <div className="grid grid-cols-3 gap-4">
+      {items.map(item => (
+        <motion.div
+          key={item.id}
+          layout
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+        >
+          <Card item={item} />
+        </motion.div>
+      ))}
+    </div>
+  </LayoutGroup>
+);
+4.2. Оптимизация свойства layout
+Проп layout (или layout={true}) заставляет Framer Motion анимировать и позицию, и размер (width/height). Анимация размеров — это дорогая операция, так как она затрагивает Layout-стадию пиксельного конвейера. Если элементы в сетке меняют только свое положение (перемешивание), но не физический размер, следует использовать layout="position". Это подсказывает библиотеке, что нужно отслеживать только координаты x и y, используя дешевые transform-свойства, пропуская вычисления размеров.   
+
+4.3. Аппаратное ускорение и will-change
+Для анимаций, которые не являются layout-трансформациями (например, hover-эффекты, параллакс), критически важно использовать свойства, которые обрабатываются только на этапе композитинга (Composite): transform и opacity.
+
+Свойство CSS will-change дает браузеру подсказку заранее создать отдельный слой для элемента (Layer Promotion). Однако его бездумное использование ("повесить на все картинки") приводит к исчерпанию видеопамяти (VRAM).
+
+Правило: Используйте will-change: transform точечно на элементах, которые будут анимироваться в ближайший момент (например, при наведении курсора или скролле в область видимости).   
+
+CSS
+/* Вредно: */
+* { will-change: transform; }
+
+/* Полезно: */
+.gallery-card {
+  /* Подготовка к трансформации при наведении */
+  will-change: transform;
+  /* Устранение субпиксельного дрожания в WebKit */
+  -webkit-backface-visibility: hidden; 
+  transform: translateZ(0);
+}
+4.4. Уменьшение размера бандла: LazyMotion
+Стандартный импорт motion тянет за собой весь движок анимаций (около 30-50 КБ gzipped), включая физику drag-n-drop и SVG-пути. Для улучшения TBT (Total Blocking Time) необходимо использовать динамическую загрузку функциональности.
+
+Используйте компонент <LazyMotion> с флагом domAnimation. Это загрузит только базовые функции (без физики жестов), что достаточно для большинства UI-анимаций, и сделает это асинхронно, не блокируя гидратацию.   
+
+TypeScript
+// app/layout.tsx
+import { LazyMotion, domAnimation } from "framer-motion";
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="ru">
+      <body>
+        {/* Загружаем движок анимаций асинхронно. 
+            domAnimation весит значительно меньше full-бандла. */}
+        <LazyMotion features={domAnimation} strict>
+          {children}
+        </LazyMotion>
+      </body>
+    </html>
+  );
+}
+5. Оркестрация ресурсов и Resource Hints
+Даже с идеально быстрым JS, LCP будет страдать, если браузер поздно обнаружит главное изображение или будет декодировать его в конкуренции с другими задачами.
+
+5.1. fetchpriority="high": Управление сетевой очередью
+Браузеры по умолчанию присваивают изображениям низкий приоритет по сравнению с CSS и блокирующими JS скриптами. LCP-изображение (обычно Hero-баннер) часто находится внизу очереди загрузки. Атрибут fetchpriority="high" (или priority проп в next/image) сигнализирует браузеру, что этот ресурс критически важен и его нужно загружать раньше вычисления макета.   
+
+Влияние на LCP: Исследования показывают улучшение LCP на 20-30% только за счет изменения приоритета в очереди загрузки, так как ресурс начинает загружаться на десятки миллисекунд раньше.
+
+5.2. Стратегия декодирования (decoding)
+Атрибут decoding управляет тем, как браузер раскодирует сжатые данные изображения (JPEG/WebP) в пиксели.
+
+async (дефолт во многих фреймворках): Декодирование происходит вне основного потока. Это предотвращает подергивания при скролле, но может задержать отрисовку уже загруженного изображения, ухудшая LCP.
+
+sync: Блокирует поток для декодирования. Для LCP-изображения это может быть полезно, так как мы хотим увидеть его немедленно после загрузки.   
+
+Рекомендация:
+
+LCP Изображение: priority (в Next.js автоматически ставит fetchpriority="high" и убирает loading="lazy"). Рассмотрите явное указание decoding="sync" или auto для самого важного изображения.
+
+Остальные изображения: loading="lazy" и decoding="async".
+
+5.3. Виртуализация через CSS: content-visibility
+В галереях с сотнями изображений (как в Pinterest) браузер тратит огромные ресурсы на расчет макета элементов, которые находятся далеко за пределами экрана (Rendering/Layout cost). Свойство content-visibility: auto позволяет браузеру пропустить рендеринг и отрисовку элементов, пока они не приблизятся к вьюпорту.
+
+Чтобы избежать "скачков" скроллбара, необходимо использовать contain-intrinsic-size, задавая примерную высоту элемента-заглушки.   
+
+CSS
+.gallery-item {
+  /* Элемент не рендерится, пока не попадет во viewport */
+  content-visibility: auto;
+  /* Резервируем место ~400px, чтобы скроллбар был корректным */
+  contain-intrinsic-size: 1px 400px; 
+}
+6. Раздел "Вредные советы" (Anti-Patterns)
+В стремлении к оптимизации разработчики часто допускают ошибки, которые приводят к обратному эффекту.
+
+"Lazy Load для всего!"
+
+Вредный совет: Добавить loading="lazy" ко всем изображениям на странице, чтобы сэкономить трафик.
+
+Реальность: Если вы добавите lazy к LCP-изображению (Hero), браузер не начнет его загрузку, пока не построит DOM и не вычислит Layout. Это гарантированно ухудшит LCP на сотни миллисекунд. LCP-элемент всегда должен быть eager.   
+
+"Анимируй box-shadow для красоты"
+
+Вредный совет: Использовать transition: box-shadow 0.3s при наведении на карточки.
+
+Реальность: box-shadow требует перерисовки (Paint) на каждом кадре анимации. Это тяжелая операция для CPU. При большом количестве элементов FPS упадет.
+
+Решение: Анимируйте opacity псевдо-элемента ::after, который содержит тень. opacity обрабатывается на GPU и не вызывает перерисовку макета.   
+
+"Поместим fetch данных в layout.tsx"
+
+Вредный совет: Запрашивать данные, зависящие от URL, в корневом макете для удобства.
+
+Реальность: В контексте PPR это фатально. Любой динамический запрос в корневом макете делает всю страницу динамической, отключая генерацию статической оболочки. Динамику нужно спускать максимально глубоко в дерево компонентов и оборачивать в Suspense.
+
+"SVG фильтры на весь экран"
+
+Вредный совет: Использовать CSS filter: url(#noise) на контейнере body для эффекта зернистости.
+
+Реальность: SVG-фильтры (особенно feTurbulence) математически сложны. Применение их к большим областям (Full HD+) может загрузить GPU на 100% и вызвать значительные задержки ввода (INP). Используйте статичные изображения с шумом или CSS-градиенты.   
+
+7. Итоговая архитектура решения (Code Implementation)
+Ниже представлен интегрированный пример реализации страницы, объединяющий все рассмотренные техники.
+
+Файл: app/portfolio/page.tsx
+
+TypeScript
+import { Suspense } from 'react';
+import { OptimizedGallery } from '@/components/OptimizedGallery';
+import { GallerySkeleton } from '@/components/Skeletons';
+import Image from 'next/image';
+
+// 1. Активация PPR для данного маршрута
+export const experimental_ppr = true;
+
+// Статическая часть страницы (Header, Intro)
+export default function PortfolioPage() {
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <header className="py-12 px-4 text-center">
+        <h1 className="text-4xl font-bold text-gray-900 mb-4">
+          Visual Experiences
+        </h1>
+        <p className="text-gray-600 max-w-2xl mx-auto">
+          Статическая оболочка загружается мгновенно (TTFB ~50ms).
+          Динамическая галерея стримится параллельно.
+        </p>
+      </header>
+
+      <main className="container mx-auto px-4">
+        {/* LCP Изображение - вне Suspense, часть статической оболочки (если возможно)
+            или первый элемент, который должен грузиться максимально быстро */}
+        <div className="relative h-[400px] w-full mb-12 rounded-2xl overflow-hidden">
+          <Image
+            src="/hero-work.jpg"
+            alt="Featured Work"
+            fill
+            priority // Автоматически: fetchpriority="high", loading="eager"
+            sizes="(max-width: 1200px) 100vw, 1200px"
+            className="object-cover"
+          />
+        </div>
+
+        {/* 2. Граница Suspense для динамического контента */}
+        <Suspense fallback={<GallerySkeleton />}>
+          {/* Асинхронный компонент, получающий данные */}
+          <AsyncGalleryLoader />
+        </Suspense>
+      </main>
+    </div>
+  );
+}
+
+async function AsyncGalleryLoader() {
+  // Эмуляция задержки БД или API запроса
+  const items = await fetchWorksFromCMS(); 
+  return <OptimizedGallery items={items} />;
+}
+Файл: components/OptimizedGallery.tsx (Client Component)
+
+TypeScript
+'use client';
+
+import { LayoutGroup, m, LazyMotion, domAnimation } from 'framer-motion';
+import Image from 'next/image';
+
+// Используем 'm' компонент вместо 'motion' для уменьшения бандла
+// Требует обертки LazyMotion в layout.tsx
+
+export const OptimizedGallery = ({ items }) => {
+  return (
+    // Группировка Layout-транзиций для предотвращения thrashing
+    <LayoutGroup>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {items.map((item, index) => (
+          <m.div
+            key={item.id}
+            layout="position" // Оптимизация: не анимировать width/height
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: index * 0.05 }}
+            className="group relative aspect-square bg-white rounded-xl shadow-sm overflow-hidden"
+            // CSS оптимизация рендеринга
+            style={{ contentVisibility: 'auto', containIntrinsicSize: '300px' }}
+          >
+            <Image
+              src={item.thumbnail}
+              alt={item.title}
+              fill
+              // Только первые элементы получают приоритет, остальные lazy
+              loading={index < 3? "eager" : "lazy"} 
+              sizes="(max-width: 768px) 100vw, 33vw"
+              className="object-cover transition-transform duration-500 group-hover:scale-105"
+            />
+            
+            {/* Оптимизированный эффект свечения (Opacity вместо Box-Shadow) */}
+            <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          </m.div>
+        ))}
+      </div>
+    </LayoutGroup>
+  );
+};
+8. Заключение
+Внедрение Partial Prerendering в Next.js 15 фундаментально меняет подход к построению высокопроизводительных интерфейсов, позволяя достичь показателей LCP, сравнимых со статическими сайтами, без потери динамических возможностей. Критическим фактором успеха является отказ от монолитного рендеринга в пользу стриминга через Suspense и строгая дисциплина в управлении ресурсами.
+
+Для приложений с Framer Motion ключевыми векторами оптимизации являются минимизация нагрузки на основной поток JS через LazyMotion, предотвращение Layout Thrashing с помощью LayoutGroup и перенос визуальных эффектов на уровень композитора браузера. Комбинация этих техник создает архитектуру, устойчивую к высокой нагрузке и обеспечивающую плавный пользовательский опыт даже на устройствах среднего ценового сегмента.
+
+Источники:
+
+   
+
+
+reactlibraries.com
+Partial Prerendering in Next.js 15: A Complete Guide - React Libraries
+Откроется в новом окне
+
+nextjs.org
+Getting Started: Partial Prerendering - Next.js
+Откроется в новом окне
+
+focusreactive.com
+Deep Dive into Web Performance: Mastering LCP Optimization for SEO Success
+Откроется в новом окне
+
+stackoverflow.com
+Why are my CSS animations consuming so many resources? - Stack Overflow
+Откроется в новом окне
+
+github.com
+Issue with Experimental PPR in Next.js 15 #74530 - GitHub
+Откроется в новом окне
+
+stackoverflow.com
+CanaryOnlyError: The experimental feature "experimental.ppr" can only be enabled when using the latest canary version of Next.js - Stack Overflow
+Откроется в новом окне
+
+reactlibraries.com
+Framer Motion vs Motion One: Mobile Animation Performance in 2025 - React Libraries
+Откроется в новом окне
+
+motion.dev
+LayoutGroup - Motion.dev
+Откроется в новом окне
+
+stackoverflow.com
+Framer Motion text gets distorted when animating with shared layouts - Stack Overflow
+Откроется в новом окне
+
+web.dev
+How to create high-performance CSS animations | Articles - web.dev
+Откроется в новом окне
+
+stackoverflow.com
+CSS performance relative to translateZ(0) - Stack Overflow
+Откроется в новом окне
+
+blog.logrocket.com
+Creating React animations in Motion (formerly Framer Motion) - LogRocket Blog
+Откроется в новом окне
+
+medium.com
+Animating React with Framer Motion: Improve Your UI with Fluid and Efficient Animations
+Откроется в новом окне
+
+developer.mozilla.org
+Fix your website's Largest Contentful Paint by optimizing image loading - MDN Web Docs
+Откроется в новом окне
+
+web.dev
+Optimize resource loading with the Fetch Priority API | Articles - web.dev
+Откроется в новом окне
+
+web.dev
+Image performance | web.dev
+Откроется в новом окне
+
+tunetheweb.com
+What does the image decoding attribute actually do? - Tune The Web
+Откроется в новом окне
+
+developer.mozilla.org
+content-visibility - CSS - MDN Web Docs - Mozilla
+Откроется в новом окне
+
+cekrem.github.io
+Introducing `content-visibility: auto` - A Hidden Performance Gem - cekrem.github.io
+Откроется в новом окне
+
+web.dev
+Optimize Largest Contentful Paint | Articles - web.dev
+Откроется в новом окне
+
+tobiasahlin.com
+How to animate box-shadow with silky smooth performance - Tobias Ahlin
+Откроется в новом окне
+
+stackoverflow.com
+Can you add noise to a CSS gradient? - Stack Overflow
+Откроется в новом окне
+
+css-tricks.com
+Grainy Gradients - CSS-Tricks
+Откроется в новом окне
+
+nextjs.org
+next.config.js: cacheComponents
+Откроется в новом окне
+
+nextjs.org
+Functions: useSearchParams | Next.js
+Откроется в новом окне
+
+reddit.com
+Next.js Partial Prerendering is an anti-pattern : r/nextjs - Reddit

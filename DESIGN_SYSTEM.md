@@ -102,6 +102,22 @@
 
 - **Class:** `.group` on parent, `.glitch-layer` on children.
 
+- **Режим Реальности:** Класс `glitch-reality` — чистый глитч без отражения и RGB-сдвига
+  ```css
+  .glitch-reality .glitch-layer {
+    transform: none !important;
+    filter: none !important;
+  }
+  ```
+
+- **Режим Изнанка:** Класс `glitch-mirror` — глитч с горизонтальным отражением и RGB-сдвигом
+  ```css
+  .glitch-mirror .glitch-layer {
+    transform: scaleX(-1);
+    filter: hue-rotate(...);
+  }
+  ```
+
 ### Framer Motion
 
 - **Entry:** `initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}`.
@@ -296,6 +312,54 @@
 - **Auto-detection:** Determines media type (image/video/audio)
 - **Auto-type:** ARCHAEOLOGIST if media present, else WITNESS
 - **Validation:** Client + server-side
+
+### GenerationDialog (Нейро-Синтезатор)
+
+- **Container:** `bg-[#0a0a0a]` с `border-primary/30` и `shadow-[0_0_50px_rgba(6,182,212,0.1)]`
+- **Header:** `bg-white/5` с `border-white/10`
+- **Sidebar:** `w-80` фиксированная ширина, `bg-black/40`, `border-white/10`
+- **Style Selector:** Grid `grid-cols-2`, кнопки с иконками
+- **Links Section:** Структурированные ссылки с подписями
+  - Google Search: `bg-blue-500/10 border-blue-500/20 text-blue-300`
+  - Прямые ссылки: `bg-green-500/10 border-green-500/20 text-green-300`
+- **Logs Terminal:** `bg-black` с `font-mono text-xs text-green-500/80`
+- **Footer Actions:** `bg-black/40` с `border-white/10`
+
+### LockedContent (Заглушка блокированного контента)
+
+- **Container:** `bg-darkCard border border-light/10 rounded-xl p-8 min-h-[200px]`
+- **Backdrop:** `bg-dark/80 backdrop-blur-sm z-10`
+
+- **Неоновое свечение (только для Реальности):**
+  - Красный слева: `bg-[radial-gradient(ellipse_at_left,_rgba(220,38,38,0.8)_0%,_rgba(220,38,38,0.4)_40%,_rgba(220,38,38,0.1)_60%,_transparent_70%)] mix-blend-screen animate-pulse-slow z-[15]`
+  - Синий справа: `bg-[radial-gradient(ellipse_at_right,_rgba(6,182,212,0.7)_0%,_rgba(6,182,212,0.3)_40%,_rgba(6,182,212,0.1)_60%,_transparent_70%)] mix-blend-screen animate-pulse-slow z-[15]` с `animationDelay: '1s'`
+
+- **Частицы (spore-locked):**
+  - Класс: `.spore-locked` с анимацией `spore-float-locked`
+  - Позиционирование: `absolute inset-0 pointer-events-none z-[5]`
+  - Количество: 9 частиц
+  - Движение: по всему блоку в разные стороны (не только вверх)
+  - Размеры: 3px × 3px, белые с `opacity: 0.8-0.9`
+  - CSS переменные: `--spore-x` (горизонтальное смещение), `--spore-start-y` (начальная позиция по высоте), `--spore-start-x` (начальное смещение по X)
+
+- **Текст:**
+  - Реальность: `text-stranger-red text-sm font-bold animate-pulse` — "Требуется переход в Изнанку для доступа к скрытым слоям реальности."
+  - Изнанка: `text-light/50 text-sm` — "Доступ к архивам Изнанки возможен только после верификации памяти."
+
+- **Кнопка RealitySwitch:**
+  - Позиционирование: `relative z-30` с `zIndex: 50, pointerEvents: 'auto'`
+  - Обертка: `div` с `pointerEvents: 'auto'` для обеспечения кликабельности
+  - Интегрирована непосредственно в `LockedContent` для режима Реальности
+
+- **Анимация частиц:**
+  ```css
+  @keyframes spore-float-locked {
+    0% { transform: translateY(calc(var(--spore-start-y, 100%))) translateX(calc(var(--spore-start-x, 0px))) rotate(0deg); opacity: 0; }
+    5% { opacity: 1; }
+    50% { transform: translateY(calc(var(--spore-start-y, 100%) - 50%)) translateX(calc(var(--spore-start-x, 0px) + var(--spore-x, 0) * 0.6vw)) rotate(180deg); opacity: 1; }
+    100% { transform: translateY(calc(var(--spore-start-y, 100%) - 110%)) translateX(calc(var(--spore-start-x, 0px) + var(--spore-x, 0) * 1.2vw)) rotate(360deg); opacity: 0; }
+  }
+  ```
 
 ---
 

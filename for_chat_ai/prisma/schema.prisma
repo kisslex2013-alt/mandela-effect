@@ -1,0 +1,211 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Effect {
+  id          String  @id @default(cuid())
+  title       String
+  description String
+  content     String
+  category    String
+  imageUrl    String?
+  videoUrl    String?
+  
+  // Источник изображения
+  imageSourceType  ImageSourceType?
+  imageSourceValue String? // URL к оригиналу, имя файла, или null для загрузки
+  
+  // Статистика
+  votesFor     Int @default(0)
+  votesAgainst Int @default(0)
+  views        Int @default(0)
+  
+  // Новые фичи
+  residue          String? // Культурные следы
+  residueSource    String? // Ссылка для остатков
+  history          String? // История открытия
+  historySource    String? // Ссылка для истории
+  yearDiscovered   Int?
+  similarEffectIds String[] @default([]) // Массив ID похожих
+  currentState     String? // Текущее состояние (факты)
+  
+  // Интерпретации (научные объяснения и версии сообщества)
+  interpretations Json?
+
+  // Видимость эффекта
+  isVisible Boolean @default(true) // Скрыт ли эффект от публичного каталога
+  
+  submissions Submission[] // Связь, если эффект создан из заявки
+  comments    Comment[] // Комментарии к эффекту
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Submission {
+  id String @id @default(cuid())
+  
+  // Основные поля формы
+  category String
+  title    String
+  question String
+  variantA String
+  variantB String
+  
+  // Дополнительные поля
+  currentState   String? // "Описание текущего состояния"
+  sourceLink     String? // "Ссылка на источник"
+  submitterEmail String? // "Ваш email"
+  
+  // Поле для блока "Интерпретации" (храним как JSON объект, так как там может быть много подпунктов)
+  interpretations Json? 
+
+  // Технические поля
+  status    String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  createdAt DateTime @default(now())
+  
+  // Связь с созданным эффектом (на будущее)
+  createdEffectId String?
+  createdEffect   Effect? @relation(fields: [createdEffectId], references: [id])
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  slug      String   @unique // например "films", "brands"
+  name      String // например "Фильмы и сериалы"
+  emoji     String // например "🎬"
+  color     String? // цвет для бейджа, опционально (например "red", "blue")
+  sortOrder Int      @default(0) // порядок сортировки
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Голоса пользователей (привязаны к анонимному visitorId)
+model Vote {
+  id        String   @id @default(cuid())
+  visitorId String // Анонимный ID посетителя (из localStorage/cookie)
+  effectId  String // ID эффекта
+  variant   String // 'A' или 'B'
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@unique([visitorId, effectId]) // Один голос на эффект от одного посетителя
+  @@index([visitorId])
+  @@index([effectId])
+}
+
+// Профили пользователей (для будущей авторизации)
+model UserProfile {
+  id         String   @id @default(cuid())
+  visitorId  String   @unique // Связь с анонимным ID
+  email      String?  @unique // Email для Magic Link (опционально)
+  provider   String? // 'email', 'google', 'github' (опционально)
+  providerId String? // ID от провайдера OAuth (опционально)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([email])
+}
+
+// Результаты генерации цифрового ID Хроно-Путешественника
+model IdentityResult {
+  id          String   @id @default(cuid())
+  syncRate    Int // Процент синхронизации с текущей реальностью (0-100)
+  archetype   String // Заголовок (например: "Сквозной Дрифтер")
+  description String // Уникальное описание от AI
+  stats       Json? // Хранение статистики по категориям { "films": 80, "brands": 20 }
+  createdAt   DateTime @default(now())
+
+  // Опциональная связь, если пользователь авторизован
+  userId String?
+  // user User? @relation... (пока не добавляем связь жестко, чтобы не ломать текущую User модель если она есть)
+}
+
+// Комментарии к эффектам (Архив Аномалий)
+model Comment {
+  id        String @id @default(cuid())
+  effectId  String // ID эффекта
+  visitorId String // Анонимный ID пользователя
+
+  // Тип комментария
+  type CommentType // WITNESS, ARCHAEOLOGIST, THEORIST
+
+  // Контент
+  text     String
+  imageUrl String? // Внешняя ссылка на изображение (для Археологов)
+  videoUrl String? // Внешняя ссылка на видео (для Археологов)
+  audioUrl String? // Внешняя ссылка на аудио (для Археологов)
+
+  // Для Теоретиков - выбор базовой теории
+  theoryType String? // "quantum", "timeline", "memory", "simulation", "other"
+
+  // Модерация
+  status      CommentStatus @default(PENDING) // PENDING, APPROVED, REJECTED
+  moderatedAt DateTime?
+
+  // Взаимодействие
+  likes   Int @default(0)
+  dislikes Int @default(0)
+  reports Int @default(0)
+
+  // Связь с эффектом
+  effect Effect @relation(fields: [effectId], references: [id], onDelete: Cascade)
+  
+  // Лайки пользователей
+  commentLikes CommentLike[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([effectId])
+  @@index([visitorId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// Лайки/дизлайки комментариев
+model CommentLike {
+  id        String   @id @default(cuid())
+  commentId String
+  visitorId String
+  isLike    Boolean  // true = лайк, false = дизлайк
+  
+  comment Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+  
+  @@unique([commentId, visitorId]) // Один лайк/дизлайк на комментарий от одного пользователя
+  @@index([commentId])
+  @@index([visitorId])
+}
+
+enum CommentType {
+  WITNESS // Свидетели - простые комментарии
+  ARCHAEOLOGIST // Археологи - с фото/видео/аудио
+  THEORIST // Теоретики - с выбором теории
+}
+
+enum CommentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ImageSourceType {
+  YANDEX
+  GOOGLE
+  URL
+  UPLOAD
+}

@@ -1,0 +1,274 @@
+CSS-only: «пыль в воздухе» (floating particles)
+
+Идея: не canvas, а многослойные псевдоэлементы с маленькими radial-gradientами + transform/opacity анимацией. GPU-дружественно: использовать transformиopacity(композит на GPU), избегатьbox-shadow` с большим радиусом и постоянных repaint'ов.
+
+HTML:
+
+<div class="stage">
+  <header class="hero">STRANGER</header>
+  <!-- содержимое UI -->
+</div>
+
+
+CSS (чистый, можно превратить в Tailwind utilities):
+
+.stage{
+  position:relative; overflow:hidden;
+  isolation:isolate; /* чтобы blend повёлся локально */
+}
+
+/* базовый слой частиц */
+.stage::before,
+.stage::after{
+  content:"";
+  position:absolute; inset:0; pointer-events:none;
+  background-repeat: repeat;
+  /* используем много маленьких radial-gradient слоёв */
+  background-image:
+    radial-gradient(circle at 20% 30%, rgba(255,255,255,0.08) 0 1px, transparent 2px),
+    radial-gradient(circle at 60% 70%, rgba(255,255,255,0.06) 0 1.2px, transparent 2.2px),
+    radial-gradient(circle at 80% 20%, rgba(255,255,255,0.04) 0 0.9px, transparent 2px);
+  background-size: 120px 120px, 180px 180px, 100px 100px;
+  mix-blend-mode: screen;
+  transform: translateZ(0);
+  will-change: transform, opacity;
+}
+
+/* медленное дрейфование разных слоёв */
+.stage::before{
+  animation: driftA 28s linear infinite;
+  opacity: .9;
+  filter: blur(.3px);
+}
+.stage::after{
+  animation: driftB 36s linear infinite;
+  opacity: .7;
+  mix-blend-mode: overlay;
+  transform-origin:center;
+  filter: blur(.6px);
+}
+
+@keyframes driftA{
+  from{ transform: translateY(-5%) translateX(0); }
+  50%{ transform: translateY(5%) translateX(3%); }
+  to{ transform: translateY(-5%) translateX(0); }
+}
+@keyframes driftB{
+  from{ transform: translateY(8%) translateX(-4%); }
+  50%{ transform: translateY(-6%) translateX(6%); }
+  to{ transform: translateY(8%) translateX(-4%); }
+}
+
+
+Пояснение: никакого JS, никакого repaint'а контента — только трансформы псевдоэлементов. При необходимости уменьшите количество слоёв или частоту анимации для низкопроизводительных устройств.
+
+Пример похожей реализации на CodePen (чисто CSS частицы). 
+codepen.io
+
+«Красный туман» / Upside Down atmosphere (CSS gradients + masks)
+
+Цель: объёмный красный/фиолетовый туман, без тяжелых фильтров. Используем градиенты, radial mask и mix-blend-mode + backdrop-filter (опционально).
+
+/* контейнер тумана */
+.fog {
+  position:absolute; inset:0; pointer-events:none;
+  background:
+    radial-gradient(40% 40% at 20% 30%, rgba(255,40,60,0.25), transparent 40%),
+    radial-gradient(60% 40% at 80% 70%, rgba(90,10,110,0.18), transparent 35%),
+    linear-gradient(180deg, rgba(10,0,20,0.05), rgba(0,0,0,0.2));
+  mix-blend-mode: screen; /* или overlay в зависимости от сцены */
+  mask-image: radial-gradient(closest-side, rgba(0,0,0,1), rgba(0,0,0,0.6), transparent 70%);
+  animation: fogShift 40s linear infinite;
+  filter: saturate(1.2) contrast(1.05);
+  will-change: transform;
+}
+
+@keyframes fogShift{
+  0%{ transform: translateY(-1%); }
+  50%{ transform: translateY(1%); }
+  100%{ transform: translateY(-1%); }
+}
+
+
+Опция: для локального затемнения/инверсии подложки используйте mix-blend-mode: multiply на отдельном слое. backdrop-filter: blur(4px) добавит глубину, но бэкдроп-фильтр дорогой — ставьте через @supports и включайте только для десктопа.
+
+Анимация заголовка (в стиле заставки): сближение букв + свечение (CSS)
+
+Стратегия: анимировать letter-spacing, transform и text-shadow. Использовать text-rendering: optimizeLegibility; и will-change: transform, letter-spacing для GPU.
+
+HTML:
+
+<h1 class="sv-title">STRANGER THINGS</h1>
+
+
+CSS:
+
+.sv-title{
+  font-family: "Benguiat-like", Georgia, serif; /* заменить на выбранный шрифт */
+  font-size: clamp(28px, 6vw, 96px);
+  letter-spacing: 0.6em;
+  transform-origin:center;
+  color:#ffefe6;
+  text-shadow:
+    0 0 6px rgba(255,80,90,0.85),
+    0 0 18px rgba(255,40,60,0.55),
+    0 12px 30px rgba(0,0,0,0.7);
+  animation: titleIn 2.2s cubic-bezier(.2,.8,.2,1) forwards;
+  will-change: letter-spacing, transform;
+}
+
+@keyframes titleIn{
+  0%{
+    letter-spacing: 1.2em;
+    transform: translateY(6%) scale(.98);
+    opacity: .0;
+    filter: blur(1px);
+  }
+  60%{
+    opacity: 1;
+    filter: blur(0);
+  }
+  100%{
+    letter-spacing: 0.06em; /* финальное сближение */
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* подпись — дополнительный «неоновый» эффект: */
+.sv-title::after{
+  content:"";
+  position:absolute; inset:0;
+  mix-blend-mode: screen;
+  pointer-events:none;
+  background: linear-gradient(90deg, rgba(255,0,50,0.12), rgba(255,220,200,0.08));
+  opacity:0.9;
+}
+
+
+Совет: для «мерцания» не используйте JS — добавьте 1–2 мелких ключевых кадров, изменяющих text-shadow alpha.
+
+Есть готовые примеры 80s text/SVG-filter эффектов на CodePen. 
+codepen.io
+
+SVG-фильтры
+Film Grain через SVG (feTurbulence)
+
+feTurbulence может дать бесшовную зернистость. Важная оговорка: анимация самого feTurbulence (baseFrequency) дорогостоящая в рендере. Хитрость: сгенерировать tile (small pattern) один раз и анимировать положение слоя (translate) CSS-transformом — это гораздо дешевле чем постоянное перерасчёт фильтра.
+
+SVG (встроить в HTML):
+
+Рекомендации по производительности:
+
+Если feTurbulence всё же нужен анимированным — анимируйте очень медленно и с минимальными частотами.
+
+Лучший вариант: сгенерировать feTurbulence один раз, сохранить как tiny SVG (встраиваемый), использовать его как background-image: url('data:image/svg+xml;...') и двигать/тасовать слой CSS-трансформом. Это даёт маленький сетевой вес и минимальную перерисовку. Пример этой техники и обсуждение оптимизации — на CodePen. 
+codepen.io
+
+Хроматическая аберрация (сдвиг цветовых каналов)
+
+Принцип: разделить каналы, сместить каждый и сложить. Реализация через SVG filter: feColorMatrix + feOffset для каждой маски канала. Это легче, чем WebGL, и даёт контролируемый эффект для UI-элементов.
+
+SVG:
+
+Применение:
+
+.ui-card { filter: url(#chromAber); }
+
+
+Опции: уменьшите offsets и используйте mask/clip-path чтобы эффект показывался только на границах или при :hover — так снизите perceptual load.
+
+Есть рабочие примеры хроматической аберрации на CodePen. 
+codepen.io
+
+Шрифты (Benguiat-like, с кириллицей)
+
+Факт: оригинальный логотип Stranger Things — ITC Benguiat (коммерческий). На Google Fonts такой нет. Практическая стратегия:
+
+Для точной копии — купить/приобрести лицензию ITC Benguiat (если нужен бренд-идентитет).
+
+Для веба и кириллицы — подобрать ближайший свободный display-шрифт с декоративными засечками; затем применять стили (tracked caps, letter-spacing, текстовые тени) чтобы приблизить атмосферу.
+
+Предложения Google Fonts с поддержкой кириллицы, которые дают декоративный «ретро»-вкус и читаются в вебе:
+
+Piazzolla — хороший выразительный сериф с кириллической поддержкой; подходит для заголовков и даёт тот классический «викторианский» колорит. 
+Google Fonts
++1
+
+Forum — декоративный, округлый, поддерживает кириллицу; можно использовать для логотипоподобных заголовков. 
+Google Fonts
+
+Как комбинировать:
+
+Заголовки: Piazzolla/Forum (woff2, только необходимые веса и subset=cyrillic — чтобы держать вес минимальным).
+
+Тело: Inter / Roboto / Source Sans Pro (с кириллицей) — для читаемости.
+
+Пример подключения (Next.js — next/font/google или классический link):
+
+<link href="https://fonts.googleapis.com/css2?family=Piazzolla:wght@400;700&display=swap&subset=cyrillic" rel="stylesheet">
+
+
+Пояснение: subset=cyrillic уменьшит загрузку.
+
+Если нужна ещё большая схожесть — можно взять одну из свободных дигитал-реплик Benguiat (Bengal, Bengal-typefaces, или Benguiat Frisky) и self-host woff2, соблюдая лицензию. Ссылки и сравнительные подборки альтернатив — см. подборки похожих шрифтов и обзоры. 
+typewolf.com
++1
+
+Сравнение производительности — CSS vs JS (кратко, прямо)
+
+CSS (transform, opacity, text-shadow, gradients, blend-mode): минимальные repaint'ы, GPU compositing, низкая нагрузка CPU. Идеально для анимаций интерфейса и статичных декоративных эффектов.
+
+SVG filters:
+
+Простые операции (feColorMatrix без анимации, feOffset) — дешёвые.
+
+feTurbulence и анимация параметров — может быть дорогой; обходной путь: рендер один раз + двигать слой CSS-transform (cheap). CodePen авторы рекомендуют эту технику. 
+codepen.io
+
+JS / Canvas / WebGL (Three.js):
+
+Много возможностей, но существенный байт-вес и CPU/GPU нагрузка. Для вашего бюджета (<50KB JS) — неприемлемо, если только вы не используете CDN и минимизируете всё до tiny libs.
+
+Практический совет: «пыль», «туман», «свет» — делайте на CSS. «Пленочная зернистость» лучше через tiny SVG или static tiled PNG (woff2-like size tradeoff). Хроматическая аберрация — SVG для отдельных элементов, не на весь документ.
+
+Интеграция в Next.js + Tailwind — практические советы
+
+Шрифты: используйте next/font/google (или self-host woff2) и подгружайте только subset: ['cyrillic'] и нужные веса.
+
+CSS: вынесите тяжёлые эффекты в отдельные слои (position:absolute; pointer-events:none;) чтобы основное дерево рендерилось отдельно и GPU-композитор делал свою работу.
+
+Адаптивность: добавляйте @media (prefers-reduced-motion: reduce) чтобы отключать анимации для пользователей, которые этого хотят.
+
+Лайт-версия: включайте/выключайте фильтры по классу .reduced-effects (серверный флаг или user toggle), чтобы держать нагрузку минимальной на слабых устройствах.
+
+Ссылки / примеры (CodePen, Google Fonts)
+
+CSS particles (pure CSS example). 
+codepen.io
+
+SVG film grain (feTurbulence pattern + оптимизация). 
+codepen.io
+
+Chromatic aberration demo (SVG/CSS). 
+codepen.io
+
+80s / Stranger Things text effects (пример с SVG фильтрами). 
+codepen.io
+
+Google Fonts: Piazzolla (поддержка кириллицы). 
+Google Fonts
+
+Google Fonts: Forum (с кириллицей). 
+Google Fonts
+
+Быстрые меры по экономии веса (читай: как не убить 50KB JS)
+
+Ноль JS для визуальных эффектов, кроме микровзаимодействий.
+
+Использовать woff2 + subset=cyrillic, предзагрузка (link rel="preload" as="font").
+
+SVG-фильтры инлайнами (не отдельные большие растровые PNG).
+
+Lazy load декоративных слоёв за пределами первой «fold» (ключевые UI-части загружаются раньше).
+
+— конец.

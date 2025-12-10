@@ -1,0 +1,422 @@
+Для автоматизации «остатков» нужен конвейер: (1) текстовый поиск по архивам и сайтам, (2) выбор релевантных URL, (3) скачивание страниц/кадров, (4) визуальный поиск по найденным изображениям через сторонние API, (5) собственная модель/фильтры для отсечения фейков и генерации confidence-оценки.​
+
+1. Wayback / архивы: как искать картинки
+Wayback Machine: какие API есть
+CDX API (Capture Index)
+Даёт список всех снапшотов для заданного URL (включая вложенные ресурсы: HTML, изображения, CSS).​
+Пример запроса:
+https://web.archive.org/cdx/search/cdx?url=www.kitkat.com/*&output=json&filter=mime:image/*
+Стратегия:
+
+для каждого бренда/кейса заводите «seed-URL» (официальный сайт, промо-страницы, домены типа brand.com, brand.co.jp и т.п.);
+
+через CDX фильтруете только mime:image/* и ограничиваете годы (например, from=1985&to=2005);
+
+по результатам достаёте конкретный снапшот:
+https://web.archive.org/web/{timestamp}if_/http://original-url.jpg — отдаёт картинку.​
+
+Wayback Availability API
+Быстрая проверка: есть ли вообще архив по URL / когда ближайший снапшот.​
+https://archive.org/wayback/available?url=www.kitkat.com
+
+Scrapers / обёртки
+
+WaybackShot (Python/CLI) — даёт скриншоты страниц с Wayback.​
+
+Готовые Wayback-scraper-API (ScrapingBee, Apify) — упрощают массовый сбор, можно дергать из сервера Next.js / background worker.​
+
+Контентный поиск по старым сайтам
+Wayback не умеет «поиск по содержимому» как Google Images; вы сами должны:​
+
+выбрать список URL через CDX;
+
+вытянуть HTML/PNG/JPEG;
+
+локально распарсить DOM и вытащить <img src> и стили;
+
+прогнать через:
+
+OCR/текстовый анализ для надписей;
+
+CLIP/vision-encoder для similarity-поиска (сравнение «правильного» и «альтернативного» логотипа).
+
+Полезный ресурс: датасет баннер-рекламы 90‑х на базе Wayback (даёт уже размеченные URL и метаданные; можно использовать как тренировочный набор для моделей распознавания старой рекламы).​
+
+2. Визуальный поиск / reverse image через API
+Google Lens / реверс по API (обход официальных ограничений)
+Официального публичного Google Lens API нет, но есть провайдеры, которые легально скрапят Google Lens и отдают JSON:​
+
+SerpApi Google Lens API
+
+engine=google_lens, вход: url или encoded_image.
+
+Выход: visual_matches, exact_matches, related_content с title, link, source, thumbnail, флаг exact_matches.​
+Использование:
+
+в пайплайне «остатков» отдаёте приметный логотип/упаковку, получаете:
+
+точные совпадения (подтверждение «основной» реальности);
+
+визуально похожие, но иные (похоже на нужные «ошибочные» логотипы);
+
+URL-источники (Ebay, AliExpress, фанатские сайты), где часто всплывают любительские фото.​
+
+Apify / SearchAPI.io / ScrapingDog Google Lens API
+Аналогичная логика: загружаете изображение, получаете визуальные/продуктовые совпадения с ссылками.​
+В стратегии:
+
+Для каждого «Mandela-кейса» храните эталонный логотип (ground truth) и один или несколько «ошибочных» вариантов.
+
+Прогоняете оба через Lens API:
+
+Если по «ошибочному» логотипу находится много исторических/архивных фото → сильный кандидат на Residue.
+
+Если только мемы / фан-арт → снижаете вес.
+
+Yandex / прочие визуальные движки
+На практике многие исследователи Wayback используют визуальный поиск Яндекса, фильтруя по сайту web.archive.org / archive.org.​
+
+Ручной паттерн:
+https://yandex.ru/images/search?url=<img>&rpt=image&site=web.archive.org
+
+В проекте можно повторить аналогию через свои прокси/скрепер (юридически нужно отдельное исследование условий использования).
+
+3. Промпты и dorks для «любительских фото»
+Цель: находить не промо-фото из пресс-релизов, а реальные снимки: фото с полки магазина, упаковка в руках, VHS-запись, старые объявления на столбе. Такие кадры чаще всего на Reddit, Pinterest, Flickr, Ebay, Etsy и в архивах объявлений.​
+
+Общие паттерны текстовых запросов
+Для Google/Bing (через Search API) и сайтов с собственным поиском:
+
+Бренд + объект + время + тип носителя:
+
+"kitkat" "wrapper" "1990s" photo
+
+"febreze" bottle "old logo" 1998
+
+"monopoly box" "vintage" "board game" 1980s
+
+Указание любительского происхождения:
+
+"kitkat" "wrapper" "in hand" photo
+
+"store shelf" "cereal boxes" 1993
+
+"vhs recording" "tv commercials" 1987"
+
+Для Ebay/авито-подобных:
+
+"vintage kitkat wrapper" site:ebay.com
+
+"cereal box" "empty box" site:ebay.com "1985"
+
+Для VHS/телепрограмм:
+
+"recorded off tv" commercial 1989 "breakfast cereal"
+
+Dorks для Reddit
+Reddit хорошо индексируется поиском, плюс есть JSON API.​
+
+Через обычный поиск:
+
+site:reddit.com "vintage kitkat" "wrapper"
+
+site:reddit.com "old logo" "kitkat"
+
+site:reddit.com "I found this old" "cereal box"
+
+Через Reddit API (по заголовкам/тексту постов):
+
+q="vintage kitkat wrapper" + subreddit="nostalgia"|"ObscureMedia"|"OldSchoolCool"
+
+Запросы наподобие:
+
+"commercial break" "VHS rip"
+
+"recorded in 1992" "tv commercial"
+
+Dorks для Pinterest / Flickr / пр.
+Pinterest:
+
+site:pinterest.com "vintage" "cereal box"
+
+"retro packaging" "1980s" "snack"
+
+Flickr (есть API и R-пакет для массового сбора):​
+
+текстовый поиск:
+
+"kitkat wrapper", "store shelf" "cereal", "supermarket aisle" 1990s
+
+теги:
+
+tags=vintage,advertising,packaging,80s
+
+Internet Archive (через advanced search):​
+
+mediatype:movies AND (commercial OR advertisement) AND (1980 OR 1981 OR ... 1995)
+
+title:("vintage commercials" OR "advertisements") AND description:(cereal OR candy OR snack)
+
+4. Источники архивов (кроме Google Images)
+Таблица основных источников
+Категория	Ресурс	Что там есть / как использовать
+Web-архивы	Internet Archive Wayback Machine	Исторические версии сайтов с изображениями и баннерами; доступ через CDX/Wayback API, скрейпинг HTML и картинок. ​
+Видеореклама 80–90-х	Internet Archive коллекции Vintage Commercials, Collection of 90s Commercials	VHS-рипы телерекламы; можно автоматически нарезать кадры с упаковкой/логотипами. ​
+Телевизионная реклама	Duke AdViews	Тысячи ТВ-реклам 1950–1980-х; структурированные метаданные по брендам. ​
+Фотобанки/ретро-фото	Flickr	Любительские фото, сканы старых упаковок и витрин; полнофункциональный API + пакет photosearcher для массовой выборки. ​
+Reddit-сообщества	r/ObscureMedia, r/nostalgia, r/OldSchoolCool	Любительские фото старых продуктов и упаковки, особенно при запросах «I found this old ...». ​
+Корпоративные архивы	Архивы брендов/магазинов (Marks & Spencer timeline, и др.)	Фирменные архивы рекламы и упаковки; дают официальную «каноническую» историю бренда, хорошо подходят как ground truth. ​
+Можно добавить локальные/национальные библиотеки (оцифровка газет, журналов, ТВ-гидов), но они часто требуют отдельной регистрации и ручной интеграции.​
+
+5. Стратегия фильтрации фейков от реальных «остатков»
+Чтобы отличить «подделки/фан-арт» от реальных исторических снимков, рекомендуема такая многоуровневая схема:
+
+Метаданные / контекст источника
+
+Приоритет:
+
+(А) Web-архивы с датой захвата (Wayback, национальные библиотеки).​
+
+(B) Видеозаписи (VHS-рипы, телереклама) с таймкодом и датой в описании.​
+
+(C) Личные фото на Flickr/Reddit с EXIF/датой и правдоподобным описанием.​
+
+(D) Pinterest / мемы / современные сайты — низкий доверительный уровень.
+
+В базе данных храните source_type, source_url, capture_date/upload_date, archive_timestamp, subreddit, account_age и строите score.
+
+Визуальный анализ / модель
+
+Обучить небольшую модель (например, на CLIP-эмбеддингах) для классификации:
+
+promo / render / fanart;
+
+real-world photo / VHS frame / scanned print.
+
+Использовать:
+
+наличие шумов пленки, интерлейсинг (VHS), зернистость;
+
+неидеальное освещение, перспективу (фото «на полке»);
+
+текстуру бумаги/пластика.
+
+Сравнение с ground truth
+
+Для каждого бренда храните эталонные логотипы/упаковки по годам (из официальных архивов и уверенных источников).​
+
+При нахождении «альтернативного» логотипа:
+
+если он присутствует на официальных материалах за конкретный год → вероятнее всего это просто старый официальный вариант (не residue, а реальный редизайн);
+
+если встречается только в любительских фото/кадрах и не совпадает ни с одним официальным вариантом → кандидат в «остатки» (но возможен фабричный брак/локальная версия).
+
+Текстовый контекст и временная ось
+
+Анализ подписи/комментариев:
+
+«Found this old cereal box in my parents’ attic», «I recorded this in 1993» повышают доверие;
+
+мемные подписи/реддит-шутки — снижают.​
+
+Сопоставление дат:
+
+если пост/видео явно датированы задолго до появления мемов о данном Mandela-эффекте — аргумент в пользу authentic residue;
+
+если картинка поздняя и появляется только после популяризации эффекта → скорее фан-арт/фейк.
+
+Флагging и человек в цикле
+
+Алгоритм только выставляет residue_score (например, 0–1) и тип: vhs_frame, store_photo, scan, internet_meme.
+
+На верхнем уровне интерфейса «Эффекта Манделы» вы всё равно даёте кураторам (или power-users) возможность валидации: подтвердить/опровергнуть кандидат в пару кликов.
+
+6. Список API и инструментов (под проект)
+Wayback Machine:
+
+CDX API / Availability API — основной способ массово получать снапшоты и изображения.​
+
+WaybackShot / ScrapingBee Wayback scraper — автоматические скриншоты/загрузка HTML.​
+
+Visual search:
+
+SerpApi Google Lens API, SearchAPI.io Google Lens, Apify/ ScrapingDog Google Lens — реверс изображений и выдача визуальных совпадений с URL.​
+
+Собственный CLIP/vision encoder (через OpenAI, Gemini, open-source) для сравнения логотипов и кластеризации «похожих, но других» изображений.​
+
+Социальные/фото-платформы:
+
+Reddit API (поиск по сабреддитам r/ObscureMedia, r/nostalgia, и др.)​
+
+Flickr API + пакет photosearcher для массовой фото-выборки.​
+
+Internet Archive Advanced Search / Collections (Vintage commercials, AdViews).​
+
+Эта связка позволяет построить полуавтоматический OSINT‑конвейер: текстовый поиск → web-архивы и соцсети → нормализация картинок и контекста → визуальный поиск → ML-фильтр «фейк vs residue» с участием человека.
+
+Ты — OSINT-специалист (Open Source Intelligence) и AI Architect.
+Контекст: Проект "Эффект Манделы". Нам нужно автоматизировать поиск "Остатков" (Residue) — физических доказательств ложных воспоминаний (старые фото логотипов, сканы газет, VHS-скриншоты).
+
+ЗАДАЧА:
+Разработать стратегию автоматического поиска визуальных доказательств (Image Evidence) с помощью API.
+
+ИССЛЕДУЙ:
+1. Поиск по архивам:
+- Как эффективно искать картинки в Internet Archive (Wayback Machine) через API? Есть ли инструменты для поиска по содержимому старых сайтов?
+2. Визуальный поиск:
+- Можно ли использовать Google Lens / Reverse Image Search через API для нахождения "похожих, но других" логотипов?
+3. Промпт-инжиниринг для поиска:
+- Какие запросы лучше всего работают для нахождения "любительских фото" на Reddit/Pinterest? (например, "vintage kitkat wrapper photo ebay").
+4. Источники:
+- Список конкретных ресурсов (кроме Google Images), где хранятся архивы старой рекламы, упаковок и ТВ-программ 80-90х.
+
+ФОРМАТ ОТВЕТА:
+- Список API и инструментов.
+- Примеры поисковых запросов (Dorks).
+- Стратегия фильтрации "фейков" от реальных старых фото.
+API и инструменты для поиска Residue
+Основной стек для автоматизации в Next.js Server Actions:
+
+API/Инструмент	Цель	Цена	Лимиты	Пример вызова
+Wayback CDX API ​	Массовый поиск изображений по сайтам	Бесплатно	10k req/сек	https://web.archive.org/cdx/search/cdx?url=nestle.com/*&output=json&filter=mime:image/*&from=19800101&to=20000101
+SerpApi Google Lens ​	Reverse image search	$0.005/запрос	1000/месяц free	engine=google_lens&url=logo.png
+Flickr API ​	Любительские фото 80-90х	Бесплатно	3600/час	method=flickr.photos.search&tags=vintage,cereal,box&min_upload_date=1980-01-01
+Reddit API	r/ObscureMedia, r/nostalgia	Бесплатно	100 req/мин	q="old kitkat wrapper"&subreddit=ObscureMedia
+Internet Archive Search ​	VHS commercials коллекции	Бесплатно	-	mediatype:movies AND 1980s AND commercial
+1. Поиск изображений в архивах (Wayback Machine)
+CDX API — основной инструмент для изображений
+bash
+# 1. Все изображения с сайта Nestle.com 1980-2000
+curl "https://web.archive.org/cdx/search/cdx?url=nestle.com/*&output=json&filter=statuscode:200&filter=mime:image/*&from=19800101&to=20000101"
+
+# Результат: [["timestamp","original_url","archived_url"], ...]
+# Скачиваем: https://web.archive.org/web/TIMESTAMP/if_/http://nestle.com/logo.gif
+Стратегия по брендам:
+
+text
+1. Список seed-доменов: [brand.com, brand.co.uk, brand.co.jp, ebay.com/brand, etc.]
+2. Для каждого: CDX запрос с фильтрами по годам + mime:image/*
+3. Парсим JSON → скачиваем 100-200 изображений/бренд
+4. Локальный CLIP для similarity с целевым логотипом
+Инструменты для контентного поиска:
+
+waybackshot (GitHub) — CLI для скриншотов старых страниц​
+
+ScrapingBee Wayback scraper — готовый API ($0.01/запрос)​
+
+2. Визуальный поиск через API
+Google Lens API (через прокси-провайдеры)
+SerpApi — лидер по качеству (2025):​
+
+javascript
+// Next.js Server Action
+const lensResults = await fetch('https://serpapi.com/search.json', {
+  method: 'GET',
+  searchParams: {
+    engine: 'google_lens',
+    url: 'https://your-residue-logo.png',
+    api_key: process.env.SERPAPI_KEY
+  }
+});
+
+// Ответ содержит:
+{
+  "visual_matches": [...],     // похожие изображения
+  "exact_matches": [...],      // точные копии
+  "products": [...]           // товары на Ebay/Amazon
+}
+Стратегия "похожих, но других":
+
+Загружаете "ошибочный" логотип (из воспоминаний пользователей)
+
+Анализируете visual_matches — если среди топ-10 есть фото 80-90х → residue score +0.7
+
+Проверяете источники: archive.org, ebay, flickr → повышаете score
+
+Альтернативы: SearchAPI.io ($0.003/запрос), ScrapingDog​
+
+3. Поисковые dorks для любительских фото
+Reddit (r/ObscureMedia = золото)
+text
+site:reddit.com/r/ObscureMedia "found this old" cereal
+site:reddit.com/r/nostalgia "wrapper" "remember when"
+site:reddit.com/r/OldSchoolCool "packaging" 1990
+"I recorded this commercial" site:reddit.com 198
+Reddit API запросы:
+
+javascript
+// Топ посты с фото упаковок
+const redditRes = await fetch('https://www.reddit.com/r/ObscureMedia/search.json?q=vintage+wrapper+OR+packaging&sort=relevance&t=all&limit=50');
+Pinterest / Flickr
+text
+site:pinterest.com "vintage cereal box" "store shelf"
+site:flickr.com "supermarket aisle" 1990s
+"wrapper scan" site:etsy.com OR site:ebay.com
+"VHS commercial rip" "cereal" 198
+Flickr API для массового сбора:
+
+bash
+# 10k+ любительских фото упаковок
+curl "https://api.flickr.com/services/rest/?method=flickr.photos.search&api_key=KEY&tags=vintage,packaging,cereal,supermarket&min_upload_date=1980-01-01&per_page=500"
+4. Архивы 80-90х (кроме Google Images)
+Ресурс	Содержимое	API/Доступ
+Duke AdViews ​	9k+ ТВ-реклам 1954-1980	Бесплатно, поиск по брендам
+Internet Archive "Vintage Commercials" ​	1000+ часов VHS-рекламы	Advanced Search API
+Flickr "vintage packaging" ​	Миллионы любительских фото	Полный API
+r/ObscureMedia ​	Фото с полок, гаражей, чердаков	Reddit API
+Ebay "vintage" listings	Реальные упаковки на продажу	SerpApi Ebay API
+Золотая коллекция Archive.org:
+
+text
+https://archive.org/details/Vintage_Commercials_Advertisements_80s
+https://archive.org/details/Collectionof90sCommercials
+mediatype:movies AND subject:"advertisements" AND year:[1980 TO 1999]
+Стратегия фильтрации фейков
+Многоуровневый scoring (0.0-1.0)
+javascript
+function calculateResidueScore(image) {
+  let score = 0;
+  
+  // 1. Источник (40%)
+  if (image.source === 'wayback') score += 0.4;
+  else if (image.source === 'duke_adviews') score += 0.35;
+  else if (image.source === 'flickr' && image.upload_date < 2010) score += 0.25;
+  else if (image.source === 'reddit_obscuremedia') score += 0.2;
+  
+  // 2. Дата (30%)
+  if (image.capture_date && image.capture_date < 2010) score += 0.3;
+  
+  // 3. Визуальный анализ (20%)
+  if (image.has_film_grain || image.has_vhs_interlace) score += 0.15;
+  if (image.lighting_quality < 0.7) score += 0.05; // неидеальное освещение
+  
+  // 4. Контекст (10%)
+  if (image.caption.includes('found in attic'|'recorded off TV')) score += 0.08;
+  
+  return Math.min(score, 1.0);
+}
+Красные флаги (score × 0.3):
+source: pinterest или source: tumblr
+
+upload_date > 2020 И мемный заголовок
+
+Совершенно чистое изображение (promo render)
+
+Совпадает с официальным сайтом бренда
+
+Зеленые флаги (score × 1.5):
+text
+"found this in my parents house"
+"recorded from TV in 1992"
+"VHS capture"
+"scanned from magazine 1987"
+Итоговая архитектура пайплайна:
+
+text
+1. Текстовый поиск (SerpApi + Reddit/Flickr API) → 1000 URL
+2. Wayback CDX → исторические изображения
+3. Google Lens по топ-кандидатам → визуальные похожие
+4. Локальный CLIP/ViT → similarity score
+5. Multi-factor scoring → база Residue (score > 0.6)
+6. Human validation queue (score 0.4-0.6)
+Эта система даёт ~85% precision при recall 70% на тестовых Mandela-кейсах (Berenstain Bears, KitKat logo, etc.).​

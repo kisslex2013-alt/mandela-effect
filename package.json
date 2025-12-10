@@ -4,10 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev --webpack",
+    "dev:clean": "npm run clean && next dev --webpack",
     "build": "prisma generate && next build --webpack",
     "postinstall": "prisma generate",
     "start": "next start",
     "lint": "eslint",
+    "clean": "node -e \"const fs = require('fs'); const path = require('path'); function rmDir(dir) { if (fs.existsSync(dir)) { fs.readdirSync(dir).forEach(f => { const curPath = path.join(dir, f); if (fs.lstatSync(curPath).isDirectory()) rmDir(curPath); else fs.unlinkSync(curPath); }); fs.rmdirSync(dir); } } rmDir('.next'); console.log('✅ Кеш очищен');\"",
     "analyze": "cross-env ANALYZE=true next build --webpack",
     "db:seed": "npx prisma db seed",
     "db:reset-demo": "cross-env SEED_MODE=demo npx prisma db push --force-reset && cross-env SEED_MODE=demo npx prisma db seed",

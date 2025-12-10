@@ -235,6 +235,34 @@ export async function getUserVotes(visitorId: string): Promise<UserVoteStats> {
 }
 
 /**
+ * Получить все голоса пользователя в формате для синхронизации
+ * Возвращает массив объектов { effectId, variant }
+ */
+export async function getUserVotedEffects(visitorId: string): Promise<Array<{ effectId: string; variant: 'A' | 'B' }>> {
+  try {
+    if (!visitorId) {
+      return [];
+    }
+
+    const votes = await prisma.vote.findMany({
+      where: { visitorId },
+      select: {
+        effectId: true,
+        variant: true,
+      },
+    });
+
+    return votes.map((v) => ({
+      effectId: v.effectId,
+      variant: v.variant as 'A' | 'B',
+    }));
+  } catch (error) {
+    console.error('[getUserVotedEffects] Ошибка:', error);
+    return [];
+  }
+}
+
+/**
  * Получить статистику пользователя с деталями
  */
 export async function getUserStats(visitorId: string): Promise<{

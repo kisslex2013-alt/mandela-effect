@@ -4,8 +4,8 @@ import OpenAI from 'openai';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { STYLE_PRESETS } from '@/lib/constants';
 import { searchResidue } from '@/lib/exa';
+import { generateResidueDorks } from '@/lib/dorks';
 
-// Интерфейс для результата генерации
 interface GeneratedEffectInfo {
   currentState: string;
   scientific: string;
@@ -59,9 +59,8 @@ function normalizeToString(val: any): string {
   return String(val);
 }
 
-function ensureUrl(url: string | undefined, title: string, suffix: string): string {
-  if (url && url.startsWith('http') && url.length > 10) return url;
-  return `https://www.google.com/search?q=${encodeURIComponent(title + ' ' + suffix)}`;
+function createGoogleSearchUrl(query: string): string {
+  return `https://www.google.com/search?q=${encodeURIComponent(query)}`;
 }
 
 async function generateWithDeepSeek(systemPrompt: string, userPrompt: string): Promise<string | null> {
@@ -117,23 +116,48 @@ export async function generateEffectData(
   
   console.log(`[generateEffectData] Generating for: ${title}`);
 
-  // 1. Ищем реальные доказательства (RAG)
   let residueContext = "";
   let foundResidueLink = "";
   
   try {
-    const searchResults = await searchResidue(title);
+    // 1. УТОЧНЯЕМ ПОИСК: ищем фото и доказательства, избегая статей
+    const searchTitle = /[а-яА-Я]/.test(title) 
+      ? `${title} эффект манделы фото доказательство старая упаковка` 
+      : `${title} mandela effect residue evidence photo vintage`;
+
+    const searchResults = await searchResidue(searchTitle);
+    
     if (searchResults.length > 0) {
+      // 2. ФИЛЬТРАЦИЯ: Стараемся избегать Хабр, Википедию и новостные сайты в качестве "доказательства"
+      const bestResult = searchResults.find(r => 
+        !r.url.includes('wikipedia.org') && 
+        !r.url.includes('habr.com') && 
+        !r.url.includes('meduza.io') &&
+        !r.url.includes('vc.ru')
+      ) || searchResults[0];
+      
+      foundResidueLink = bestResult.url;
       residueContext = `
-      REAL FOUND EVIDENCE (Use this to write the 'residue' section):
-      ${searchResults.map(r => `- [${r.publishedDate || 'Unknown Date'}] ${r.title}: ${r.text}`).join('\n')}
+      REAL FOUND EVIDENCE (Use this specific fact for 'residue' section):
+      - Title: ${bestResult.title}
+      - Context: ${bestResult.text}
       `;
-      foundResidueLink = searchResults[0].url;
-      console.log(`[generateEffectData] Found ${searchResults.length} residue links`);
+      console.log(`[generateEffectData] ✅ Found residue link: ${foundResidueLink}`);
     }
   } catch (e) {
     console.warn('[generateEffectData] Exa search failed, proceeding without RAG');
   }
+
+  // Fallback: Если ссылка все равно плохая (или её нет) - берем Dork на форум
+  const dorks = generateResidueDorks(title);
+  
+  // Если найденная ссылка - это Хабр/Вики, лучше заменить её на Dork (поиск по форумам)
+  if (foundResidueLink && (foundResidueLink.includes('habr') || foundResidueLink.includes('wikipedia'))) {
+     foundResidueLink = ""; // Сбрасываем, чтобы использовался fallback
+  }
+
+  const fallbackResidueLink = dorks.length > 0 ? dorks[0].url : createGoogleSearchUrl(`${title} residue discussion`);
+  const finalResidueLink = foundResidueLink || fallbackResidueLink;
 
   const systemPrompt = `
 ТЫ — ЭКСПЕРТ ПО ЭФФЕКТУ МАНДЕЛЫ.
@@ -143,19 +167,13 @@ export async function generateEffectData(
 2. Написать тексты для карточки.
 3. Сгенерировать VISUAL PROFILER (imagePrompt).
 
-${residueContext ? 'ВАЖНО: Используй предоставленные "REAL FOUND EVIDENCE" для написания раздела "residue". Это реальные факты.' : ''}
+${residueContext ? 'ВАЖНО: У тебя есть НАЙДЕННОЕ ДОКАЗАТЕЛЬСТВО в блоке "REAL FOUND EVIDENCE". Обязательно используй этот факт в поле residue.' : 'ВАЖНО: Реальных доказательств не найдено. В поле residue напиши, что "пользователи часто вспоминают этот вариант в обсуждениях", но не выдумывай конкретный источник.'}
 
 ПРАВИЛА ДЛЯ ТЕКСТА (Русский):
-- residue: Приводи конкретные примеры.
+- residue: Приводи конкретные примеры заблуждений. Не ссылайся на Хабр или Википедию.
 - scientific: Объясни работу памяти.
-
-ПРАВИЛА ДЛЯ ССЫЛОК:
-- Если у тебя есть реальная ссылка из контекста, используй её.
-- Иначе генерируй Google Search.
-
-ПРАВИЛА ДЛЯ VISUAL PROFILER (English):
-- Описывай ЛОЖНОЕ ВОСПОМИНАНИЕ (Вариант А).
-- НЕ используй имена. Описывай внешность.
+- history: Краткая история реального объекта.
+- community: Реакция соцсетей.
 
 ВЕРНИ ТОЛЬКО JSON:
 {
@@ -165,11 +183,6 @@ ${residueContext ? 'ВАЖНО: Используй предоставленны�
   "community": "...",
   "history": "...",
   "residue": "...",
-  "sourceLink": "...",
-  "scientificSource": "...",
-  "communitySource": "...",
-  "historySource": "...",
-  "residueSource": "${foundResidueLink || '...'}", 
   "imagePrompt": "..."
 }`;
 
@@ -196,12 +209,13 @@ ${residueContext ? 'ВАЖНО: Используй предоставленны�
       history: normalizeToString(parsed.history),
       residue: normalizeToString(parsed.residue),
       
-      sourceLink: ensureUrl(parsed.sourceLink, title, 'Mandela Effect'),
-      scientificSource: ensureUrl(parsed.scientificSource, title, 'scientific explanation'),
-      communitySource: ensureUrl(parsed.communitySource, title, 'reddit theory'),
-      historySource: ensureUrl(parsed.historySource, title, 'history'),
-      // Если Exa нашла ссылку, используем её, иначе то, что дал AI, иначе Google
-      residueSource: foundResidueLink || ensureUrl(parsed.residueSource, title, 'residue proof'),
+      // ИСПОЛЬЗУЕМ НАШУ ЛУЧШУЮ ССЫЛКУ (Или фото, или форум)
+      residueSource: finalResidueLink,
+      
+      historySource: createGoogleSearchUrl(`${title} история создания факты`),
+      scientificSource: createGoogleSearchUrl(`ложная память конфабуляция научное объяснение`),
+      communitySource: createGoogleSearchUrl(`${title} mandela effect reddit pikabu discussion`),
+      sourceLink: createGoogleSearchUrl(`${title} mandela effect`),
       
       category: parsed.category || 'other',
       imagePrompt: parsed.imagePrompt,

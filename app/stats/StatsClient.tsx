@@ -2,6 +2,8 @@
 
 import { useMemo, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+
+// Прямой импорт Recharts - компонент загружается только на клиенте через StatsClientWrapper с ssr: false
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, LabelList, Tooltip } from 'recharts';
 import ImageWithSkeleton from '@/components/ui/ImageWithSkeleton';
 import Link from 'next/link';

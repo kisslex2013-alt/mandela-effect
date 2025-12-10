@@ -1,0 +1,257 @@
+Коротко — концепт
+
+Захват изображений → 2. Индексация (метаданные, OCR, эмбеддинги) → 3. Массовый reverse/visual-search → 4. Кросс-корреляция временных срезов (Wayback/CommonCrawl/архивы) → 5. Верификация (EXIF, ELA, JPG QTs, provenance) → 6. Ручная проверка высокого риска.
+
+Инструменты / API (список, что брать и зачем)
+
+Wayback Machine / CDX API — для поиска захватов страниц и изображений по URL/паттерну; позволяет фильтры по MIME и дате. Используется как первичный источник временных снимков страниц. 
+Архив Интернета
++1
+
+Internet Archive Advanced Search / archive.org API / python client — для коллекций, материалов VHS, сканов и отдельных предметов (items). Удобно для скачивания asset’ов и метаданных. 
+help.archive.org
++1
+
+Common Crawl / CC index — массовый интернет-краул с API/индексом; полезно, если нужно найти упоминания/изображения вне Wayback. Можно параллельно опрашивать индекс. 
+index.commoncrawl.org
+
+Archive.today / Memento — альтернативные снапшоты страниц (иногда хранит скриншоты и «застывшие» JS-страницы). Применять как дополнение к Wayback. 
+Википедия
+
+TinEye (коммерческий) — надёжный reverse image search API для нахождения копий/вариаций изображений (включает изменённые/обработанные варианты). Платный, но индекс профессионального уровня. 
+services.tineye.com
++1
+
+Bing Visual Search (Azure Cognitive Services) — официальный visual search / similar images; можно искать по URL/файлу и получать похожие результаты и инсайты. Хорошая альтернатива Google Lens. 
+Microsoft Learn
+
+Google Cloud Vision + Vision Product Search — для распознавания логотипов/текста/labels; Product Search можно конфигурировать для поиска похожих предметов по изображению. Официальная замена «Lens» для бэкенда. (Google Lens у потребителя; прямого «официального» публичного Lens API нет — есть Google Vision/Cloud APIs и сторонние неофициальные прокси). 
+scrapfly.io
++1
+
+SerpAPI / scraping-API провайдеры (BrightData, Apify, Scraping-API) — если нужно массово опрашивать Pinterest/Google Images/eBay (официальных API либо нет, либо ограничены). Использовать аккуратно и с ротацией прокси. 
+ScraperAPI
++1
+
+Pushshift / Reddit dumps / Reddit API — поиск «любительских» фотографий в сабреддитах и исторических постах (Pushshift — удобная историческая копия). Учти ставки доступа и правила. 
+pushshift.io
++1
+
+ExifTool, Forensically, Amped Authenticate (коммерческая) — инструменты для автоматизированного извлечения метаданных и первичного анализа подписи/манипуляций (EXIF, JPEG QTs, ELA). 
+29a.ch by Jonas Wagner
++1
+
+Примеры запросов / код (готовые сниппеты)
+1) Wayback CDX — найти все image-captures для домена/URL
+
+curl:
+
+# все jpeg/png/gif захваты для example.com, json
+curl "https://web.archive.org/cdx/search/cdx?url=example.com/*&output=json&filter=mimetype:image/jpeg&filter=mimetype:image/png&filter=mimetype:image/gif&from=1980&to=2005&collapse=digest"
+
+
+Параметры: url, output=json, filter=mimetype:..., from/to, collapse (по digest/URL чтобы убрать дубли). Док: Wayback CDX API. 
+Архив Интернета
++1
+
+2) Internet Archive search (item search) — пример через API / curl
+# поиск items с медиа 'vhs' или 'video' по ключевому слову
+curl "https://archive.org/advancedsearch.php?q=(collection:(texts) OR mediatype:(movies) )AND title:(\"vhs\" OR \"tv\" OR \"promo\")&fl[]=identifier, title, mediatype, subject&output=json"
+
+
+Используй python-client internetarchive для batch загрузок. 
+help.archive.org
++1
+
+3) TinEye — пример запроса (curl)
+curl -s -u "API_USER:API_PASS" \
+  -F "image_url=https://example.com/suspic.jpg" \
+  "https://api.tineye.com/rest/search/"
+# или POST raw image
+
+
+Результат — список совпадений с URL, датами, score. Док: TinEye API. 
+services.tineye.com
++1
+
+4) Bing Visual Search (пример, POST)
+curl -X POST "https://api.bing.microsoft.com/v7.0/images/visualsearch" \
+ -H "Ocp-Apim-Subscription-Key: YOUR_KEY" \
+ -F "image=@/path/to/probe.jpg"
+
+
+Ответ содержит похожие изображения, инсайты, страницы. 
+Microsoft Learn
+
+5) Common Crawl — найти URL по домену
+
+Простой пример: обратиться к index.commoncrawl.org/конкретному индексу. Документация — index API. 
+index.commoncrawl.org
++1
+
+Промпт-инжиниринг / Dorks — запросы для поиска «любительских фото» и упаковок
+
+(формулируй как ключевые слова + площадка + year ranges + synonyms). Примеры готовых запросов:
+
+eBay / Etsy / Google / Pinterest:
+
+vintage "Kit Kat" wrapper photo ebay
+
+1980s "KitKat" packaging scan "wrapper" "photo"
+
+"old logo" "Kit Kat" 1985 "packaging" "scan"
+
+"vhs screenshot" "tv ad" "1989" "brand name"
+
+Reddit / Pushshift:
+
+subreddit:r/nostalgia title:("vintage" OR "scan" OR "photo") "kit kat" OR "kitkat"
+
+site:reddit.com "vintage kitkat wrapper" OR "old candy wrapper photo"
+
+Archive-oriented (Internet Archive / Wayback):
+
+site:archive.org "KitKat" wrapper
+
+site:web.archive.org "kit kat" "wrapper" "198"
+
+Generic Dorks (Google/SerpAPI):
+
+"vintage %BRAND% wrapper photo" OR "packaging scan" OR "box scan" filetype:jpg
+
+"%BRAND% logo 198* scan" OR "%BRAND% advertisement 198*"
+
+Подставлять %BRAND%, использовать OR/кавычки, диапазоны годов. Для Pinterest/Instagram — ключи вроде vintage packaging, old wrapper.
+
+Pipeline архитектура (автоматизируемый)
+
+Seed sources: список брендов/названий/вариаций логотипов (включая опечатки).
+
+Crawl Layer:
+
+Wayback CDX + Internet Archive collection queries + CommonCrawl index + Archive.today queries.
+
+Social dumps: Pushshift + SerpAPI для Pinterest/Img SERP + eBay search API / scraping.
+
+Visual Layer (per image):
+
+EXTRACT: download image + store origin URL + Wayback capture timestamp.
+
+ANALYZE: OCR (Google Vision or Tesseract) → извлечь текст/маркировку.
+
+EMBED: compute visual embedding (CLIP или Google Vision feature vector).
+
+REVERSE: TinEye + Bing Visual Search + SerpAPI image scraping — вернуть похожие и место появления.
+
+Correlation:
+
+Сопоставить совпадения по хешам, похожести эмбеддингов, OCR-тексту и временным штампам.
+
+Если несколько независимых архивах (Wayback + IA + eBay listing) указывают на одну и ту же картинку/дата — повышаем доверие.
+
+Forensic filter:
+
+EXIF extraction (ExifTool) → если GPS/timestamp совпадает с claimed, +1.
+
+JPEG Quantization Tables сравнение (если доступно) → проверка на источник камеры/сканера.
+
+ELA / noise/clone detect (Forensically) — пометка на сильное/слабое вмешательство.
+
+Score / triage: комбинированный скор (provenanceScore, forensicScore, independentSources). Высокий score → ручная проверка.
+
+Стратегия фильтрации фейков vs реально старых фото
+
+Автоматизация — это статистика и признаки. Правила, которые реально работают в практике OSINT:
+
+A. Признаки «реальности»
+
+Наличие независимых источников: та же картинка/описание найдена в Wayback snapshot, на eBay listing с датой и в архиве новостей. (важно: независимость доменов).
+
+Дата-штамп страницы: Wayback/CC capture показывает страницу/листинг в нужном году. 
+Архив Интернета
++1
+
+EXIF/JPEG QT соответствие: quantization table и другие признаки указывают на период/устройство (сканер vs camera). 
+Amped Blog
+
+Физические артефакты: целостность полутоновой печати, скан-артефакты, пыль/царапины — сложнее подделать массово.
+
+Контекст: совпадение с газетой/рекламой того времени (OCR текста на картинке совпадает с газетной версией в архиве).
+
+B. Признаки «фейка» / ремейка
+
+EXIF полностью отсутствует и картинка впервые появляется в соцсетях в последние годы без старых упоминаний.
+
+Высокая степень цифровой обработки: неоднородный ELA, резкие разницы JPEG QTs, артефакты клонирования. (использовать Forensically / ELA). 
+29a.ch by Jonas Wagner
++1
+
+Одно-источниковая цепочка: появляется только в одном инстаграм-посте/фэйк-магазине и нигде больше.
+
+Reverse search выдаёт предшествующие результаты, где файл использован как часть коллажа/мема → вероятный современный монтаж.
+
+C. Автоматические правила (пример)
+
+if independent_sources >= 2 AND wayback_capture_date <= claimed_year + 2 AND forensic_score >= threshold then mark as 'likely original' else 'suspicious'.
+
+if tinEye_matches >= N AND earliest_match_date < claimed_year+2 then +provenance.
+
+Практические советы / хитрости
+
+Не полагаться на один reverse API: комбинируй TinEye + Bing Visual Search + SerpAPI (Google scraping) — разные индексы дают разные покрытия. 
+services.tineye.com
++2
+Microsoft Learn
++2
+
+Сохраняй полную мета-цепочку: исходный URL, capture URL, capture timestamp, HTTP headers, sha256 файла, и результаты OCR/embeddings — нужен chain of custody.
+
+Работа с Pinterest / Etsy / eBay: официальные API ограничены; для массового поиска придётся использовать scraping-APIs (Apify, BrightData) или SerpAPI. 
+Apify Blog
++1
+
+Параметры для image queries: передавать уменьшенные thumbnails для скоринга, но использовать оригинал (full) для forensic checks.
+
+Приспособь rate limits: Wayback/CDX и TinEye — имеют лимиты; делай очередь и retry/backoff.
+
+Быстрые Dorks и шаблоны (копировать-вставить)
+
+site:web.archive.org "BRAND" "wrapper" filetype:jpg
+
+site:archive.org "vhs" "BRAND" OR "commercial" title:BRAND
+
+site:ebay.com "vintage" "BRAND" "wrapper" photo
+
+site:pinterest.* "vintage BRAND packaging" OR "BRAND wrapper scan"
+
+subreddit:r/nostalgia "BRAND" "scan" OR "wrapper" OR "vintage"
+
+Риски, легальность и этика (кратко)
+
+Scraping коммерческих платформ часто нарушает TOS и может требовать прокси/rotating IP. Используй официальный API где возможно. Серийные массовые запросы по Google без SerpAPI приведут к блокировкам. 
+ScraperAPI
++1
+
+Полезные ссылки (чтобы не терять время)
+
+Wayback / CDX API docs. 
+Архив Интернета
+
+Internet Archive API / python client. 
+help.archive.org
++1
+
+Common Crawl index overview. 
+index.commoncrawl.org
+
+TinEye API docs. 
+services.tineye.com
+
+Bing Visual Search overview (Azure). 
+Microsoft Learn
+
+Forensically (image forensics toolkit) + ExifTool pointers. 
+29a.ch by Jonas Wagner
++1
+
+— Конец.

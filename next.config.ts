@@ -16,6 +16,20 @@ const nextConfig: NextConfig = {
       // Увеличиваем таймаут для AI генерации
       allowedOrigins: ['localhost:3000'],
     },
+    // Оптимизация компиляции в dev режиме
+    optimizePackageImports: ['lucide-react', 'framer-motion', 'recharts'],
+  },
+
+  // Очистка кэша для проблемных модулей
+  webpack: (config, { dev, isServer }) => {
+    if (dev && !isServer) {
+      // Очищаем кэш для удаленных файлов
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        '@/lib/lazy-charts': false, // Блокируем импорт удаленного файла
+      };
+    }
+    return config;
   },
 
   // Оптимизация изображений

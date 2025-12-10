@@ -1,0 +1,317 @@
+Для стиля под Stranger Things лучше опираться на чистый CSS, SVG-фильтры и аккуратную типографику: это даёт атмосферу «Upside Down» при почти нулевом JS и хорошо укладывается в бюджет < 50 KB.​
+
+1. CSS-only: пыль, туман, титры
+Пыль в воздухе (без Canvas)
+Идея: несколько псевдоэлементов с radial-gradient как фоновым изображением, плюс очень медленные @keyframes (1–2 анимации на весь экран, не на тысячи слоёв). Это дешевле, чем рендерить частицы JS-циклами или Canvas, и не добавляет JS-байты.​
+
+css
+/* Контейнер поверх всего UI */
+.dust-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 40;
+  mix-blend-mode: screen;
+  opacity: 0.35;
+}
+
+.dust-layer::before,
+.dust-layer::after {
+  content: "";
+  position: absolute;
+  inset: -10%;
+  background-image:
+    radial-gradient(circle at 10% 20%, rgba(255,255,255,0.14) 0, transparent 40%),
+    radial-gradient(circle at 70% 80%, rgba(255,255,255,0.1) 0, transparent 45%),
+    radial-gradient(circle at 40% 60%, rgba(255,255,255,0.08) 0, transparent 35%);
+  background-repeat: no-repeat;
+  animation: dust-drift 60s linear infinite;
+  will-change: transform;
+}
+
+.dust-layer::after {
+  opacity: 0.6;
+  animation-duration: 90s;
+  animation-direction: reverse;
+}
+
+@keyframes dust-drift {
+  0%   { transform: translate3d(0,0,0); }
+  50%  { transform: translate3d(10px,-20px,0); }
+  100% { transform: translate3d(0,0,0); }
+}
+В Next.js + Tailwind можно вынести это в globals.css и использовать <div className="dust-layer" /> в layout.tsx.
+
+Красный туман / Upside Down через градиенты и mask
+Идея: фон страницы тёмно-синий/чёрный, сверху слой с красным градиентом и полупрозрачной маской, который «просвечивает» UI, создавая туманный glow. Поддержка mask-image/-webkit-mask-image уже хорошая для современных браузеров.​
+
+css
+.upsidedown-fog {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 30;
+  background:
+    radial-gradient(circle at 50% 120%, rgba(255, 0, 0, 0.55), transparent 60%),
+    radial-gradient(circle at 10% 10%, rgba(255, 0, 80, 0.35), transparent 55%),
+    radial-gradient(circle at 90% 0%, rgba(255, 40, 40, 0.25), transparent 55%);
+  mix-blend-mode: screen;
+  opacity: 0.9;
+
+  /* маска, чтобы туман сильнее внизу и по краям */
+  -webkit-mask-image: radial-gradient(circle at 50% 120%, rgba(0,0,0,1), rgba(0,0,0,0) 70%);
+  mask-image: radial-gradient(circle at 50% 120%, rgba(0,0,0,1), rgba(0,0,0,0) 70%);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 140% 140%;
+  mask-size: 140% 140%;
+  animation: fog-breathe 40s ease-in-out infinite;
+}
+
+@keyframes fog-breathe {
+  0%, 100% { transform: scale(1) translate3d(0,0,0); opacity: 0.9; }
+  50%      { transform: scale(1.05) translate3d(0,-10px,0); opacity: 1; }
+}
+CSS-анимация текста в стиле заставки
+Название Stranger Things — это Benguiat-сереф с красным свечением и лёгким сближением букв.​
+
+css
+.stranger-title {
+  font-family: "Cormorant Garamond", "Times New Roman", serif; /* см. блок про шрифты */
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: #ff253a;
+  text-align: center;
+  position: relative;
+  font-size: clamp(2.5rem, 5vw, 4.5rem);
+  text-shadow:
+    0 0 6px rgba(255, 0, 40, 0.7),
+    0 0 18px rgba(255, 40, 40, 0.9);
+  animation: title-zoom 4s ease-out forwards;
+}
+
+/* эффект «сближения» букв и лёгкого zoom-in */
+@keyframes title-zoom {
+  0% {
+    letter-spacing: 1.1em;
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  40% {
+    opacity: 1;
+  }
+  100% {
+    letter-spacing: 0.3em;
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* лёгкое внутреннее свечения через псевдоэлемент */
+.stranger-title::after {
+  content: attr(data-shadow);
+  position: absolute;
+  inset: 0;
+  color: transparent;
+  text-shadow:
+    0 0 18px rgba(255,0,0,0.8),
+    0 0 32px rgba(255,0,0,0.9);
+  mix-blend-mode: screen;
+  opacity: 0;
+  animation: title-glow 4s ease-out 0.5s forwards;
+}
+
+@keyframes title-glow {
+  0%   { opacity: 0; }
+  60%  { opacity: 1; }
+  100% { opacity: 0.8; }
+}
+В JSX:
+
+tsx
+<h1 className="stranger-title" data-shadow="Мандела эффект">
+  Мандела эффект
+</h1>
+2. SVG-фильтры: grain и хроматическая аберрация
+Лёгкий Film Grain через SVG filter
+Самый дешёвый вариант: маленький noise.svg или procedural noise через feTurbulence, повешенный на контейнер/фон. Статический grain почти бесплатен; анимация (baseFrequency/seed) дороже и заметно грузит CPU, поэтому лучше оставить статичный или очень медленный.​​
+
+Вариант 1: SVG feTurbulence (1 filter, 1 DOM-узел)
+xml
+<svg width="0" height="0" style="position:absolute">
+  <filter id="film-grain">
+    <feTurbulence type="fractalNoise"
+                  baseFrequency="1"
+                  numOctaves="2"
+                  stitchTiles="stitch"
+                  result="noise" />
+    <feColorMatrix type="saturate" values="0" />
+    <feComponentTransfer>
+      <feFuncA type="linear" slope="0.25" /> <!-- прозрачность зерна -->
+    </feComponentTransfer>
+  </filter>
+</svg>
+css
+.film-grain-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+  filter: url(#film-grain);
+}
+Можешь повесить filter и на конкретный блок: className="card film-grain" и в CSS .film-grain { filter: url(#film-grain); }.​
+
+Вариант 2: noise-texture через background-image
+Если SVG-фильтр на больших областях даёт просадку, можно использовать заранее сгенерированный noise.png/noise.svg (1–2 KB) как фон, что дешевле в рантайме и не требует фильтров.​
+
+css
+.grain-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 20;
+  background-image: url("/textures/noise.svg");
+  background-size: 200px 200px;
+  mix-blend-mode: soft-light;
+  opacity: 0.25;
+}
+Хроматическая аберрация для UI-элементов
+SVG-фильтр с раздельными каналами и небольшим смещением. Важно применять его только к небольшим элементам (кнопки, логотип, модалки), иначе filter на весь экран будет дорогим.​
+
+xml
+<svg width="0" height="0" style="position:absolute">
+  <filter id="chromatic-aberration">
+    <!-- красный канал -->
+    <feColorMatrix in="SourceGraphic" type="matrix"
+      values="1 0 0 0 0
+              0 0 0 0 0
+              0 0 0 0 0
+              0 0 0 1 0" result="red" />
+    <feOffset in="red" dx="2" dy="0" result="redOffset" />
+
+    <!-- зелёный канал -->
+    <feColorMatrix in="SourceGraphic" type="matrix"
+      values="0 0 0 0 0
+              0 1 0 0 0
+              0 0 0 0 0
+              0 0 0 1 0" result="green" />
+    <feOffset in="green" dx="-1" dy="0" result="greenOffset" />
+
+    <!-- синий канал -->
+    <feColorMatrix in="SourceGraphic" type="matrix"
+      values="0 0 0 0 0
+              0 0 0 0 0
+              0 0 1 0 0
+              0 0 0 1 0" result="blue" />
+    <feOffset in="blue" dx="0" dy="1" result="blueOffset" />
+
+    <!-- смешиваем каналы -->
+    <feBlend in="redOffset" in2="greenOffset" mode="screen" result="rg" />
+    <feBlend in="rg" in2="blueOffset" mode="screen" />
+  </filter>
+</svg>
+css
+.ca-ui {
+  filter: url(#chromatic-aberration);
+}
+
+/* можно включать только при hover/focus для экономии */
+.ca-hover:hover {
+  filter: url(#chromatic-aberration);
+}
+Применять к, например:
+
+tsx
+<button className="ca-hover px-4 py-2 border border-red-600 text-red-400 bg-black">
+  Начать сеанс
+</button>
+3. CSS vs JS по perf при бюджете < 50 KB JS
+CSS-анимации и градиенты:
+
+0 KB дополнительно к JS-бандлу.
+
+Переносятся на compositor/GPU (transform/opacity/filters) и не блокируют main thread.​​
+
+Минусы: меньше контроля (нет реактивности к курсору/физики).
+
+JS-подходы (particles.js, canvas, WebGL):
+
++20–40 KB JS только на библиотеку, плюс твой glue-код.​​
+
+Постоянный рендер в requestAnimationFrame, основной поток занят отрисовкой.
+
+Для эффекта «лёгкая пыль и туман» это overkill.
+
+Для твоего бюджета: использовать чистый CSS для пыли/тумана/титров, SVG-фильтры — только для декоративных акцентов и мелких элементов, при этом вообще не добавлять JS под эти эффекты.
+
+4. Шрифты: похожие на Benguiat с кириллицей
+Оригинальный ITC Benguiat не бесплатен и не доступен в Google Fonts, но есть ряд гарнитур с похожим ощущением «80s horror / Stephen King» и поддержкой кириллицы.​
+
+Рекомендации для заголовков:
+
+Cormorant Garamond (cyrillic)
+
+Вычурный антиква-сереф, хорошо тянет ретро/готическую атмосферу.
+
+В жирных начертаниях с увеличенным letter-spacing и красным glow очень близок к Stranger Things.​
+
+Cinzel (cyrillic subset через Latin + расширение может не быть, но как вариант, если русские тексты минимальны).
+
+PT Serif / Spectral
+
+Более спокойные, но с правильным кернингом и хорошей читабельностью, подходят как fallback.​
+
+Для интерфейсного текста:
+
+IBM Plex Sans / Montserrat / Roboto
+
+Хорошо читаются для UI, есть полноценная кириллица, сочетаются с «хоррор» заголовками.​
+
+В Next.js (App Router) + Tailwind:
+
+ts
+// app/fonts.ts
+import { Cormorant_Garamond, IBM_Plex_Sans } from "next/font/google";
+
+export const titleFont = Cormorant_Garamond({
+  subsets: ["cyrillic", "latin"],
+  weight: ["600", "700"],
+  variable: "--font-title",
+});
+
+export const uiFont = IBM_Plex_Sans({
+  subsets: ["cyrillic", "latin"],
+  weight: ["400", "500"],
+  variable: "--font-ui",
+});
+tsx
+// app/layout.tsx
+import { titleFont, uiFont } from "./fonts";
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="ru" className={`${titleFont.variable} ${uiFont.variable}`}>
+      <body className="bg-[#050814] text-gray-100 font-[var(--font-ui)]">
+        <div className="dust-layer" />
+        <div className="upsidedown-fog" />
+        <div className="grain-bg" />
+        {children}
+      </body>
+    </html>
+  );
+}
+tsx
+<h1 className="stranger-title font-[var(--font-title)]" data-shadow="Эффект Манделы">
+  Эффект Манделы
+</h1>
+5. Примеры и CodePen-референсы
+Конкретные CodePen-демки под твою задачу можно собрать за пару итераций, но для вдохновения и проверки перфа будут полезны:
+
+Подборки CSS particle backgrounds (без JS, с градиентами и простыми keyframes).​​
+
+Туториалы по SVG film grain / grainy backgrounds (показывают лёгкий feTurbulence и варианты наложения).​​
+
+Статьи по SVG chromatic aberration (разделение каналов + feOffset/feBlend).​
+
+Если нужно, можно в следующем сообщении собрать конкретный минимальный пример для твоего проекта (герой-блок: логотип, кнопка, фон, пыль, туман, grain) в виде одного JSX + CSS файла, чтобы ты просто вставил в Next.js.

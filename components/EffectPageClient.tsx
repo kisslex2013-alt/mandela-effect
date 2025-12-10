@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ArrowLeft, Share2, Eye, Calendar, MessageSquare, ChevronRight, ChevronLeft, 
   ChevronDown, Search, BookOpen, BrainCircuit, History, ExternalLink, Lock, 
   Users, AlertTriangle, ThumbsUp, ThumbsDown, Image as ImageIcon, PlayCircle, 
-  Mic, Plus, X, Loader2, Maximize2, Sparkles
+  Mic, Plus, X, Loader2, Maximize2, Sparkles, RotateCw
 } from 'lucide-react';
 import Link from 'next/link';
 import ImageWithSkeleton from '@/components/ui/ImageWithSkeleton';
@@ -19,7 +19,10 @@ import { createComment, toggleCommentLike } from '@/app/actions/comments';
 import { incrementViews, getNextUnvotedEffect, getPrevUnvotedEffect } from '@/app/actions/effects';
 import { getCategoryInfo } from '@/lib/constants';
 import { votesStore } from '@/lib/votes-store';
+import { getClientVisitorId } from '@/lib/client-visitor';
 import toast from 'react-hot-toast';
+import { useReality } from '@/lib/context/RealityContext';
+import RealitySwitch from '@/components/ui/RealitySwitch';
 
 // --- TYPES ---
 interface EffectPageClientProps {
@@ -47,9 +50,9 @@ const ImageLightbox = ({ src, onClose }: { src: string | null, onClose: () => vo
   );
 };
 
-// 1. Аккордеон
-const AccordionItem = ({ title, icon: Icon, children, color = "cyan", sourceLink, defaultOpen = false }: any) => {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
+// 1. Аккордеон (контролируемый компонент)
+const AccordionItem = ({ title, icon: Icon, children, color = "cyan", sourceLink, isOpen, onToggle, isLocked = false }: any) => {
+  console.log(`🟣 [AccordionItem ${title}] Рендер. isOpen: ${isOpen}, isLocked: ${isLocked}`);
   
   const colorClassesMap: Record<string, string> = {
     cyan: "text-cyan-400 border-cyan-500/30 bg-cyan-950/20",
@@ -59,17 +62,36 @@ const AccordionItem = ({ title, icon: Icon, children, color = "cyan", sourceLink
   };
   const colorClasses = colorClassesMap[color] || "text-cyan-400 border-cyan-500/30 bg-cyan-950/20";
 
+  const handleToggle = () => {
+    console.log(`🟣 [AccordionItem ${title}] handleToggle вызван. isLocked: ${isLocked}`);
+    if (isLocked || !onToggle) return;
+    onToggle();
+  };
+
   return (
-    <div className={`border rounded-xl overflow-hidden transition-all ${isOpen ? colorClasses : "border-white/10 bg-darkCard"}`}>
-      <button onClick={() => setIsOpen(!isOpen)} className="w-full flex items-center justify-between p-4 text-left hover:bg-white/5 transition-colors">
+    <div className={`border rounded-xl overflow-hidden transition-all ${isOpen ? colorClasses : "border-white/10 bg-darkCard"} ${isLocked ? 'opacity-50' : ''}`}>
+      <button 
+        onClick={handleToggle} 
+        disabled={isLocked}
+        className={`w-full flex items-center justify-between p-4 text-left transition-colors ${
+          isLocked 
+            ? 'cursor-not-allowed opacity-50' 
+            : 'hover:bg-white/5 cursor-pointer'
+        }`}
+      >
         <div className="flex items-center gap-3">
           <Icon className={`w-5 h-5 ${isOpen ? "" : "text-light/50"}`} />
           <span className={`font-bold text-lg ${isOpen ? "" : "text-light/70"}`}>{title}</span>
+          {isLocked && <Lock className="w-4 h-4 text-white/40 ml-2" />}
         </div>
-        <ChevronDown className={`w-5 h-5 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+        {isLocked ? (
+          <Lock className="w-4 h-4 text-white/40" />
+        ) : (
+          <ChevronDown className={`w-5 h-5 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+        )}
       </button>
       <AnimatePresence>
-        {isOpen && (
+        {isOpen && !isLocked && (
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
             <div className="p-4 pt-0 text-light/80 leading-relaxed whitespace-pre-line border-t border-white/5">
               {children}
@@ -102,7 +124,7 @@ const CommentItem = ({ comment, onImageClick }: { comment: any, onImageClick: (s
     if (newHasLiked) toast.success('Голос учтен');
 
     try {
-      const visitorId = localStorage.getItem('visitorId');
+      const visitorId = getClientVisitorId();
       if (visitorId) {
         await toggleCommentLike(comment.id, visitorId);
       }
@@ -185,8 +207,7 @@ const AddCommentModal = ({ isOpen, onClose, effectId }: any) => {
     if (!text.trim()) return toast.error('Напишите что-нибудь');
     setLoading(true);
     try {
-      let visitorId = localStorage.getItem('visitorId');
-      if (!visitorId) { visitorId = crypto.randomUUID(); localStorage.setItem('visitorId', visitorId); }
+      const visitorId = getClientVisitorId();
 
       const result = await createComment({
         effectId,
@@ -249,35 +270,134 @@ const AddCommentModal = ({ isOpen, onClose, effectId }: any) => {
 };
 
 // 4. Заглушка
-const LockedContent = ({ isVisible }: { isVisible: boolean }) => (
-  <AnimatePresence>
-    {isVisible && (
-      <motion.div 
-        initial={{ opacity: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        transition={{ duration: 0.4 }}
-        className="relative overflow-hidden rounded-xl border border-light/10 bg-darkCard p-8 text-center h-full flex flex-col items-center justify-center min-h-[200px]"
-      >
-        <div className="absolute inset-0 bg-dark/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center">
-          <Lock className="w-12 h-12 text-white/20 mb-4" />
-          <h3 className="text-xl font-bold text-white mb-2">ДАННЫЕ ЗАСЕКРЕЧЕНЫ</h3>
-          <p className="text-light/50 text-sm max-w-md">
-            Доступ к архивам, фактам и теориям открывается только после верификации вашей памяти.
-            <br /><span className="text-primary mt-2 block">Проголосуйте выше, чтобы получить доступ.</span>
-          </p>
-        </div>
-        <div className="opacity-20 blur-sm select-none pointer-events-none space-y-4 w-full">
-          <div className="h-6 bg-white/20 rounded w-3/4 mx-auto"></div>
-          <div className="h-4 bg-white/10 rounded w-full"></div>
-          <div className="h-4 bg-white/10 rounded w-5/6 mx-auto"></div>
-        </div>
-      </motion.div>
-    )}
-  </AnimatePresence>
-);
+const LockedContent = ({ isVisible, isUpsideDown = false }: { isVisible: boolean; isUpsideDown?: boolean }) => {
+  // Получаем контекст для определения стадии иконки
+  let voteCount = 0;
+  let requiredVotes = 25;
+  try {
+    const reality = useReality();
+    voteCount = reality.voteCount;
+    requiredVotes = reality.requiredVotes;
+  } catch (error) {
+    // Игнорируем ошибку, используем значения по умолчанию
+  }
+  
+  // Определяем стадию для иконки (как в RealitySwitch)
+  let stage = 0;
+  if (voteCount >= 25) stage = 3;
+  else if (voteCount >= 20) stage = 2;
+  else if (voteCount >= 10) stage = 1;
+  
+  // Определяем иконку в зависимости от стадии (убираем Lock, показываем только RotateCw для стадии 3)
+  const getIcon = () => {
+    if (stage >= 3) {
+      return <RotateCw className="w-12 h-12 text-stranger-red mb-4 animate-spin-slow" />;
+    }
+    return null; // Не показываем иконку для стадий 0-2
+  };
+  
+  // Получаем текст состояния (как в RealitySwitch)
+  const getStatusText = () => {
+    if (isUpsideDown) return null; // В изнанке не показываем статус
+    if (stage === 3) return "В ИЗНАНКУ";
+    return "СИНХРОНИЗАЦИЯ";
+  };
+  
+  // Получаем цвет текста статуса
+  const getStatusTextColor = () => {
+    if (stage === 0) return "text-white/30";
+    if (stage === 1) return "text-cyan-400/80";
+    if (stage === 2) return "text-purple-400 animate-pulse";
+    if (stage === 3) return "text-stranger-red font-bold";
+    return "text-white/30";
+  };
+  
+  // Рассчитываем прогресс
+  const progress = Math.min((voteCount / requiredVotes) * 100, 100);
+  
+  return (
+    <AnimatePresence>
+      {isVisible && (
+        <motion.div 
+          initial={{ opacity: 1 }}
+          exit={{ opacity: 0, scale: 0.95 }}
+          transition={{ duration: 0.4 }}
+          className="relative rounded-xl border border-light/10 bg-darkCard p-8 text-center h-full flex flex-col items-center justify-center min-h-[200px]"
+        >
+          {/* Неоновое свечение (красный слева, синий справа) - только для режима Реальности - УСИЛЕНО */}
+          {!isUpsideDown && (
+            <>
+              <div className="absolute inset-y-0 left-0 w-1/2 bg-[radial-gradient(ellipse_at_left,_rgba(220,38,38,0.8)_0%,_rgba(220,38,38,0.4)_40%,_rgba(220,38,38,0.1)_60%,_transparent_70%)] mix-blend-screen animate-pulse-slow z-[12] pointer-events-none" />
+              <div className="absolute inset-y-0 right-0 w-1/2 bg-[radial-gradient(ellipse_at_right,_rgba(6,182,212,0.7)_0%,_rgba(6,182,212,0.3)_40%,_rgba(6,182,212,0.1)_60%,_transparent_70%)] mix-blend-screen animate-pulse-slow z-[12] pointer-events-none" style={{ animationDelay: '1s' }} />
+            </>
+          )}
+          
+          {/* Частицы (споры) - только для режима Реальности - ПОВЕРХ всего, но под кнопкой */}
+          {!isUpsideDown && (
+            <div className="absolute inset-0 pointer-events-none z-[25] rounded-xl overflow-hidden">
+              <div className="spore-locked" style={{ left: '10%', top: '80%', animationDelay: '0s' }} />
+              <div className="spore-locked" style={{ left: '80%', top: '90%', animationDelay: '-2s' }} />
+              <div className="spore-locked" style={{ left: '40%', top: '70%', animationDelay: '-4s' }} />
+              <div className="spore-locked" style={{ left: '20%', top: '60%', animationDelay: '-1s' }} />
+              <div className="spore-locked" style={{ left: '70%', top: '85%', animationDelay: '-3s' }} />
+              <div className="spore-locked" style={{ left: '50%', top: '50%', animationDelay: '-5s' }} />
+              <div className="spore-locked" style={{ left: '30%', top: '75%', animationDelay: '-1.5s' }} />
+              <div className="spore-locked" style={{ left: '90%', top: '65%', animationDelay: '-3.5s' }} />
+              <div className="spore-locked" style={{ left: '15%', top: '55%', animationDelay: '-2.5s' }} />
+            </div>
+          )}
+          
+          <div className="absolute inset-0 bg-dark/80 backdrop-blur-sm z-[15] flex flex-col items-center justify-center">
+            {!isUpsideDown ? (
+              <div className="relative z-[30] w-full max-w-md px-4">
+                <p className="text-stranger-red text-sm font-bold animate-pulse mb-4 pointer-events-none">
+                  Требуется переход в Изнанку для доступа к скрытым слоям реальности.
+                </p>
+                
+                {/* Кнопка RealitySwitch - ПОВЕРХ частиц, но под текстом по z-index, с pointer-events-auto */}
+                <div className="flex justify-center mt-4 relative z-[50] pointer-events-auto cursor-pointer">
+                  <RealitySwitch />
+                </div>
+              </div>
+            ) : (
+              <p className="text-light/50 text-sm max-w-md z-[30] pointer-events-none">
+                Доступ к архивам Изнанки возможен только после верификации памяти.
+                <br /><span className="text-primary mt-2 block">Сделайте выбор выше, чтобы получить доступ.</span>
+              </p>
+            )}
+          </div>
+          
+          <div className="opacity-20 blur-sm select-none pointer-events-none space-y-4 w-full z-0">
+            <div className="h-6 bg-white/20 rounded w-3/4 mx-auto"></div>
+            <div className="h-4 bg-white/10 rounded w-full"></div>
+            <div className="h-4 bg-white/10 rounded w-5/6 mx-auto"></div>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+};
 
 // --- MAIN COMPONENT ---
 export default function EffectPageClient({ effect, initialUserVote, prevEffect, nextEffect }: EffectPageClientProps) {
+  console.log('🚀🚀🚀 [EffectPageClient] ========== КОМПОНЕНТ НАЧАЛ РЕНДЕРИТЬСЯ ==========');
+  console.log('🚀 [EffectPageClient] effect.id:', effect.id);
+  console.log('🚀 [EffectPageClient] effect.title:', effect.title);
+  
+  // Получаем контекст Reality
+  let isUpsideDown = false;
+  try {
+    const reality = useReality();
+    isUpsideDown = reality.isUpsideDown;
+    console.log('⚪ [EffectPageClient] Контекст получен:', {
+      isUpsideDown,
+      isUnlocked: reality.isUnlocked,
+      voteCount: reality.voteCount,
+    });
+  } catch (error) {
+    console.error('[EffectPageClient] Error getting Reality context:', error);
+  }
+  
   const [userVote, setUserVote] = useState(initialUserVote);
   const [votes, setVotes] = useState({ for: effect.votesFor, against: effect.votesAgainst });
   const [isVoting, setIsVoting] = useState(false);
@@ -288,6 +408,14 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
   const [prevUnvotedEffect, setPrevUnvotedEffect] = useState<{ id: string; title: string } | null>(null);
   const [showUnvotedOnly, setShowUnvotedOnly] = useState(true); // Фильтр активен по умолчанию
   
+  // Состояние для взаимоисключающих аккордеонов (Остатки, История, Теории)
+  const [openExclusiveAccordion, setOpenExclusiveAccordion] = useState<string | null>(null);
+  console.log('⚪ [EffectPageClient] openExclusiveAccordion =', openExclusiveAccordion);
+  
+  // Состояния для независимых аккордеонов (Факты)
+  const [isFactsOpen, setIsFactsOpen] = useState<boolean>(false);
+  console.log('⚪ [EffectPageClient] isFactsOpen =', isFactsOpen);
+  
   const votingCardRef = useRef<HTMLDivElement>(null);
   const infoBlockRef = useRef<HTMLDivElement>(null);
   const lockedContentRef = useRef<HTMLDivElement>(null);
@@ -295,11 +423,44 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
 
   const categoryInfo = getCategoryInfo(effect.category);
   const CategoryIcon = categoryInfo.icon;
-  const hasAccess = !!userVote; // Определяем hasAccess до использования в useEffect
+  
+  // Логика доступа к аккордеонам: только в режиме Изнанка И с голосом
+  const hasAccess = isUpsideDown && !!userVote;
+  console.log('⚪ [EffectPageClient] hasAccess =', hasAccess, '(isUpsideDown:', isUpsideDown, ', userVote:', userVote, ')');
+  
+  // Логика доступа к комментариям: после голосования в любом режиме
+  const hasAccessComments = !!userVote;
+  console.log('⚪ [EffectPageClient] hasAccessComments =', hasAccessComments, '(userVote:', userVote, ')');
+  
+  // Функция для переключения взаимоисключающих аккордеонов
+  const handleExclusiveAccordionToggle = useCallback((id: string) => {
+    console.log(`🔵 [handleExclusiveAccordionToggle] Вызвано для: ${id}, текущий: ${openExclusiveAccordion}`);
+    setOpenExclusiveAccordion(current => {
+      if (current === id) {
+        console.log(`🔵 [handleExclusiveAccordionToggle] Закрываем аккордеон: ${id}`);
+        return null;
+      }
+      console.log(`🔵 [handleExclusiveAccordionToggle] Открываем аккордеон: ${id}`);
+      return id;
+    });
+  }, [openExclusiveAccordion]);
+  
+  // Синхронизация состояния аккордеонов при переключении режима
+  useEffect(() => {
+    console.log(`🟢 [useEffect isUpsideDown] isUpsideDown изменился на: ${isUpsideDown}`);
+    if (!isUpsideDown) {
+      console.log('🟢 [useEffect isUpsideDown] Переход в Реальность: закрываем все аккордеоны.');
+      setOpenExclusiveAccordion(null);
+      setIsFactsOpen(false);
+    } else {
+      console.log('🟢 [useEffect isUpsideDown] Переход в Изнанку: сбрасываем взаимоисключающие аккордеоны.');
+      setOpenExclusiveAccordion(null);
+    }
+  }, [isUpsideDown]);
 
   useEffect(() => {
     const initPage = async () => {
-      const visitorId = localStorage.getItem('visitorId');
+      const visitorId = getClientVisitorId();
       
       // 1. Проверяем голос на сервере
       if (visitorId) {
@@ -336,10 +497,10 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
       }
       
       // Синхронизация высоты блока "Архив Аномалий" с LockedContent когда доступ закрыт
-      if (!hasAccess && lockedContentRef.current && commentsBlockRef.current) {
+      if (!hasAccessComments && lockedContentRef.current && commentsBlockRef.current) {
         const lockedHeight = lockedContentRef.current.offsetHeight;
         commentsBlockRef.current.style.minHeight = `${lockedHeight}px`;
-      } else if (hasAccess && commentsBlockRef.current) {
+      } else if (hasAccessComments && commentsBlockRef.current) {
         commentsBlockRef.current.style.minHeight = 'auto';
       }
     };
@@ -354,7 +515,7 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
       window.removeEventListener('resize', syncHeights);
       clearTimeout(timeout);
     };
-  }, [hasAccess]); // Пересчитываем только при изменении доступа, не при изменении голосования
+  }, [hasAccessComments]); // Пересчитываем только при изменении доступа к комментариям
 
   // Если пришёл initialUserVote, записываем его в локальный store, чтобы превью в каталоге/главной знали о голосе
   useEffect(() => {
@@ -409,8 +570,7 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
     votesStore.set(effect.id, variant); // локально фиксируем голос для синхронизации превью
 
     try {
-      let visitorId = localStorage.getItem('visitorId');
-      if (!visitorId) { visitorId = crypto.randomUUID(); localStorage.setItem('visitorId', visitorId); }
+      const visitorId = getClientVisitorId();
       const result = await saveVote({ visitorId, effectId: effect.id, variant });
       if (!result.success) {
         if (result.vote) { 
@@ -462,10 +622,22 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
-        className="relative h-[50vh] w-full overflow-hidden"
+        className={`relative h-[50vh] w-full overflow-hidden group glitch-wrapper ${isUpsideDown ? 'glitch-mirror' : ''}`}
       >
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-dark/60 to-dark z-10" />
-        {effect.imageUrl && <ImageWithSkeleton src={effect.imageUrl} alt={effect.title} fill className="object-cover opacity-60" />}
+        {effect.imageUrl && (
+          <>
+            <ImageWithSkeleton src={effect.imageUrl} alt={effect.title} fill className="object-cover opacity-60 relative z-[1]" />
+            {/* ГЛИТЧ СЛОИ: Рендерим всегда, стиль меняется через CSS класс родителя */}
+            {effect.imageUrl && (
+              <div className={`glitch-layers absolute inset-0 z-[2] opacity-0 group-hover:opacity-100 transition-opacity ${isUpsideDown ? '' : 'glitch-reality'}`}>
+                <div className="glitch-layer" style={{ backgroundImage: `url('${effect.imageUrl.replace(/'/g, '%27')}')` }} />
+                <div className="glitch-layer" style={{ backgroundImage: `url('${effect.imageUrl.replace(/'/g, '%27')}')` }} />
+                <div className="glitch-layer" style={{ backgroundImage: `url('${effect.imageUrl.replace(/'/g, '%27')}')` }} />
+              </div>
+            )}
+          </>
+        )}
         
         <div className="absolute inset-0 z-20 container mx-auto px-4 flex flex-col justify-end pb-12">
           <Link href="/catalog" className="inline-flex items-center gap-2 text-light/60 hover:text-primary mb-6 transition-colors w-fit"><ArrowLeft className="w-4 h-4" /> Назад в каталог</Link>
@@ -565,61 +737,117 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
             </AnimatePresence>
           </div>
 
-          {/* Accordions (Locked until vote) */}
-          <AnimatePresence mode="wait">
-            {hasAccess ? (
-              <motion.div 
-                key="accordions"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.5, delay: 0.2 }}
-                className="space-y-4"
-              >
-              {/* Текущее состояние - показываем только если нет голоса (чтобы не дублировать) */}
-              {!userVote && (
-                <AccordionItem title="Текущее состояние | Факты" icon={BookOpen} color="cyan" sourceLink={effect.interpretations?.sourceLink} defaultOpen={true}>
-                  {effect.currentState || "Информация уточняется..."}
-                </AccordionItem>
-              )}
-              
-              {effect.residue && (
-                <AccordionItem title="Культурные следы | Остатки" icon={Search} color="red" sourceLink={effect.residueSource}>
-                  {effect.residue}
-                </AccordionItem>
-              )}
-              
-              {effect.history && (
-                <AccordionItem title="Временная шкала | История" icon={History} color="orange" sourceLink={effect.historySource}>
-                  {effect.history}
-                </AccordionItem>
-              )}
-              
-              {(effect.interpretations?.scientific || effect.interpretations?.community) && (
-                <AccordionItem title="Что об этом говорят | Теории" icon={BrainCircuit} color="purple">
-                  {effect.interpretations?.scientific && (
-                    <div className="mb-4">
-                      <h4 className="font-bold text-purple-300 mb-2 flex items-center gap-2"><BrainCircuit className="w-4 h-4" /> Научная точка зрения</h4>
-                      <p>{effect.interpretations.scientific}</p>
-                      {effect.interpretations?.scientificSource && <a href={effect.interpretations.scientificSource} target="_blank" className="text-xs text-purple-400/60 hover:text-purple-400 mt-1 block">Источник</a>}
-                    </div>
+          {/* Accordions - ЛОГИКА ОТОБРАЖЕНИЯ */}
+          {(() => {
+            console.log('🟡 [RENDER LOGIC] isUpsideDown =', isUpsideDown);
+            console.log('🟡 [RENDER LOGIC] userVote =', userVote);
+            console.log('🟡 [RENDER LOGIC] hasAccess =', hasAccess);
+            console.log('🟡 [RENDER LOGIC] openExclusiveAccordion =', openExclusiveAccordion);
+            console.log('🟡 [RENDER LOGIC] isFactsOpen =', isFactsOpen);
+            
+            // В режиме Реальности: показываем только заглушку (Факты уже показаны после голосования)
+            if (!isUpsideDown) {
+              console.log('🟡 [RENDER LOGIC] Режим Реальности: показываем только заглушку');
+              return (
+                <div ref={lockedContentRef}>
+                  <LockedContent isVisible={true} isUpsideDown={false} />
+                </div>
+              );
+            }
+            
+            // В режиме Изнанки БЕЗ голоса: показываем заглушку
+            if (isUpsideDown && !userVote) {
+              console.log('🟡 [RENDER LOGIC] Режим Изнанки БЕЗ голоса: показываем заглушку');
+              return (
+                <div ref={lockedContentRef}>
+                  <LockedContent isVisible={true} isUpsideDown={true} />
+                </div>
+              );
+            }
+            
+            // В режиме Изнанки С голосом: показываем все аккордеоны (кроме Фактов, они уже показаны после голосования)
+            console.log('🟡 [RENDER LOGIC] Режим Изнанки С голосом: показываем все аккордеоны (кроме Фактов)');
+            return (
+              <AnimatePresence mode="wait">
+                <motion.div 
+                  key="accordions"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ duration: 0.5, delay: 0.2 }}
+                  className="space-y-4"
+                >
+                  {/* Факты НЕ показываем здесь - они уже показаны после голосования */}
+                  
+                  {/* Остатки - ВЗАИМОИСКЛЮЧАЮЩИЙ */}
+                  {effect.residue && (
+                    <AccordionItem 
+                      title="Культурные следы | Остатки" 
+                      icon={Search} 
+                      color="red" 
+                      sourceLink={effect.residueSource}
+                      isOpen={openExclusiveAccordion === 'residue'}
+                      onToggle={() => {
+                        console.log('🟠 [AccordionItem residue] onClick вызван');
+                        handleExclusiveAccordionToggle('residue');
+                      }}
+                      isLocked={false}
+                    >
+                      {effect.residue}
+                    </AccordionItem>
                   )}
-                  {effect.interpretations?.community && (
-                    <div className="pt-4 border-t border-purple-500/20">
-                      <h4 className="font-bold text-purple-300 mb-2 flex items-center gap-2"><Users className="w-4 h-4" /> Теории сообщества</h4>
-                      <p>{effect.interpretations.community}</p>
-                      {effect.interpretations?.communitySource && <a href={effect.interpretations.communitySource} target="_blank" className="text-xs text-purple-400/60 hover:text-purple-400 mt-1 block">Источник</a>}
-                    </div>
+                  
+                  {/* История - ВЗАИМОИСКЛЮЧАЮЩИЙ */}
+                  {effect.history && (
+                    <AccordionItem 
+                      title="Временная шкала | История" 
+                      icon={History} 
+                      color="orange" 
+                      sourceLink={effect.historySource}
+                      isOpen={openExclusiveAccordion === 'history'}
+                      onToggle={() => {
+                        console.log('🟠 [AccordionItem history] onClick вызван');
+                        handleExclusiveAccordionToggle('history');
+                      }}
+                      isLocked={false}
+                    >
+                      {effect.history}
+                    </AccordionItem>
                   )}
-                </AccordionItem>
-              )}
-              </motion.div>
-            ) : (
-              <div key="locked" ref={lockedContentRef}>
-                <LockedContent isVisible={!hasAccess} />
-              </div>
-            )}
-          </AnimatePresence>
+                  
+                  {/* Теории - ВЗАИМОИСКЛЮЧАЮЩИЙ */}
+                  {(effect.interpretations?.scientific || effect.interpretations?.community) && (
+                    <AccordionItem 
+                      title="Что об этом говорят | Теории" 
+                      icon={BrainCircuit} 
+                      color="purple"
+                      isOpen={openExclusiveAccordion === 'theories'}
+                      onToggle={() => {
+                        console.log('🟠 [AccordionItem theories] onClick вызван');
+                        handleExclusiveAccordionToggle('theories');
+                      }}
+                      isLocked={false}
+                    >
+                      {effect.interpretations?.scientific && (
+                        <div className="mb-4">
+                          <h4 className="font-bold text-purple-300 mb-2 flex items-center gap-2"><BrainCircuit className="w-4 h-4" /> Научная точка зрения</h4>
+                          <p>{effect.interpretations.scientific}</p>
+                          {effect.interpretations?.scientificSource && <a href={effect.interpretations.scientificSource} target="_blank" className="text-xs text-purple-400/60 hover:text-purple-400 mt-1 block">Источник</a>}
+                        </div>
+                      )}
+                      {effect.interpretations?.community && (
+                        <div className="pt-4 border-t border-purple-500/20">
+                          <h4 className="font-bold text-purple-300 mb-2 flex items-center gap-2"><Users className="w-4 h-4" /> Теории сообщества</h4>
+                          <p>{effect.interpretations.community}</p>
+                          {effect.interpretations?.communitySource && <a href={effect.interpretations.communitySource} target="_blank" className="text-xs text-purple-400/60 hover:text-purple-400 mt-1 block">Источник</a>}
+                        </div>
+                      )}
+                    </AccordionItem>
+                  )}
+                </motion.div>
+              </AnimatePresence>
+            );
+          })()}
 
         </div>
 
@@ -645,11 +873,11 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
           </div>
 
           {/* Comments Block */}
-          <div ref={commentsBlockRef} className="bg-darkCard border border-light/10 rounded-xl p-6 sticky top-24 flex flex-col" style={{ minHeight: hasAccess ? 'auto' : '300px' }}>
+          <div ref={commentsBlockRef} className="bg-darkCard border border-light/10 rounded-xl p-6 sticky top-24 flex flex-col" style={{ minHeight: hasAccessComments ? 'auto' : '300px' }}>
             <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><MessageSquare className="w-4 h-4 text-primary" /> Архив Аномалий</h3>
             
             <AnimatePresence mode="wait">
-              {hasAccess ? (
+              {hasAccessComments ? (
                 <motion.div
                   key="comments-content"
                   initial={{ opacity: 0, y: 20 }}
