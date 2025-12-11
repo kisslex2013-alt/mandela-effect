@@ -414,6 +414,9 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
   const [showUnvotedOnly, setShowUnvotedOnly] = useState(true); // Фильтр активен по умолчанию
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null); // ID эффекта, к которому идет навигация
   
+  // Защита от повторных вызовов голосования
+  const isVotingRef = useRef(false);
+  
   // Состояние для взаимоисключающих аккордеонов (Остатки, История, Теории)
   const [openExclusiveAccordion, setOpenExclusiveAccordion] = useState<string | null>(null);
   console.log('⚪ [EffectPageClient] openExclusiveAccordion =', openExclusiveAccordion);
@@ -573,8 +576,10 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
   const { vA, vB } = parseVariants();
 
   const handleVote = async (variant: 'A' | 'B') => {
-    if (isVoting || userVote) return;
+    // Защита от повторных вызовов
+    if (isVoting || userVote || isVotingRef.current) return;
 
+    isVotingRef.current = true;
     setIsVoting(true);
     setUserVote(variant);
     setVotes(prev => ({ ...prev }));
@@ -582,7 +587,14 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
 
     try {
       const visitorId = getClientVisitorId();
-      const result = await saveVote({ visitorId, effectId: effect.id, variant });
+      
+      // Таймаут для предотвращения зависания
+      const votePromise = saveVote({ visitorId, effectId: effect.id, variant });
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Vote timeout')), 8000)
+      );
+      
+      const result = await Promise.race([votePromise, timeoutPromise]) as Awaited<ReturnType<typeof saveVote>>;
       if (!result.success) {
         if (result.vote) { 
           setUserVote(result.vote.variant as 'A' | 'B'); 
@@ -606,7 +618,8 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
         toast.success('Голос записан');
         votesStore.set(effect.id, variant);
       }
-    } catch (error) { 
+    } catch (error) {
+      console.error('[EffectPageClient] Ошибка при голосовании:', error);
       setUserVote(null); 
       if (initialUserVote) votesStore.set(effect.id, initialUserVote);
       else {
@@ -615,7 +628,11 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
         localStorage.setItem('mandela_votes', JSON.stringify(votes));
         window.dispatchEvent(new Event('votes-updated'));
       }
-    } finally { setIsVoting(false); }
+      toast.error('Ошибка при сохранении голоса');
+    } finally { 
+      setIsVoting(false);
+      isVotingRef.current = false;
+    }
   };
 
   return (

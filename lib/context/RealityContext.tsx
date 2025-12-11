@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { getUserVoteCount } from '@/app/actions/user-stats';
 import { getClientVisitorId } from '@/lib/client-visitor'; // ИМПОРТ
 import { getUserVotedEffects, migrateLocalVotes } from '@/app/actions/votes';
@@ -31,14 +31,26 @@ export function RealityProvider({ children }: { children: React.ReactNode }) {
   const [isTransitioning, setIsTransitioning] = useState(false); // Новое состояние
   const [mounted, setMounted] = useState(false);
   const REQUIRED_VOTES = 25;
+  
+  // Защита от множественных одновременных вызовов
+  const isSyncingRef = useRef(false);
+  const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const checkStatus = async () => {
+  const checkStatus = useCallback(async () => {
+    // Предотвращаем множественные одновременные вызовы
+    if (isSyncingRef.current) {
+      console.log('[RealityContext] Синхронизация уже выполняется, пропускаем...');
+      return;
+    }
+    
     const vid = getClientVisitorId(); // ИСПОЛЬЗУЕМ ЕДИНУЮ ФУНКЦИЮ
     if (!vid) {
       setVoteCount(0);
       setIsUnlocked(false);
       return;
     }
+
+    isSyncingRef.current = true;
 
     try {
       console.log('[RealityContext] Начало синхронизации...');
@@ -167,14 +179,36 @@ export function RealityProvider({ children }: { children: React.ReactNode }) {
       const localCount = Object.keys(votesStore.get()).length;
       setVoteCount(localCount);
       setIsUnlocked(localCount >= REQUIRED_VOTES);
+    } finally {
+      isSyncingRef.current = false;
     }
-  };
+  }, [isUpsideDown, mounted, isTransitioning]);
+  
+  // Debounced версия checkStatus для использования из компонентов
+  const debouncedCheckStatus = useCallback(() => {
+    // Очищаем предыдущий таймаут
+    if (syncTimeoutRef.current) {
+      clearTimeout(syncTimeoutRef.current);
+    }
+    
+    // Устанавливаем новый таймаут (1 секунда задержка для быстрого отклика)
+    syncTimeoutRef.current = setTimeout(() => {
+      checkStatus();
+    }, 1000);
+  }, [checkStatus]);
 
   // Загружаем данные ТОЛЬКО ОДИН РАЗ при старте
   useEffect(() => {
     setMounted(true);
     checkStatus();
-  }, []);
+    
+    // Очистка таймаута при размонтировании
+    return () => {
+      if (syncTimeoutRef.current) {
+        clearTimeout(syncTimeoutRef.current);
+      }
+    };
+  }, [checkStatus]);
 
   useEffect(() => {
     if (isUpsideDown) {
@@ -184,7 +218,7 @@ export function RealityProvider({ children }: { children: React.ReactNode }) {
     }
   }, [isUpsideDown]);
 
-  const toggleReality = async () => {
+  const toggleReality = useCallback(async () => {
     if (!isUnlocked || isTransitioning) return;
     
     // 1. Запускаем анимацию (короткую)
@@ -200,10 +234,10 @@ export function RealityProvider({ children }: { children: React.ReactNode }) {
 
     // 4. Выключаем анимацию
     setIsTransitioning(false);
-  };
+  }, [isUnlocked, isTransitioning, isUpsideDown]);
 
   // Мгновенное обновление (Optimistic UI)
-  const incrementVotes = () => {
+  const incrementVotes = useCallback(() => {
     console.log("Incrementing votes...");
     setVoteCount(prev => {
       const newCount = prev + 1;
@@ -212,19 +246,30 @@ export function RealityProvider({ children }: { children: React.ReactNode }) {
       }
       return newCount;
     });
-  };
+    
+    // Запускаем отложенную синхронизацию (debounced)
+    debouncedCheckStatus();
+  }, [isUnlocked, debouncedCheckStatus]);
+  
+  // Обновленная версия refreshVotes с debounce
+  const refreshVotes = useCallback(() => {
+    debouncedCheckStatus();
+  }, [debouncedCheckStatus]);
+
+  // Мемоизируем значение контекста для предотвращения лишних ре-рендеров
+  const contextValue = useMemo(() => ({
+    isUpsideDown, 
+    toggleReality, 
+    isUnlocked, 
+    voteCount,
+    requiredVotes: REQUIRED_VOTES,
+    refreshVotes,
+    incrementVotes,
+    isTransitioning
+  }), [isUpsideDown, isUnlocked, voteCount, isTransitioning, refreshVotes, incrementVotes]);
 
   return (
-    <RealityContext.Provider value={{ 
-      isUpsideDown, 
-      toggleReality, 
-      isUnlocked, 
-      voteCount,
-      requiredVotes: REQUIRED_VOTES,
-      refreshVotes: checkStatus,
-      incrementVotes,
-      isTransitioning
-    }}>
+    <RealityContext.Provider value={contextValue}>
       {children}
     </RealityContext.Provider>
   );
