@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useReality } from '@/lib/context/RealityContext';
 import EffectCard from '@/components/EffectCard';
 import CustomSelect, { type SelectOption } from '@/components/ui/CustomSelect';
 import { votesStore } from '@/lib/votes-store';
@@ -73,6 +74,7 @@ const COLOR_CLASSES: Record<string, string> = {
 };
 
 export default function CatalogClient({ initialEffects, categories }: CatalogClientProps) {
+  const { isUpsideDown } = useReality();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [sortBy, setSortBy] = useState<SortType>('popular');
@@ -189,7 +191,7 @@ export default function CatalogClient({ initialEffects, categories }: CatalogCli
         
         <div className="text-center mb-12">
           <h1 className="text-4xl md:text-6xl font-black text-white mb-4 tracking-tight glitch-text" data-text="АРХИВ АНОМАЛИЙ">
-            АРХИВ <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500">АНОМАЛИЙ</span>
+            АРХИВ <span className={`text-transparent bg-clip-text bg-gradient-to-r ${isUpsideDown ? 'from-red-500 to-purple-600' : 'from-cyan-400 to-blue-600'}`}>АНОМАЛИЙ</span>
           </h1>
           <p className="text-light/60 text-lg">База данных сбоев реальности. Доступ разрешен.</p>
         </div>

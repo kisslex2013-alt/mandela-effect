@@ -12,8 +12,10 @@ import { useReality } from '@/lib/context/RealityContext';
 const navItems = [
   { name: 'Главная', href: '/' },
   { name: 'Каталог', href: '/catalog' },
-  { name: 'Моя Память', href: '/my-memory' }, // Поменяли местами
-  { name: 'Статистика', href: '/stats' },     // Поменяли местами
+  { name: 'Память', href: '/my-memory' },
+  { name: 'Статистика', href: '/stats' },
+  { name: 'Как устроено', href: '/how-it-works' },
+  { name: 'О проекте', href: '/about' },
 ];
 
 export default function Header() {

@@ -137,7 +137,7 @@ export default function HomeClient({
           <div className="text-center max-w-5xl mx-auto mb-12 w-full">
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="space-y-8">
               <h1 className="text-4xl md:text-7xl font-black text-white tracking-tight glitch-text" data-text="ЭФФЕКТ МАНДЕЛЫ">
-                ЭФФЕКТ <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500">МАНДЕЛЫ</span>
+                ЭФФЕКТ <span className={`text-transparent bg-clip-text bg-gradient-to-r ${isUpsideDown ? 'from-red-500 to-purple-600' : 'from-cyan-400 to-purple-500'}`}>МАНДЕЛЫ</span>
               </h1>
               <p className="text-lg md:text-xl text-light/60 leading-relaxed max-w-2xl mx-auto">
                 Сбой в матрице или ложная память? Исследуй коллективные заблуждения и проверь свою реальность.
@@ -328,18 +328,28 @@ export default function HomeClient({
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5 }}
-          className="relative bg-gradient-to-r from-red-500/10 via-orange-500/10 to-yellow-500/10 border-2 border-red-500/30 rounded-3xl p-8 md:p-12 overflow-hidden"
+          className={`relative bg-gradient-to-r border-2 rounded-3xl p-8 md:p-12 overflow-hidden ${
+            isUpsideDown 
+              ? 'from-red-500/10 via-orange-500/10 to-yellow-500/10 border-red-500/30' 
+              : 'from-blue-500/10 via-cyan-500/10 to-sky-500/10 border-blue-500/30'
+          }`}
         >
           <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.05)_50%,transparent_75%)] bg-[length:20px_20px] animate-[slide_20s_linear_infinite] opacity-20" />
           <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center gap-6">
             <div className="flex-shrink-0">
-              <div className="p-4 bg-red-500/20 rounded-full border-2 border-red-500/50 animate-pulse">
-                <AlertTriangle className="w-8 h-8 md:w-10 md:h-10 text-red-400" />
+              <div className={`p-4 rounded-full border-2 animate-pulse ${
+                isUpsideDown 
+                  ? 'bg-red-500/20 border-red-500/50' 
+                  : 'bg-blue-500/20 border-blue-500/50'
+              }`}>
+                <AlertTriangle className={`w-8 h-8 md:w-10 md:h-10 ${
+                  isUpsideDown ? 'text-red-400' : 'text-blue-400'
+                }`} />
               </div>
             </div>
             <div className="flex-1">
               <h3 className="text-2xl md:text-3xl font-black text-white mb-3 tracking-tight">
-                <span className="text-red-400">ВНИМАНИЕ:</span>{' '}
+                <span className={isUpsideDown ? 'text-red-400' : 'text-blue-400'}>ВНИМАНИЕ:</span>{' '}
                 <span className="glitch-text" data-text="ЗОНА НЕСТАБИЛЬНОСТИ">ЗОНА НЕСТАБИЛЬНОСТИ</span>
               </h3>
               <p className="text-base md:text-lg text-light/80 leading-relaxed mb-4">

@@ -166,7 +166,7 @@ export default function Footer() {
               </li>
               <li>
                 <Link href="/my-memory" className="hover:text-primary hover:pl-2 transition-all block">
-                  [03] Моя память
+                  [03] Память
                 </Link>
               </li>
               <li>
@@ -175,18 +175,18 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/submit" className="hover:text-primary hover:pl-2 transition-all block">
-                  [05] Добавить эффект
-                </Link>
-              </li>
-              <li>
                 <Link href="/how-it-works" className="hover:text-primary hover:pl-2 transition-all block">
-                  [06] Как это работает
+                  [06] Как устроено
                 </Link>
               </li>
               <li>
                 <Link href="/about" className="hover:text-primary hover:pl-2 transition-all block">
                   [07] О проекте
+                </Link>
+              </li>
+              <li>
+                <Link href="/submit" className="hover:text-primary hover:pl-2 transition-all block">
+                  [05] Добавить эффект
                 </Link>
               </li>
             </ul>

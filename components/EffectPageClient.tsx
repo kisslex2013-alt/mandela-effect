@@ -23,6 +23,9 @@ import { getClientVisitorId } from '@/lib/client-visitor';
 import toast from 'react-hot-toast';
 import { useReality } from '@/lib/context/RealityContext';
 import RealitySwitch from '@/components/ui/RealitySwitch';
+import CipherReveal from '@/components/ui/CipherReveal';
+import RedactedText from '@/components/ui/RedactedText';
+import RedactedWords from '@/components/ui/RedactedWords';
 
 // --- TYPES ---
 interface EffectPageClientProps {
@@ -269,8 +272,26 @@ const AddCommentModal = ({ isOpen, onClose, effectId }: any) => {
   );
 };
 
-// 4. Заглушка
-const LockedContent = ({ isVisible, isUpsideDown = false }: { isVisible: boolean; isUpsideDown?: boolean }) => {
+// --- ГЕНЕРАТОР СООБЩЕНИЙ (Вместо статического массива) ---
+const generateSystemMessage = (id: string = 'default') => {
+  // Хэш для стабильности (чтобы на одной странице текст не скакал при ре-рендере)
+  const seed = id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  
+  const prefixes = ["CRITICAL_DESYNC", "MEMORY_CORRUPTION", "TIMELINE_DIVERGENCE", "REALITY_BREACH", "PATTERN_VOID", "ERR_NO_CONTEXT", "SYSTEM_ALERT"];
+  const bodies = [
+    "НАРУШЕНИЕ ЦЕЛОСТНОСТИ ВОСПОМИНАНИЙ", "ТРЕБУЕТСЯ ПОДТВЕРЖДЕНИЕ НАБЛЮДАТЕЛЯ", "ДОСТУП ОГРАНИЧЕН ПРОТОКОЛОМ 'ОМЕГА'",
+    "СБОЙ СИНХРОНИЗАЦИИ НЕЙРОИНТЕРФЕЙСА", "ОБНАРУЖЕНЫ СЛЕДЫ ВМЕШАТЕЛЬСТВА", "АРХИВ ЗАШИФРОВАН АЛГОРИТМОМ МАНДЕЛЫ",
+    "ВРЕМЕННАЯ ЛИНИЯ НЕСТАБИЛЬНА", "ОБЪЕКТ НЕ НАЙДЕН В ТЕКУЩЕЙ РЕАЛЬНОСТИ"
+  ];
+  const suffixes = [":: INITIATE_VOTE", ":: WAITING_FOR_INPUT...", "// REBOOT_REQUIRED", ":: SYNC_PENDING", ":: ACCESS_DENIED", "-> TRACE_LOST"];
+
+  const pick = (arr: string[], offset: number) => arr[(seed + offset) % arr.length];
+
+  return `${pick(prefixes, 0)} :: ${pick(bodies, 1)} ${pick(suffixes, 2)}`;
+};
+
+// 4. Заглушка (С размытым текстом)
+const LockedContent = ({ isVisible, isUpsideDown = false, effectId }: { isVisible: boolean; isUpsideDown?: boolean; effectId?: string }) => {
   // Получаем контекст для определения стадии иконки
   let voteCount = 0;
   let requiredVotes = 25;
@@ -288,32 +309,21 @@ const LockedContent = ({ isVisible, isUpsideDown = false }: { isVisible: boolean
   else if (voteCount >= 20) stage = 2;
   else if (voteCount >= 10) stage = 1;
   
-  // Определяем иконку в зависимости от стадии (убираем Lock, показываем только RotateCw для стадии 3)
-  const getIcon = () => {
-    if (stage >= 3) {
-      return <RotateCw className="w-12 h-12 text-stranger-red mb-4 animate-spin-slow" />;
-    }
-    return null; // Не показываем иконку для стадий 0-2
-  };
+  // Генерируем системное сообщение для режима Реальности
+  const systemMessage = generateSystemMessage(effectId || 'default');
   
-  // Получаем текст состояния (как в RealitySwitch)
-  const getStatusText = () => {
-    if (isUpsideDown) return null; // В изнанке не показываем статус
-    if (stage === 3) return "В ИЗНАНКУ";
-    return "СИНХРОНИЗАЦИЯ";
-  };
+  // Определяем заголовок и описание
+  const title = !isUpsideDown ? "ДОСТУП ЗАПРЕЩЕН" : "ПАМЯТЬ НЕ ВЕРИФИЦИРОВАНА";
+  const description = !isUpsideDown 
+    ? systemMessage 
+    : "Система не может подтвердить вашу версию событий. Чтобы получить доступ к Архивам Аномалий, зафиксируйте своё воспоминание выше.";
   
-  // Получаем цвет текста статуса
-  const getStatusTextColor = () => {
-    if (stage === 0) return "text-white/30";
-    if (stage === 1) return "text-cyan-400/80";
-    if (stage === 2) return "text-purple-400 animate-pulse";
-    if (stage === 3) return "text-stranger-red font-bold";
-    return "text-white/30";
-  };
+  const isSystemMessage = !isUpsideDown; // Флаг для стилизации
   
-  // Рассчитываем прогресс
-  const progress = Math.min((voteCount / requiredVotes) * 100, 100);
+  // Подсказка действия
+  const actionHint = !isUpsideDown
+    ? ">>> ТРЕБУЕТСЯ ПЕРЕХОД" 
+    : ">>> ТРЕБУЕТСЯ ГОЛОС";
   
   return (
     <AnimatePresence>
@@ -322,55 +332,50 @@ const LockedContent = ({ isVisible, isUpsideDown = false }: { isVisible: boolean
           initial={{ opacity: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
           transition={{ duration: 0.4 }}
-          className="relative rounded-xl border border-light/10 bg-darkCard p-8 text-center h-full flex flex-col items-center justify-center min-h-[200px]"
+          className="relative bg-darkCard/50 border border-white/10 rounded-xl p-6 text-center flex flex-col items-center justify-center min-h-[180px] mt-4 group overflow-hidden"
         >
-          {/* Неоновое свечение (красный слева, синий справа) - только для режима Реальности - УСИЛЕНО */}
-          {!isUpsideDown && (
-            <>
-              <div className="absolute inset-y-0 left-0 w-1/2 bg-[radial-gradient(ellipse_at_left,_rgba(220,38,38,0.8)_0%,_rgba(220,38,38,0.4)_40%,_rgba(220,38,38,0.1)_60%,_transparent_70%)] mix-blend-screen animate-pulse-slow z-[12] pointer-events-none" />
-              <div className="absolute inset-y-0 right-0 w-1/2 bg-[radial-gradient(ellipse_at_right,_rgba(6,182,212,0.7)_0%,_rgba(6,182,212,0.3)_40%,_rgba(6,182,212,0.1)_60%,_transparent_70%)] mix-blend-screen animate-pulse-slow z-[12] pointer-events-none" style={{ animationDelay: '1s' }} />
-            </>
-          )}
-          
-          {/* Частицы (споры) - только для режима Реальности - ПОВЕРХ всего, но под кнопкой */}
-          {!isUpsideDown && (
-            <div className="absolute inset-0 pointer-events-none z-[25] rounded-xl overflow-hidden">
-              <div className="spore-locked" style={{ left: '10%', top: '80%', animationDelay: '0s' }} />
-              <div className="spore-locked" style={{ left: '80%', top: '90%', animationDelay: '-2s' }} />
-              <div className="spore-locked" style={{ left: '40%', top: '70%', animationDelay: '-4s' }} />
-              <div className="spore-locked" style={{ left: '20%', top: '60%', animationDelay: '-1s' }} />
-              <div className="spore-locked" style={{ left: '70%', top: '85%', animationDelay: '-3s' }} />
-              <div className="spore-locked" style={{ left: '50%', top: '50%', animationDelay: '-5s' }} />
-              <div className="spore-locked" style={{ left: '30%', top: '75%', animationDelay: '-1.5s' }} />
-              <div className="spore-locked" style={{ left: '90%', top: '65%', animationDelay: '-3.5s' }} />
-              <div className="spore-locked" style={{ left: '15%', top: '55%', animationDelay: '-2.5s' }} />
-            </div>
-          )}
-          
-          <div className="absolute inset-0 bg-dark/80 backdrop-blur-sm z-[15] flex flex-col items-center justify-center">
-            {!isUpsideDown ? (
-              <div className="relative z-[30] w-full max-w-md px-4">
-                <p className="text-stranger-red text-sm font-bold animate-pulse mb-4 pointer-events-none">
-                  Требуется переход в Изнанку для доступа к скрытым слоям реальности.
-                </p>
-                
-                {/* Кнопка RealitySwitch - ПОВЕРХ частиц, но под текстом по z-index, с pointer-events-auto */}
-                <div className="flex justify-center mt-4 relative z-[50] pointer-events-auto cursor-pointer">
-                  <RealitySwitch />
-                </div>
-              </div>
-            ) : (
-              <p className="text-light/50 text-sm max-w-md z-[30] pointer-events-none">
-                Доступ к архивам Изнанки возможен только после верификации памяти.
-                <br /><span className="text-primary mt-2 block">Сделайте выбор выше, чтобы получить доступ.</span>
-              </p>
-            )}
+          {/* Фоновые эффекты */}
+          <div className="absolute inset-0 pointer-events-none z-0 rounded-xl overflow-hidden">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.1),transparent_70%)] mix-blend-screen" />
+            <div className="spore-locked" style={{ left: '10%', top: '80%', animationDelay: '0s' }} />
+            <div className="spore-locked" style={{ left: '80%', top: '90%', animationDelay: '-2s' }} />
+            <div className="spore-locked" style={{ left: '40%', top: '70%', animationDelay: '-4s' }} />
+            <div className="spore-locked" style={{ left: '20%', top: '60%', animationDelay: '-1s' }} />
+            <div className="spore-locked" style={{ left: '70%', top: '85%', animationDelay: '-3s' }} />
           </div>
-          
-          <div className="opacity-20 blur-sm select-none pointer-events-none space-y-4 w-full z-0">
-            <div className="h-6 bg-white/20 rounded w-3/4 mx-auto"></div>
-            <div className="h-4 bg-white/10 rounded w-full"></div>
-            <div className="h-4 bg-white/10 rounded w-5/6 mx-auto"></div>
+
+          {/* Контент */}
+          <div className="relative z-10 flex flex-col items-center w-full max-w-xl">
+            <Lock className="w-8 h-8 text-white/20 mb-3 group-hover:text-white/40 transition-colors" />
+            <h3 className="text-lg font-bold text-white mb-3 tracking-wide uppercase">{title}</h3>
+            
+            {/* Единая карточка системы (Компактная) */}
+            <div className="w-full bg-black/40 border border-white/10 rounded-lg overflow-hidden backdrop-blur-md shadow-lg">
+                <div className="p-3 text-left border-b border-white/5">
+                    <p className={`text-xs leading-relaxed font-mono ${
+                        isSystemMessage ? 'text-green-400' : 'text-light/70'
+                    }`}>
+                        <span className="opacity-50 mr-2">$</span>
+                        {description}
+                    </p>
+                    
+                    {isSystemMessage && (
+                        <p className="text-[10px] text-green-500/60 mt-2 font-mono uppercase tracking-widest animate-pulse">
+                            {actionHint}
+                        </p>
+                    )}
+                </div>
+
+                {/* Нижняя часть: Панель управления (Кнопка) */}
+                {!isUpsideDown && (
+                    <div className="bg-white/5 p-2 flex justify-center items-center relative">
+                        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-red-900/10 pointer-events-none" />
+                        <div className="relative z-50 scale-90 transform transition-transform hover:scale-100 pointer-events-auto cursor-pointer">
+                            <RealitySwitch />
+                        </div>
+                    </div>
+                )}
+            </div>
           </div>
         </motion.div>
       )}
@@ -642,8 +647,21 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
         <div className="absolute inset-0 z-20 container mx-auto px-4 flex flex-col justify-end pb-12">
           <Link href="/catalog" className="inline-flex items-center gap-2 text-light/60 hover:text-primary mb-6 transition-colors w-fit"><ArrowLeft className="w-4 h-4" /> Назад в каталог</Link>
           <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border border-white/10 bg-white/5 w-fit mb-4 ${categoryInfo.color} bg-opacity-10 text-xs font-bold uppercase tracking-wider`}><CategoryIcon className="w-4 h-4" /> {categoryInfo.name}</div>
-          <h1 className="text-4xl md:text-6xl font-black text-white mb-4 drop-shadow-lg">{effect.title}</h1>
-          <p className="text-xl text-light/80 max-w-2xl leading-relaxed">{effect.description}</p>
+          <h1 className="text-4xl md:text-6xl font-black text-white mb-4 drop-shadow-lg">
+            {isUpsideDown ? (
+              <CipherReveal text={effect.title} reveal={true} />
+            ) : (
+              effect.title
+            )}
+          </h1>
+          <p className="text-xl text-light/80 max-w-2xl leading-relaxed">
+            {effect.description}
+            {isUpsideDown && (
+              <span className="ml-2">
+                <RedactedText>[ДАННЫЕ УДАЛЕНЫ]</RedactedText>
+              </span>
+            )}
+          </p>
         </div>
       </motion.div>
 
@@ -723,7 +741,7 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
                     <h3 className="font-bold text-lg text-cyan-400">Текущее состояние | Факты</h3>
                   </div>
                   <div className="text-light/80 leading-relaxed whitespace-pre-line">
-                    {effect.currentState}
+                    <RedactedWords text={effect.currentState} minWords={1} maxWords={5} seed={effect.id} />
                   </div>
                   {effect.interpretations?.sourceLink && (
                     <div className="mt-4 pt-3 border-t border-white/10">
@@ -750,7 +768,7 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
               console.log('🟡 [RENDER LOGIC] Режим Реальности: показываем только заглушку');
               return (
                 <div ref={lockedContentRef}>
-                  <LockedContent isVisible={true} isUpsideDown={false} />
+                  <LockedContent isVisible={true} isUpsideDown={false} effectId={effect.id} />
                 </div>
               );
             }
@@ -760,7 +778,7 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
               console.log('🟡 [RENDER LOGIC] Режим Изнанки БЕЗ голоса: показываем заглушку');
               return (
                 <div ref={lockedContentRef}>
-                  <LockedContent isVisible={true} isUpsideDown={true} />
+                  <LockedContent isVisible={true} isUpsideDown={true} effectId={effect.id} />
                 </div>
               );
             }

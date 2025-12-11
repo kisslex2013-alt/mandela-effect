@@ -27,9 +27,5 @@ async function getData() {
 
 export default async function StatsPage() {
   const data = await getData();
-  return (
-    <div className="min-h-screen bg-dark pt-32">
-      <StatsClientWrapper {...data} />
-    </div>
-  );
+  return <StatsClientWrapper {...data} />;
 }

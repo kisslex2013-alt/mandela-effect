@@ -13,7 +13,9 @@ import ArchiveAnomalies from '@/components/comments/ArchiveAnomalies';
 import toast from 'react-hot-toast';
 import { useReality } from '@/lib/context/RealityContext';
 import { Lock, ChevronDown, ChevronUp } from 'lucide-react';
-import RealitySwitch from '@/components/ui/RealitySwitch'; // Импортируем переключатель для заглушки
+import RealitySwitch from '@/components/ui/RealitySwitch';
+import CipherReveal from '@/components/ui/CipherReveal';
+import RedactedText from '@/components/ui/RedactedText';
 
 // --- ИКОНКИ ---
 const ArrowLeftIcon = () => (<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>);
@@ -51,39 +53,83 @@ interface EffectClientProps {
   effect: Effect;
 }
 
-// Компонент заглушки (Обновленный)
-const LockedContent = ({ title, description, showSwitch = false }: { title: string, description: string, showSwitch?: boolean }) => (
-  <div className="relative bg-darkCard/50 border border-white/10 rounded-2xl p-8 text-center flex flex-col items-center justify-center min-h-[200px] mt-4 group">
-    {/* Фоновые эффекты (z-index: 0) */}
-    <div className="absolute inset-0 pointer-events-none z-0 rounded-2xl overflow-hidden">
-        {/* Мягкий градиент вместо "полицейской сирены" */}
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.15),transparent_70%)] mix-blend-screen" />
-        
-        {/* Частицы (яркие) */}
-        <div className="spore-locked" style={{ left: '10%', top: '80%', animationDelay: '0s' }} />
-        <div className="spore-locked" style={{ left: '80%', top: '90%', animationDelay: '-2s' }} />
-        <div className="spore-locked" style={{ left: '40%', top: '70%', animationDelay: '-4s' }} />
-        <div className="spore-locked" style={{ left: '20%', top: '60%', animationDelay: '-1s' }} />
-        <div className="spore-locked" style={{ left: '70%', top: '85%', animationDelay: '-3s' }} />
-    </div>
+// --- ГЕНЕРАТОР СООБЩЕНИЙ (Вместо статического массива) ---
+const generateSystemMessage = (id: string = 'default') => {
+  // Хэш для стабильности (чтобы на одной странице текст не скакал при ре-рендере)
+  const seed = id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  
+  const prefixes = ["CRITICAL_DESYNC", "MEMORY_CORRUPTION", "TIMELINE_DIVERGENCE", "REALITY_BREACH", "PATTERN_VOID", "ERR_NO_CONTEXT", "SYSTEM_ALERT"];
+  const bodies = [
+    "НАРУШЕНИЕ ЦЕЛОСТНОСТИ ВОСПОМИНАНИЙ", "ТРЕБУЕТСЯ ПОДТВЕРЖДЕНИЕ НАБЛЮДАТЕЛЯ", "ДОСТУП ОГРАНИЧЕН ПРОТОКОЛОМ 'ОМЕГА'",
+    "СБОЙ СИНХРОНИЗАЦИИ НЕЙРОИНТЕРФЕЙСА", "ОБНАРУЖЕНЫ СЛЕДЫ ВМЕШАТЕЛЬСТВА", "АРХИВ ЗАШИФРОВАН АЛГОРИТМОМ МАНДЕЛЫ",
+    "ВРЕМЕННАЯ ЛИНИЯ НЕСТАБИЛЬНА", "ОБЪЕКТ НЕ НАЙДЕН В ТЕКУЩЕЙ РЕАЛЬНОСТИ"
+  ];
+  const suffixes = [":: INITIATE_VOTE", ":: WAITING_FOR_INPUT...", "// REBOOT_REQUIRED", ":: SYNC_PENDING", ":: ACCESS_DENIED", "-> TRACE_LOST"];
 
-    {/* Контент (z-index: 10) */}
-    <div className="relative z-10 flex flex-col items-center w-full">
-        <Lock className="w-12 h-12 text-white/20 mb-4 group-hover:text-white/40 transition-colors" />
-        <h3 className="text-xl font-bold text-white mb-2 tracking-wide uppercase">{title}</h3>
-        <p className="text-light/60 text-sm max-w-md mb-6 leading-relaxed font-mono">
-            {description}
-        </p>
-        
-        {/* Кнопка (z-index: 50 - ПОВЕРХ ВСЕГО) */}
-        {showSwitch && (
-            <div className="relative z-50 scale-125 transform transition-transform hover:scale-135 pointer-events-auto cursor-pointer">
-                <RealitySwitch />
+  const pick = (arr: string[], offset: number) => arr[(seed + offset) % arr.length];
+
+  return `${pick(prefixes, 0)} :: ${pick(bodies, 1)} ${pick(suffixes, 2)}`;
+};
+
+// Компонент заглушки (Единый блок)
+const LockedContent = ({ title, description, showSwitch = false, effectId }: { title: string, description: string, showSwitch?: boolean, effectId?: string }) => {
+  const { isUpsideDown } = useReality();
+  const systemMessage = generateSystemMessage(effectId || 'default');
+  const displayDescription = description || systemMessage;
+  const isSystemMessage = !description;
+
+  return (
+    <div className="relative bg-darkCard/50 border border-white/10 rounded-xl p-6 text-center flex flex-col items-center justify-center min-h-[180px] mt-4 group overflow-hidden">
+        {/* Фоновые эффекты */}
+        <div className="absolute inset-0 pointer-events-none z-0 rounded-xl overflow-hidden">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.1),transparent_70%)] mix-blend-screen" />
+            <div className="spore-locked" style={{ left: '10%', top: '80%', animationDelay: '0s' }} />
+            <div className="spore-locked" style={{ left: '80%', top: '90%', animationDelay: '-2s' }} />
+            <div className="spore-locked" style={{ left: '40%', top: '70%', animationDelay: '-4s' }} />
+            <div className="spore-locked" style={{ left: '20%', top: '60%', animationDelay: '-1s' }} />
+            <div className="spore-locked" style={{ left: '70%', top: '85%', animationDelay: '-3s' }} />
+        </div>
+
+        {/* Контент */}
+        <div className="relative z-10 flex flex-col items-center w-full max-w-xl">
+            <Lock className="w-8 h-8 text-white/20 mb-3 group-hover:text-white/40 transition-colors" />
+            <h3 className="text-lg font-bold text-white mb-3 tracking-wide uppercase">{title}</h3>
+            
+            {/* Единая карточка системы (Компактная) */}
+            <div className="w-full bg-black/40 border border-white/10 rounded-lg overflow-hidden backdrop-blur-md shadow-lg">
+                <div className="p-3 text-left border-b border-white/5">
+                    <p className={`text-xs leading-relaxed font-mono ${
+                        isSystemMessage ? 'text-green-400' : 'text-light/70'
+                    }`}>
+                        <span className="opacity-50 mr-2">$</span>
+                        {displayDescription}
+                    </p>
+                    
+                    {/* Подсказка показывается всегда, независимо от isSystemMessage */}
+                    <div className="text-[10px] text-green-500/60 mt-2 font-mono uppercase tracking-widest animate-pulse">
+                        {!isUpsideDown ? (
+                            <>
+                                &gt;&gt;&gt; ТРЕБУЕТСЯ ПЕРЕХОД <span className="text-stranger-red font-bold drop-shadow-[0_0_8px_rgba(220,38,38,0.8)]">В ИЗНАНКУ</span>
+                            </>
+                        ) : (
+                            ">>> НЕОБХОДИМО ЗАФИКСИРОВАТЬ НАБЛЮДЕНИЕ (ГОЛОС)"
+                        )}
+                    </div>
+                </div>
+
+                {showSwitch && (
+                    <div className="bg-white/5 p-2 flex justify-center items-center relative">
+                        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-red-900/10 pointer-events-none" />
+                        <div className="relative z-50 scale-90 transform transition-transform hover:scale-100 pointer-events-auto cursor-pointer">
+                            <RealitySwitch />
+                        </div>
+                    </div>
+                )}
             </div>
-        )}
+        </div>
     </div>
-  </div>
-);
+  );
+};
 
 export default function EffectClient({ effect: initialEffect }: EffectClientProps) {
   const router = useRouter();
@@ -337,8 +383,15 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
             
             {/* Заголовок */}
             <div>
-              <h1 className="text-3xl md:text-4xl font-black text-white mb-4 leading-tight">{effect.title}</h1>
-              <p className="text-lg text-light/80 leading-relaxed">{effect.description}</p>
+              <h1 className="text-3xl md:text-4xl font-black text-white mb-4 leading-tight">
+                <CipherReveal text={effect.title} reveal={true} />
+              </h1>
+              <p className="text-lg text-light/80 leading-relaxed">
+                {effect.description} 
+                <span className="ml-2">
+                  <RedactedText>[ДАННЫЕ УДАЛЕНЫ]</RedactedText>
+                </span>
+              </p>
             </div>
 
             {/* Блок Голосования */}
@@ -431,7 +484,7 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
             </motion.div>
 
             {/* Секция контента (Аккордеоны и Заглушки) */}
-            <div className="space-y-3 pt-2">
+            <motion.div layout className="space-y-3 pt-2">
                 
                 {/* 1. Факты (Видны всегда, если есть контент) - НЕЗАВИСИМЫЙ аккордеон */}
                 {(effect.currentState || scientificText) && (
@@ -453,102 +506,132 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
                 )}
 
                 {/* ЛОГИКА ОТОБРАЖЕНИЯ СКРЫТОГО КОНТЕНТА */}
-                {!isUpsideDown ? (
-                    // --- РЕЖИМ РЕАЛЬНОСТИ ---
-                    // ВСЕГДА показываем только заглушку, независимо от наличия голоса
-                    <LockedContent 
-                        title="ДОСТУП ЗАПРЕЩЕН"
-                        description="Вы находитесь в стабильной версии реальности. Исторические хроники, остатки артефактов и теории заговора скрыты протоколом безопасности. Требуется переход в Изнанку."
-                        showSwitch={true}
-                    />
-                ) : (
-                    // --- РЕЖИМ ИЗНАНКИ ---
-                    userVote ? (
-                        // Если проголосовал: Показываем контент
-                        <AnimatePresence>
-                            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
-                                {/* Остатки - ВЗАИМОИСКЛЮЧАЮЩИЙ */}
-                                {effect.residue && (
-                                    <AccordionItem 
-                                        id="residue"
-                                        title="Культурные следы | Остатки" 
-                                        icon={<SearchIcon />} 
-                                        color="blue"
-                                        isOpen={openAccordion === 'residue'}
-                                        onToggle={() => handleExclusiveAccordionToggle('residue')}
-                                    >
-                                        <div className="whitespace-pre-wrap">{effect.residue}</div>
-                                        {effect.residueSource && (
-                                            <a href={effect.residueSource} target="_blank" rel="noopener" className="mt-3 text-xs text-blue-400 hover:underline flex items-center gap-1">
-                                                <ExternalLinkIcon /> Ссылка на остатки
-                                            </a>
-                                        )}
-                                    </AccordionItem>
-                                )}
-
-                                {/* История - ВЗАИМОИСКЛЮЧАЮЩИЙ */}
-                                {effect.history && (
-                                    <AccordionItem 
-                                        id="history"
-                                        title="Временная шкала | История" 
-                                        icon={<ScrollTextIcon />} 
-                                        color="amber"
-                                        isOpen={openAccordion === 'history'}
-                                        onToggle={() => handleExclusiveAccordionToggle('history')}
-                                    >
-                                        <div className="whitespace-pre-wrap">{effect.history}</div>
-                                        {effect.historySource && (
-                                            <a href={effect.historySource} target="_blank" rel="noopener" className="mt-3 text-xs text-amber-400 hover:underline flex items-center gap-1">
-                                                <ExternalLinkIcon /> Источник истории
-                                            </a>
-                                        )}
-                                    </AccordionItem>
-                                )}
-
-                                {/* Теории - ВЗАИМОИСКЛЮЧАЮЩИЙ */}
-                                {(scientificText || communityText) && (
-                                    <AccordionItem 
-                                        id="theories"
-                                        title="Что об этом говорят | Теории" 
-                                        icon={<BrainIcon />} 
-                                        color="pink"
-                                        isOpen={openAccordion === 'theories'}
-                                        onToggle={() => handleExclusiveAccordionToggle('theories')}
-                                    >
-                                        {scientificText && (
-                                            <div className="mb-4 pb-4 border-b border-white/5">
-                                                <h4 className="text-xs font-bold text-pink-300 uppercase tracking-wider mb-2">Научная точка зрения</h4>
-                                                <div className="whitespace-pre-wrap">{scientificText}</div>
-                                            </div>
-                                        )}
-                                        {communityText && (
-                                            <div>
-                                                <h4 className="text-xs font-bold text-pink-300 uppercase tracking-wider mb-2">Теории сообщества</h4>
-                                                <div className="whitespace-pre-wrap">{communityText}</div>
-                                            </div>
-                                        )}
-                                    </AccordionItem>
-                                )}
-
-                                {/* Архив Аномалий (Комментарии) - НЕЗАВИСИМЫЙ аккордеон */}
-                                <ArchiveAnomalies 
-                                    effectId={effect.id} 
-                                    isOpen={isCommentsOpen}
-                                    onToggle={() => setIsCommentsOpen(prev => !prev)}
+                <motion.div layout className="overflow-hidden">
+                    <AnimatePresence mode="wait">
+                        {!isUpsideDown ? (
+                            // --- РЕЖИМ РЕАЛЬНОСТИ ---
+                            // ВСЕГДА показываем только заглушку, независимо от наличия голоса
+                            <motion.div
+                                key="reality-locked"
+                                layout
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -10 }}
+                                transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+                            >
+                                <LockedContent 
+                                    title="ДОСТУП ЗАПРЕЩЕН"
+                                    description=""
+                                    showSwitch={true}
+                                    effectId={effect.id}
                                 />
                             </motion.div>
-                        </AnimatePresence>
-                    ) : (
-                        // Если НЕ проголосовал в Изнанке: Заглушка "Голосуй"
-                        <LockedContent 
-                            title="ПАМЯТЬ НЕ ВЕРИФИЦИРОВАНА"
-                            description="Система не может подтвердить вашу версию событий. Чтобы получить доступ к Архивам Аномалий, зафиксируйте своё воспоминание выше."
-                            showSwitch={false}
-                        />
-                    )
-                )}
+                        ) : (
+                            // --- РЕЖИМ ИЗНАНКИ ---
+                            userVote ? (
+                                // Если проголосовал: Показываем контент
+                                <motion.div
+                                    key="upside-down-content"
+                                    layout
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -10 }}
+                                    transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+                                    className="space-y-3"
+                                >
+                                    {/* Остатки - ВЗАИМОИСКЛЮЧАЮЩИЙ */}
+                                    {effect.residue && (
+                                        <AccordionItem 
+                                            id="residue"
+                                            title="Культурные следы | Остатки" 
+                                            icon={<SearchIcon />} 
+                                            color="blue"
+                                            isOpen={openAccordion === 'residue'}
+                                            onToggle={() => handleExclusiveAccordionToggle('residue')}
+                                        >
+                                            <div className="whitespace-pre-wrap">{effect.residue}</div>
+                                            {effect.residueSource && (
+                                                <a href={effect.residueSource} target="_blank" rel="noopener" className="mt-3 text-xs text-blue-400 hover:underline flex items-center gap-1">
+                                                    <ExternalLinkIcon /> Ссылка на остатки
+                                                </a>
+                                            )}
+                                        </AccordionItem>
+                                    )}
 
-            </div>
+                                    {/* История - ВЗАИМОИСКЛЮЧАЮЩИЙ */}
+                                    {effect.history && (
+                                        <AccordionItem 
+                                            id="history"
+                                            title="Временная шкала | История" 
+                                            icon={<ScrollTextIcon />} 
+                                            color="amber"
+                                            isOpen={openAccordion === 'history'}
+                                            onToggle={() => handleExclusiveAccordionToggle('history')}
+                                        >
+                                            <div className="whitespace-pre-wrap">{effect.history}</div>
+                                            {effect.historySource && (
+                                                <a href={effect.historySource} target="_blank" rel="noopener" className="mt-3 text-xs text-amber-400 hover:underline flex items-center gap-1">
+                                                    <ExternalLinkIcon /> Источник истории
+                                                </a>
+                                            )}
+                                        </AccordionItem>
+                                    )}
+
+                                    {/* Теории - ВЗАИМОИСКЛЮЧАЮЩИЙ */}
+                                    {(scientificText || communityText) && (
+                                        <AccordionItem 
+                                            id="theories"
+                                            title="Что об этом говорят | Теории" 
+                                            icon={<BrainIcon />} 
+                                            color="pink"
+                                            isOpen={openAccordion === 'theories'}
+                                            onToggle={() => handleExclusiveAccordionToggle('theories')}
+                                        >
+                                            {scientificText && (
+                                                <div className="mb-4 pb-4 border-b border-white/5">
+                                                    <h4 className="text-xs font-bold text-pink-300 uppercase tracking-wider mb-2">Научная точка зрения</h4>
+                                                    <div className="whitespace-pre-wrap">{scientificText}</div>
+                                                </div>
+                                            )}
+                                            {communityText && (
+                                                <div>
+                                                    <h4 className="text-xs font-bold text-pink-300 uppercase tracking-wider mb-2">Теории сообщества</h4>
+                                                    <div className="whitespace-pre-wrap">{communityText}</div>
+                                                </div>
+                                            )}
+                                        </AccordionItem>
+                                    )}
+
+                                    {/* Архив Аномалий (Комментарии) - НЕЗАВИСИМЫЙ аккордеон */}
+                                    <ArchiveAnomalies 
+                                        effectId={effect.id} 
+                                        isOpen={isCommentsOpen}
+                                        onToggle={() => setIsCommentsOpen(prev => !prev)}
+                                    />
+                                </motion.div>
+                            ) : (
+                                // Если НЕ проголосовал в Изнанке: Заглушка "Голосуй"
+                                <motion.div
+                                    key="upside-down-locked"
+                                    layout
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -10 }}
+                                    transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+                                >
+                                    <LockedContent 
+                                        title="ПАМЯТЬ НЕ ВЕРИФИЦИРОВАНА"
+                                        description=""
+                                        showSwitch={false}
+                                        effectId={effect.id}
+                                    />
+                                </motion.div>
+                            )
+                        )}
+                    </AnimatePresence>
+                </motion.div>
+
+            </motion.div>
 
           </div>
         </div>
