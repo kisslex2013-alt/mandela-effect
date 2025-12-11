@@ -43,8 +43,14 @@ export function RealityProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log('[RealityContext] Начало синхронизации...');
       
+      // Таймаут для предотвращения зависания
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Sync timeout')), 15000)
+      );
+      
       // 1. Получаем голоса с сервера (источник правды)
-      let serverVotes = await getUserVotedEffects(vid);
+      const serverVotesPromise = getUserVotedEffects(vid);
+      let serverVotes = await Promise.race([serverVotesPromise, timeoutPromise]) as Awaited<ReturnType<typeof getUserVotedEffects>>;
       console.log(`[RealityContext] Голосов на сервере: ${serverVotes.length}`);
       const serverVotesMap = new Map(
         serverVotes.map(v => [v.effectId, v.variant])
@@ -69,16 +75,31 @@ export function RealityProvider({ children }: { children: React.ReactNode }) {
       // 4. Мигрируем локальные голоса на сервер (если есть)
       if (localVotesToMigrate.length > 0) {
         console.log(`[RealityContext] Миграция ${localVotesToMigrate.length} голосов с localStorage на сервер...`);
-        const migrationResult = await migrateLocalVotes(vid, localVotesToMigrate);
-        console.log(`[RealityContext] Миграция завершена: ${migrationResult.migrated} мигрировано, ${migrationResult.errors} ошибок`);
-        
-        // После миграции перезагружаем список серверных голосов
-        if (migrationResult.migrated > 0) {
-          serverVotes = await getUserVotedEffects(vid);
-          serverVotesMap.clear();
-          serverVotes.forEach(v => {
-            serverVotesMap.set(v.effectId, v.variant);
-          });
+        try {
+          const migrationPromise = migrateLocalVotes(vid, localVotesToMigrate);
+          const migrationResult = await Promise.race([
+            migrationPromise,
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Migration timeout')), 10000))
+          ]) as Awaited<ReturnType<typeof migrateLocalVotes>>;
+          
+          console.log(`[RealityContext] Миграция завершена: ${migrationResult.migrated} мигрировано, ${migrationResult.errors} ошибок`);
+          
+          // После миграции перезагружаем список серверных голосов
+          if (migrationResult.migrated > 0) {
+            const refreshPromise = getUserVotedEffects(vid);
+            serverVotes = await Promise.race([
+              refreshPromise,
+              new Promise((_, reject) => setTimeout(() => reject(new Error('Refresh timeout')), 5000))
+            ]) as Awaited<ReturnType<typeof getUserVotedEffects>>;
+            
+            serverVotesMap.clear();
+            serverVotes.forEach(v => {
+              serverVotesMap.set(v.effectId, v.variant);
+            });
+          }
+        } catch (migrationError) {
+          console.error('[RealityContext] Ошибка при миграции:', migrationError);
+          // Продолжаем работу даже если миграция не удалась
         }
       }
 
@@ -105,7 +126,20 @@ export function RealityProvider({ children }: { children: React.ReactNode }) {
       }
 
       // 6. Получаем финальный счетчик голосов (после синхронизации)
-      const count = serverVotesMap.size > 0 ? serverVotesMap.size : await getUserVoteCount(vid);
+      let count = serverVotesMap.size;
+      if (count === 0) {
+        try {
+          const countPromise = getUserVoteCount(vid);
+          count = await Promise.race([
+            countPromise,
+            new Promise<number>((_, reject) => setTimeout(() => reject(new Error('Count timeout')), 5000))
+          ]) as number;
+        } catch (countError) {
+          console.error('[RealityContext] Ошибка при получении счетчика:', countError);
+          // Используем размер мапы как fallback
+          count = serverVotesMap.size;
+        }
+      }
       setVoteCount(count);
       setIsUnlocked(count >= REQUIRED_VOTES);
       

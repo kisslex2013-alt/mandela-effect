@@ -105,7 +105,7 @@ export default function RootLayout({
               {children}
             </main>
             <Footer />
-            <DevTools />
+            {process.env.NODE_ENV !== 'production' && <DevTools />}
             <Toaster
               position="bottom-right"
               toastOptions={{

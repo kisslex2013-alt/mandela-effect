@@ -8,8 +8,11 @@ import toast from 'react-hot-toast';
 import { getClientVisitorId } from '@/lib/client-visitor';
 
 export default function DevTools() {
-  // Виджет виден только в development режиме или если мы решим его оставить
-  // Для продакшена лучше скрывать, но пока оставим для тестов
+  // Виджет виден только в development режиме
+  if (process.env.NODE_ENV === 'production') {
+    return null;
+  }
+
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { refreshVotes } = useReality();

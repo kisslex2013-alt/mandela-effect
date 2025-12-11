@@ -412,6 +412,7 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
   const [nextUnvotedEffect, setNextUnvotedEffect] = useState<{ id: string; title: string } | null>(null);
   const [prevUnvotedEffect, setPrevUnvotedEffect] = useState<{ id: string; title: string } | null>(null);
   const [showUnvotedOnly, setShowUnvotedOnly] = useState(true); // Фильтр активен по умолчанию
+  const [navigatingTo, setNavigatingTo] = useState<string | null>(null); // ID эффекта, к которому идет навигация
   
   // Состояние для взаимоисключающих аккордеонов (Остатки, История, Теории)
   const [openExclusiveAccordion, setOpenExclusiveAccordion] = useState<string | null>(null);
@@ -462,6 +463,11 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
       setOpenExclusiveAccordion(null);
     }
   }, [isUpsideDown]);
+
+  // Сбрасываем индикацию загрузки при монтировании (когда страница загрузилась)
+  useEffect(() => {
+    setNavigatingTo(null);
+  }, [effect.id]);
 
   useEffect(() => {
     const initPage = async () => {
@@ -679,18 +685,32 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
                 {showUnvotedOnly && prevUnvotedEffect ? (
                   <Link 
                     href={`/effect/${prevUnvotedEffect.id}`} 
-                    className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-light/50 hover:text-white transition-colors" 
+                    onClick={() => setNavigatingTo(prevUnvotedEffect.id)}
+                    className={`p-2 rounded-lg bg-white/5 hover:bg-white/10 text-light/50 hover:text-white transition-colors flex items-center justify-center ${
+                      navigatingTo === prevUnvotedEffect.id ? 'opacity-50 cursor-wait' : ''
+                    }`}
                     title={`Предыдущий не проголосованный: ${prevUnvotedEffect.title}`}
                   >
-                    <ChevronLeft className="w-5 h-5" />
+                    {navigatingTo === prevUnvotedEffect.id ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <ChevronLeft className="w-5 h-5" />
+                    )}
                   </Link>
                 ) : prevEffect ? (
                   <Link 
                     href={`/effect/${prevEffect.id}`} 
-                    className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-light/50 hover:text-white transition-colors" 
+                    onClick={() => setNavigatingTo(prevEffect.id)}
+                    className={`p-2 rounded-lg bg-white/5 hover:bg-white/10 text-light/50 hover:text-white transition-colors flex items-center justify-center ${
+                      navigatingTo === prevEffect.id ? 'opacity-50 cursor-wait' : ''
+                    }`}
                     title={`Предыдущий: ${prevEffect.title}`}
                   >
-                    <ChevronLeft className="w-5 h-5" />
+                    {navigatingTo === prevEffect.id ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <ChevronLeft className="w-5 h-5" />
+                    )}
                   </Link>
                 ) : <div className="w-9 h-9" />}
                 <button
@@ -707,18 +727,32 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
                 {showUnvotedOnly && nextUnvotedEffect ? (
                   <Link 
                     href={`/effect/${nextUnvotedEffect.id}`} 
-                    className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-light/50 hover:text-white transition-colors" 
+                    onClick={() => setNavigatingTo(nextUnvotedEffect.id)}
+                    className={`p-2 rounded-lg bg-white/5 hover:bg-white/10 text-light/50 hover:text-white transition-colors flex items-center justify-center ${
+                      navigatingTo === nextUnvotedEffect.id ? 'opacity-50 cursor-wait' : ''
+                    }`}
                     title={`Следующий не проголосованный: ${nextUnvotedEffect.title}`}
                   >
-                    <ChevronRight className="w-5 h-5" />
+                    {navigatingTo === nextUnvotedEffect.id ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <ChevronRight className="w-5 h-5" />
+                    )}
                   </Link>
                 ) : nextEffect ? (
                   <Link 
                     href={`/effect/${nextEffect.id}`} 
-                    className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-light/50 hover:text-white transition-colors" 
+                    onClick={() => setNavigatingTo(nextEffect.id)}
+                    className={`p-2 rounded-lg bg-white/5 hover:bg-white/10 text-light/50 hover:text-white transition-colors flex items-center justify-center ${
+                      navigatingTo === nextEffect.id ? 'opacity-50 cursor-wait' : ''
+                    }`}
                     title={`Следующий: ${nextEffect.title}`}
                   >
-                    <ChevronRight className="w-5 h-5" />
+                    {navigatingTo === nextEffect.id ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <ChevronRight className="w-5 h-5" />
+                    )}
                   </Link>
                 ) : <div className="w-9 h-9" />}
               </div>

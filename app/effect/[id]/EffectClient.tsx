@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { m, AnimatePresence } from 'framer-motion';
@@ -142,6 +142,10 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
   const [isVoting, setIsVoting] = useState(false);
   const [glitchTrigger, setGlitchTrigger] = useState(0);
   
+  // Защита от повторных вызовов
+  const isVotingRef = useRef(false);
+  const isNavigatingRef = useRef(false);
+  
   const [allIds, setAllIds] = useState<string[]>([]);
   const [relatedEffects, setRelatedEffects] = useState<any[]>([]);
   const [nextUnvotedId, setNextUnvotedId] = useState<string | null>(null);
@@ -229,15 +233,22 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
     }
   };
 
-  const handleNextUnvoted = () => {
+  const handleNextUnvoted = useCallback(() => {
+    if (isNavigatingRef.current) return;
     if (!nextUnvotedId) {
         toast.success('Вы прошли все эффекты! 🏆');
         return;
     }
+    isNavigatingRef.current = true;
     router.push(`/effect/${nextUnvotedId}`);
-  };
+    // Сбрасываем флаг через небольшую задержку
+    setTimeout(() => {
+      isNavigatingRef.current = false;
+    }, 1000);
+  }, [nextUnvotedId, router]);
 
-  const handleRandomUnvoted = () => {
+  const handleRandomUnvoted = useCallback(() => {
+    if (isNavigatingRef.current) return;
     const votes = votesStore.get();
     const unvotedIds = allIds.filter(id => !votes[id] && id !== effect.id);
     if (unvotedIds.length === 0) {
@@ -245,14 +256,21 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
       return;
     }
     const randomId = unvotedIds[Math.floor(Math.random() * unvotedIds.length)];
+    isNavigatingRef.current = true;
     router.push(`/effect/${randomId}`);
-  };
+    // Сбрасываем флаг через небольшую задержку
+    setTimeout(() => {
+      isNavigatingRef.current = false;
+    }, 1000);
+  }, [allIds, effect.id, router]);
 
   const handleVote = async (variant: 'A' | 'B') => {
-    if (isVoting || userVote) return;
+    // Защита от повторных вызовов
+    if (isVoting || userVote || isVotingRef.current) return;
     
     const hasVoted = !!votesStore.get()[effect.id];
     
+    isVotingRef.current = true;
     setIsVoting(true);
     setGlitchTrigger(prev => prev + 1);
 
@@ -272,21 +290,37 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
 
       const visitorId = getClientVisitorId();
       if (visitorId) {
-        await saveVote({
-        visitorId,
-        effectId: effect.id,
+        // Таймаут для предотвращения зависания
+        const votePromise = saveVote({
+          visitorId,
+          effectId: effect.id,
           variant
         });
+        
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Timeout')), 10000)
+        );
+        
+        await Promise.race([votePromise, timeoutPromise]);
       }
       
       toast.success('Зафиксировано');
       calculateNavigation(allIds, { ...votesStore.get(), [effect.id]: variant });
 
     } catch (error) {
+      console.error('[EffectClient] Ошибка при голосовании:', error);
       toast.error('Ошибка при голосовании');
+      // Откатываем изменения при ошибке
       setUserVote(null);
+      votesStore.set(effect.id, null as any);
+      setEffect(prev => ({
+        ...prev,
+        votesFor: variant === 'A' ? prev.votesFor - 1 : prev.votesFor,
+        votesAgainst: variant === 'B' ? prev.votesAgainst - 1 : prev.votesAgainst
+      }));
     } finally {
       setIsVoting(false);
+      isVotingRef.current = false;
     }
   };
 
