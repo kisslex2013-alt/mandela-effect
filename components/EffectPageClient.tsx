@@ -658,7 +658,7 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
             {effect.description}
             {isUpsideDown && (
               <span className="ml-2">
-                <RedactedText>[ДАННЫЕ УДАЛЕНЫ]</RedactedText>
+                <RedactedText text="[ДАННЫЕ УДАЛЕНЫ]" />
               </span>
             )}
           </p>
