@@ -389,7 +389,7 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
               <p className="text-lg text-light/80 leading-relaxed">
                 {effect.description} 
                 <span className="ml-2">
-                  <RedactedText>[ДАННЫЕ УДАЛЕНЫ]</RedactedText>
+                  <RedactedText text="[ДАННЫЕ УДАЛЕНЫ]" />
                 </span>
               </p>
             </div>
