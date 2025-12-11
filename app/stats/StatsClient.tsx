@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { useReality } from '@/lib/context/RealityContext';
 import { Activity, Users, Zap, AlertTriangle, FileText, Music, Globe, Film, Ghost, Gamepad2, Baby, Tag } from 'lucide-react';
 import ReactorChart from '@/components/stats/ReactorChart';
@@ -27,7 +27,7 @@ interface StatsClientProps {
 
 // KPI Модуль (Серверная стойка)
 const StatModule = ({ label, value, icon: Icon, isUpsideDown, delay = 0 }: any) => (
-  <motion.div 
+  <m.div 
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
     transition={{ delay }}
@@ -56,7 +56,7 @@ const StatModule = ({ label, value, icon: Icon, isUpsideDown, delay = 0 }: any) 
         {label}
       </span>
     </div>
-  </motion.div>
+  </m.div>
 );
 
 // Карточка "Секретный Архив" (Спорные)
@@ -181,7 +181,7 @@ export default function StatsClient({ effects, totalParticipants, totalVotes }: 
   }
 
   return (
-    <motion.div 
+    <m.div 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5 }}
@@ -193,7 +193,7 @@ export default function StatsClient({ effects, totalParticipants, totalVotes }: 
       <div className="max-w-7xl mx-auto px-4 relative z-10">
         
         {/* Заголовок */}
-        <motion.div 
+        <m.div 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.1 }}
@@ -214,10 +214,10 @@ export default function StatsClient({ effects, totalParticipants, totalVotes }: 
             <Activity className="w-4 h-4" />
             <span>Пульс коллективного бессознательного</span>
           </div>
-        </motion.div>
+        </m.div>
 
         {/* 1. KPI MODULES (Серверная стойка) */}
-        <motion.div 
+        <m.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.2 }}
@@ -227,16 +227,16 @@ export default function StatsClient({ effects, totalParticipants, totalVotes }: 
             <StatModule label={isUpsideDown ? "ЗАРАЖЕННЫХ" : "УЧАСТНИКОВ"} value={totalParticipants} icon={Users} isUpsideDown={isUpsideDown} delay={0.1} />
             <StatModule label="ГОЛОСОВ" value={totalVotes} icon={Activity} isUpsideDown={isUpsideDown} delay={0.2} />
             <StatModule label="ИНДЕКС СДВИГА" value={`${shiftIndex}%`} icon={AlertTriangle} isUpsideDown={isUpsideDown} delay={0.3} />
-        </motion.div>
+        </m.div>
 
-        <motion.div 
+        <m.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.3 }}
           className="grid lg:grid-cols-[1fr_2fr_1fr] gap-6 mb-12"
         >
             {/* 2. ЯДРО (Реактор) */}
-            <motion.div 
+            <m.div 
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.5, delay: 0.4 }}
@@ -247,10 +247,10 @@ export default function StatsClient({ effects, totalParticipants, totalVotes }: 
                     Ядро <span className="text-cyan-400 drop-shadow-[0_0_8px_rgba(6,182,212,0.8)]">РЕАЛЬНОСТИ</span>
                 </div>
                 <ReactorChart percentage={shiftIndex} />
-            </motion.div>
+            </m.div>
 
             {/* 3. СПЕКТР (Категории) */}
-            <motion.div 
+            <m.div 
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.5, delay: 0.5 }}
@@ -265,10 +265,10 @@ export default function StatsClient({ effects, totalParticipants, totalVotes }: 
                 ) : (
                     <div className="text-center text-light/40 py-8">Нет данных</div>
                 )}
-            </motion.div>
+            </m.div>
 
             {/* 4. ЖИВОЙ ЛОГ (Sidebar) */}
-            <motion.div 
+            <m.div 
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.5, delay: 0.6 }}
@@ -276,17 +276,17 @@ export default function StatsClient({ effects, totalParticipants, totalVotes }: 
               style={{ minHeight: 0 }}
             >
                 <LiveLog />
-            </motion.div>
-        </motion.div>
+            </m.div>
+        </m.div>
 
         {/* 5. СПОРНЫЕ (Секретный архив) */}
-        <motion.div 
+        <m.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.4 }}
           className="mb-8"
         >
-            <motion.div 
+            <m.div 
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.5, delay: 0.5 }}
@@ -294,19 +294,19 @@ export default function StatsClient({ effects, totalParticipants, totalVotes }: 
             >
                 <AlertTriangle className={`w-5 h-5 ${isUpsideDown ? 'text-red-500' : 'text-yellow-500'}`} />
                 <h2 className="text-xl font-bold text-white uppercase tracking-wide">Самые спорные (50/50)</h2>
-            </motion.div>
+            </m.div>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {controversialEffects.length > 0 ? (
                     controversialEffects.map((effect: any, index: number) => (
-                        <motion.div
+                        <m.div
                           key={effect.id}
                           initial={{ opacity: 0, y: 20 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ duration: 0.5, delay: 0.6 + index * 0.1 }}
                         >
                             <SecretFileCard effect={effect} isUpsideDown={isUpsideDown} />
-                        </motion.div>
+                        </m.div>
                     ))
                 ) : (
                     <div className="col-span-3 text-center text-light/40 py-8">
@@ -314,9 +314,9 @@ export default function StatsClient({ effects, totalParticipants, totalVotes }: 
                     </div>
                 )}
             </div>
-        </motion.div>
+        </m.div>
 
       </div>
-    </motion.div>
+    </m.div>
   );
 }

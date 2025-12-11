@@ -2,7 +2,7 @@
 
 import { useReality } from '@/lib/context/RealityContext';
 import StepCard from '@/components/how-it-works/StepCard';
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { 
   Scan, Search,
   CheckCircle2, Split,
@@ -55,29 +55,59 @@ export default function HowItWorksClient() {
       <div className="max-w-4xl mx-auto px-4 relative z-10 w-full">
         
         {/* Заголовок */}
-        <div className="text-center mb-8 md:mb-12">
-          <h1 className={`text-3xl md:text-5xl font-black mb-2 tracking-tight uppercase ${isUpsideDown ? 'glitch-text text-white' : 'text-white'}`} data-text={isUpsideDown ? "АЛГОРИТМ ВЗЛОМА" : "ПРОТОКОЛ РАБОТЫ"}>
+        <m.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.1 }}
+          className="text-center mb-8 md:mb-12"
+        >
+          <m.h1 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className={`text-2xl md:text-5xl font-black mb-2 tracking-tight uppercase break-words px-2 ${isUpsideDown ? 'glitch-text text-white' : 'text-white'}`} 
+            data-text={isUpsideDown ? "АЛГОРИТМ ВЗЛОМА" : "ПРОТОКОЛ РАБОТЫ"}
+          >
             {isUpsideDown ? "АЛГОРИТМ ВЗЛОМА" : "ПРОТОКОЛ РАБОТЫ"}
-          </h1>
-          <p className={`text-sm md:text-base max-w-xl mx-auto ${isUpsideDown ? 'text-red-400 font-mono' : 'text-light/60'}`}>
+          </m.h1>
+          <m.p 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.3 }}
+            className={`text-xs md:text-base max-w-xl mx-auto px-2 ${isUpsideDown ? 'text-red-400 font-mono' : 'text-light/60'}`}
+          >
             {isUpsideDown 
               ? ">> ИНСТРУКЦИЯ ПО ОБХОДУ БЛОКИРОВОК ПАМЯТИ <<" 
               : "Как мы анализируем коллективные искажения памяти."}
-          </p>
-        </div>
+          </m.p>
+        </m.div>
 
         {/* PIPELINE (Центральная линия) */}
-        <div className="relative">
-            {/* Сама линия */}
-            <div className="absolute left-1/2 top-0 bottom-0 w-px -translate-x-1/2 bg-white/10">
-                <motion.div 
+        <m.div 
+          initial={{ opacity: 0, scaleY: 0 }}
+          animate={{ opacity: 1, scaleY: 1 }}
+          transition={{ duration: 0.6, delay: 0.4 }}
+          className="relative"
+        >
+            {/* Сама линия - на мобильных фоном ЗА блоками, на ПК как есть */}
+            <div className="absolute left-1/2 top-0 bottom-0 w-px -translate-x-1/2 bg-white/10 hidden md:block z-0">
+                <m.div 
+                    className={`absolute top-0 left-1/2 -translate-x-1/2 w-0.5 h-20 bg-gradient-to-b from-transparent to-current ${isUpsideDown ? 'text-red-500' : 'text-cyan-400'}`}
+                    animate={{ top: ['0%', '100%'] }}
+                    transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                />
+            </div>
+            
+            {/* Вертикальная линия для мобильных (фоном) */}
+            <div className="absolute left-1/2 top-0 bottom-0 w-px -translate-x-1/2 bg-white/10 md:hidden z-0">
+                <m.div 
                     className={`absolute top-0 left-1/2 -translate-x-1/2 w-0.5 h-20 bg-gradient-to-b from-transparent to-current ${isUpsideDown ? 'text-red-500' : 'text-cyan-400'}`}
                     animate={{ top: ['0%', '100%'] }}
                     transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
                 />
             </div>
 
-            {/* Шаги (Grid с малым отступом) */}
+            {/* Шаги - на мобильных в столбик, на ПК как есть */}
             <div className="relative z-10 flex flex-col gap-4 md:gap-6">
                 {steps.map((step, index) => {
                     const content = isUpsideDown ? step.upside : step.reality;
@@ -95,21 +125,31 @@ export default function HowItWorksClient() {
                     );
                 })}
             </div>
-        </div>
+        </m.div>
 
         {/* CTA Кнопка */}
-        <div className="mt-10 text-center">
+        <m.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.5 }}
+          className="mt-10 text-center"
+        >
             <Link href="/catalog">
-                <button className={`px-8 py-3 rounded-xl font-bold text-sm md:text-base flex items-center gap-2 mx-auto transition-all ${
-                    isUpsideDown 
-                        ? 'bg-gradient-to-r from-red-600 via-red-500 to-red-600 border-2 border-red-400/80 text-white shadow-[0_0_30px_rgba(239,68,68,1),0_0_60px_rgba(220,38,38,0.5)] hover:shadow-[0_0_40px_rgba(239,68,68,1.2),0_0_80px_rgba(220,38,38,0.7)] hover:border-red-300 hover:scale-105' 
-                        : 'bg-white text-black hover:bg-gray-200 shadow-xl hover:scale-105'
-                }`}>
+                <m.button 
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.4, delay: 0.6 }}
+                  className={`px-8 py-3 rounded-xl font-bold text-sm md:text-base flex items-center gap-2 mx-auto transition-all ${
+                      isUpsideDown 
+                          ? 'bg-gradient-to-r from-red-600 via-red-500 to-red-600 border-2 border-red-400/80 text-white shadow-[0_0_30px_rgba(239,68,68,1),0_0_60px_rgba(220,38,38,0.5)] hover:shadow-[0_0_40px_rgba(239,68,68,1.2),0_0_80px_rgba(220,38,38,0.7)] hover:border-red-300 hover:scale-105' 
+                          : 'bg-white text-black hover:bg-gray-200 shadow-xl hover:scale-105'
+                  }`}
+                >
                     {isUpsideDown ? 'НАЧАТЬ ВЗЛОМ' : 'ПРИСТУПИТЬ К ИССЛЕДОВАНИЮ'}
                     <ArrowRight className="w-4 h-4" />
-                </button>
+                </m.button>
             </Link>
-        </div>
+        </m.div>
       </div>
     </div>
   );

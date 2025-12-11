@@ -12,6 +12,9 @@ interface ImageWithSkeletonProps {
   className?: string;
   objectFit?: 'contain' | 'cover' | 'fill' | 'none' | 'scale-down';
   priority?: boolean;
+  fetchPriority?: 'high' | 'low' | 'auto';
+  decoding?: 'sync' | 'async' | 'auto';
+  sizes?: string;
 }
 
 export default function ImageWithSkeleton({
@@ -23,6 +26,9 @@ export default function ImageWithSkeleton({
   className = '',
   objectFit = 'cover',
   priority = false,
+  fetchPriority,
+  decoding,
+  sizes,
 }: ImageWithSkeletonProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
@@ -170,7 +176,7 @@ export default function ImageWithSkeleton({
             width={fill ? undefined : width}
             height={fill ? undefined : height}
             fill={fill}
-            sizes={fill ? "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" : undefined}
+            sizes={sizes || (fill ? "(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" : undefined)}
             style={fill ? {} : { width: 'auto', height: 'auto' }}
             className={`object-contain relative z-10 drop-shadow-2xl transition-opacity duration-500 ${isLoading ? 'opacity-0' : 'opacity-100'} ${
               objectFit === 'cover' ? 'object-cover' :
@@ -197,6 +203,9 @@ export default function ImageWithSkeleton({
               }
             }}
             priority={priority}
+            // @ts-ignore - fetchPriority пока не во всех типах Next.js Image
+            fetchPriority={fetchPriority}
+            decoding={decoding}
             unoptimized={typeof imageSrc === 'string' && imageSrc.startsWith('http')}
           />
         </>

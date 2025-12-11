@@ -96,6 +96,7 @@ export default function RootLayout({
     <html lang="ru" className={`${inter.variable} ${mono.variable} ${ruslan.variable} scroll-smooth`}>
       <body className="bg-dark text-light antialiased selection:bg-primary/30 selection:text-white overflow-x-hidden" suppressHydrationWarning>
         <RealityProvider>
+          {/* ОПТИМИЗАЦИЯ: LazyMotion загружает анимации асинхронно */}
           <LazyMotion features={domAnimation}>
             <RealityTransition /> {/* Эффект перехода */}
             <UpsideDownLayer />

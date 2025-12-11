@@ -392,3 +392,18 @@ html { scroll-behavior: smooth; }
 ::-webkit-scrollbar-track { background: #050505; }
 ::-webkit-scrollbar-thumb { background: #333; border-radius: 0px; }
 ::-webkit-scrollbar-thumb:hover { background: #3b82f6; }
+
+/* --- PERFORMANCE UTILITIES --- */
+
+/* Применять к контейнерам карточек в длинных списках */
+.content-visibility-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 400px; /* Примерная высота карточки */
+}
+
+/* Аппаратное ускорение для анимаций */
+.gpu-accelerated {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  will-change: transform, opacity;
+}

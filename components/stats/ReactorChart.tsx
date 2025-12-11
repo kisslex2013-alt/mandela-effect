@@ -1,7 +1,7 @@
 'use client';
 
 import { useReality } from '@/lib/context/RealityContext';
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 
 interface ReactorChartProps {
   percentage: number; // 0-100 (Процент Манделы)
@@ -29,7 +29,7 @@ export default function ReactorChart({ percentage }: ReactorChartProps) {
 
       {/* Ядро (Core) */}
       <div className="relative z-10 flex flex-col items-center justify-center">
-        <motion.div 
+        <m.div 
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           className={`text-5xl font-black font-mono ${
@@ -38,7 +38,7 @@ export default function ReactorChart({ percentage }: ReactorChartProps) {
           data-text={`${percentage}%`}
         >
           {percentage}%
-        </motion.div>
+        </m.div>
         <div className={`text-[10px] uppercase tracking-[0.3em] mt-2 ${
           isUpsideDown ? 'text-red-400 font-bold' : 'text-cyan-400'
         }`}>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { useReality } from '@/lib/context/RealityContext';
 import { votesStore } from '@/lib/votes-store';
 import { generateProfileText } from '@/lib/identity-modes';
@@ -170,7 +170,7 @@ export default function IdentityClient() {
   if (!mounted) return <div className="min-h-screen bg-dark" />;
 
   return (
-    <motion.div 
+    <m.div 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5 }}
@@ -179,7 +179,7 @@ export default function IdentityClient() {
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
 
       <div className="max-w-6xl mx-auto px-4 relative z-10">
-        <motion.div 
+        <m.div 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.1 }}
@@ -188,9 +188,9 @@ export default function IdentityClient() {
           <h1 className="text-4xl md:text-6xl font-black mb-4 tracking-tight uppercase text-white glitch-text" data-text="МОЯ ПАМЯТЬ">
             МОЯ <span className={`text-transparent bg-clip-text bg-gradient-to-r ${isUpsideDown ? 'from-red-500 to-purple-600' : 'from-cyan-400 to-blue-600'}`}>ПАМЯТЬ</span>
           </h1>
-        </motion.div>
+        </m.div>
 
-        <motion.div 
+        <m.div 
           ref={cardRef} 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -220,7 +220,7 @@ export default function IdentityClient() {
 
             <div className="p-6 md:p-10">
                 {!isAnalysisReady ? (
-                    <motion.div 
+                    <m.div 
                       initial={{ opacity: 0, scale: 0.9 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ duration: 0.5, delay: 0.3 }}
@@ -240,13 +240,13 @@ export default function IdentityClient() {
                         <p className="text-light/60 text-sm max-w-md mx-auto">
                             Системе нужно больше данных. Проголосуйте еще в {REQUIRED_VOTES - voteCount} карточках.
                         </p>
-                    </motion.div>
+                    </m.div>
                 ) : (
                     // GRID LAYOUT: 50% / 50%
                     <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
                         
                         {/* Левая колонка: Текст и Кнопка */}
-                        <motion.div 
+                        <m.div 
                           initial={{ opacity: 0, x: -30 }}
                           animate={{ opacity: 1, x: 0 }}
                           transition={{ duration: 0.6, delay: 0.3 }}
@@ -289,10 +289,10 @@ export default function IdentityClient() {
                                 {isGenerating ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Share2 className="w-4 h-4" />}
                                 {isGenerating ? 'ГЕНЕРАЦИЯ...' : 'СОХРАНИТЬ РЕЗУЛЬТАТ'}
                             </button>
-                        </motion.div>
+                        </m.div>
 
                         {/* Правая колонка: HUD График */}
-                        <motion.div 
+                        <m.div 
                           initial={{ opacity: 0, x: 30 }}
                           animate={{ opacity: 1, x: 0 }}
                           transition={{ duration: 0.6, delay: 0.4 }}
@@ -336,7 +336,7 @@ export default function IdentityClient() {
                                     isUpsideDown={isUpsideDown} 
                                 />
                             </div>
-                        </motion.div>
+                        </m.div>
                     </div>
                 )}
             </div>
@@ -350,8 +350,8 @@ export default function IdentityClient() {
                     v.2.4.0
                 </div>
             </div>
-        </motion.div>
+        </m.div>
       </div>
-    </motion.div>
+    </m.div>
   );
 }

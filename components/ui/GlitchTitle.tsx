@@ -1,6 +1,6 @@
 'use client';
 
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 
 export default function GlitchTitle({ text }: { text: string }) {
   // Разделяем текст по первому пробелу: первое слово белое, остальное - градиент
@@ -9,7 +9,7 @@ export default function GlitchTitle({ text }: { text: string }) {
   const restWords = parts.slice(1).join(' ');
 
   return (
-    <motion.h1 
+    <m.h1 
       className="text-5xl md:text-7xl font-black text-white relative z-10 tracking-tighter leading-tight glitch-text md:whitespace-nowrap"
       data-text={text}
       initial={{ opacity: 0, scale: 0.9 }}
@@ -22,6 +22,6 @@ export default function GlitchTitle({ text }: { text: string }) {
           {' '}{restWords}
         </span>
       )}
-    </motion.h1>
+    </m.h1>
   );
 }

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence } from 'framer-motion';
 import { saveVote } from '@/app/actions/votes';
 import { getAllEffectIds, getRelatedEffects } from '@/app/actions/effects';
 import { votesStore } from '@/lib/votes-store';
@@ -347,10 +347,10 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
                         Похожие сбои
                     </div>
                     {relatedEffects.length > 0 && (
-                        <motion.div layout className="grid grid-cols-2 gap-4">
+                        <m.div layout className="grid grid-cols-2 gap-4">
                             <AnimatePresence mode="popLayout">
                                 {relatedEffects.map((relItem, index) => (
-                                    <motion.div
+                                    <m.div
                                         key={relItem.id}
                                         layout
                                         initial={{ opacity: 0, scale: 0.9 }}
@@ -369,10 +369,10 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
                                                 </div>
                                             </div>
                                         </Link>
-                                    </motion.div>
+                                    </m.div>
                                 ))}
                             </AnimatePresence>
-                        </motion.div>
+                        </m.div>
                     )}
                 </div>
             </div>
@@ -395,7 +395,7 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
             </div>
 
             {/* Блок Голосования */}
-            <motion.div 
+            <m.div 
                 key={glitchTrigger}
                 animate={glitchTrigger > 0 ? { 
                   x: [0, -5, 5, -2, 2, 0],
@@ -433,7 +433,7 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
                     </div>
                 ) : (
                     // Результаты
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-darkCard border border-light/10 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+                    <m.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-darkCard border border-light/10 rounded-2xl p-6 shadow-xl relative overflow-hidden">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 relative z-10">
                             {/* Вариант А */}
                             <div className={`p-4 rounded-xl border-2 relative overflow-hidden transition-colors duration-500 ${userVote === 'A' ? 'border-[var(--vote-a-bg)] bg-[var(--vote-a-bg)]/10' : 'border-white/5 bg-white/5 opacity-80'}`}>
@@ -447,7 +447,7 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
                                 </div>
                                 <div className="text-sm font-medium text-white mb-3 line-clamp-4">{variantA}</div>
                                 <div className="relative h-2 bg-dark rounded-full overflow-hidden mb-1">
-                                    <motion.div initial={{ width: 0 }} animate={{ width: `${percentA}%` }} className="h-full" style={{ backgroundColor: 'var(--vote-a-bg)' }} />
+                                    <m.div initial={{ width: 0 }} animate={{ width: `${percentA}%` }} className="h-full" style={{ backgroundColor: 'var(--vote-a-bg)' }} />
                                 </div>
                                 <div className="text-right font-black" style={{ color: 'var(--vote-a-text)' }}>{percentA}%</div>
                             </div>
@@ -464,7 +464,7 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
                                 </div>
                                 <div className="text-sm font-medium text-white mb-3 line-clamp-4">{variantB}</div>
                                 <div className="relative h-2 bg-dark rounded-full overflow-hidden mb-1">
-                                    <motion.div initial={{ width: 0 }} animate={{ width: `${percentB}%` }} className="h-full" style={{ backgroundColor: 'var(--vote-b-bg)' }} />
+                                    <m.div initial={{ width: 0 }} animate={{ width: `${percentB}%` }} className="h-full" style={{ backgroundColor: 'var(--vote-b-bg)' }} />
                                 </div>
                                 <div className="text-right font-black" style={{ color: 'var(--vote-b-text)' }}>{percentB}%</div>
                             </div>
@@ -479,12 +479,12 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
                                 </p>
                             </div>
                         </div>
-                    </motion.div>
+                    </m.div>
                 )}
-            </motion.div>
+            </m.div>
 
             {/* Секция контента (Аккордеоны и Заглушки) */}
-            <motion.div layout className="space-y-3 pt-2">
+            <m.div layout className="space-y-3 pt-2">
                 
                 {/* 1. Факты (Видны всегда, если есть контент) - НЕЗАВИСИМЫЙ аккордеон */}
                 {(effect.currentState || scientificText) && (
@@ -506,12 +506,12 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
                 )}
 
                 {/* ЛОГИКА ОТОБРАЖЕНИЯ СКРЫТОГО КОНТЕНТА */}
-                <motion.div layout className="overflow-hidden">
+                <m.div layout className="overflow-hidden">
                     <AnimatePresence mode="wait">
                         {!isUpsideDown ? (
                             // --- РЕЖИМ РЕАЛЬНОСТИ ---
                             // ВСЕГДА показываем только заглушку, независимо от наличия голоса
-                            <motion.div
+                            <m.div
                                 key="reality-locked"
                                 layout
                                 initial={{ opacity: 0, y: 10 }}
@@ -525,12 +525,12 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
                                     showSwitch={true}
                                     effectId={effect.id}
                                 />
-                            </motion.div>
+                            </m.div>
                         ) : (
                             // --- РЕЖИМ ИЗНАНКИ ---
                             userVote ? (
                                 // Если проголосовал: Показываем контент
-                                <motion.div
+                                <m.div
                                     key="upside-down-content"
                                     layout
                                     initial={{ opacity: 0, y: 10 }}
@@ -608,10 +608,10 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
                                         isOpen={isCommentsOpen}
                                         onToggle={() => setIsCommentsOpen(prev => !prev)}
                                     />
-                                </motion.div>
+                                </m.div>
                             ) : (
                                 // Если НЕ проголосовал в Изнанке: Заглушка "Голосуй"
-                                <motion.div
+                                <m.div
                                     key="upside-down-locked"
                                     layout
                                     initial={{ opacity: 0, y: 10 }}
@@ -625,13 +625,13 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
                                         showSwitch={false}
                                         effectId={effect.id}
                                     />
-                                </motion.div>
+                                </m.div>
                             )
                         )}
                     </AnimatePresence>
-                </motion.div>
+                </m.div>
 
-            </motion.div>
+            </m.div>
 
           </div>
         </div>
@@ -664,7 +664,7 @@ function AccordionItem({ id, title, icon, color, children, isOpen, onToggle }: a
 
               <AnimatePresence>
                 {isOpen && (
-                  <motion.div
+                  <m.div
                         initial={{ height: 0, opacity: 0 }} 
                         animate={{ height: 'auto', opacity: 1 }} 
                         exit={{ height: 0, opacity: 0 }}
@@ -673,7 +673,7 @@ function AccordionItem({ id, title, icon, color, children, isOpen, onToggle }: a
                         <div className="p-4 pt-0 text-sm text-light/70 leading-relaxed border-t border-white/5 mx-4 mt-2 mb-4">
                             {children}
                     </div>
-                  </motion.div>
+                  </m.div>
                 )}
               </AnimatePresence>
             </div>

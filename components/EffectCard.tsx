@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence } from 'framer-motion';
 import { MessageSquare, Share2, Eye, HelpCircle, X, Copy, Check, Send, Twitter } from 'lucide-react';
 import { saveVote } from '@/app/actions/votes';
 import ImageWithSkeleton from '@/components/ui/ImageWithSkeleton';
@@ -177,7 +177,7 @@ export default function EffectCard(props: EffectCardProps) {
   const safeImageUrl = effectData.imageUrl ? effectData.imageUrl.replace(/'/g, '%27') : null;
 
   return (
-    <motion.div
+    <m.div
       initial={{ opacity: 0, y: 20 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
@@ -208,7 +208,7 @@ export default function EffectCard(props: EffectCardProps) {
         {/* INLINE SHARE OVERLAY */}
         <AnimatePresence>
           {isShareOpen && (
-            <motion.div
+            <m.div
               initial={{ opacity: 0, backdropFilter: "blur(0px)" }}
               animate={{ opacity: 1, backdropFilter: "blur(12px)" }}
               exit={{ opacity: 0, backdropFilter: "blur(0px)" }}
@@ -280,7 +280,7 @@ export default function EffectCard(props: EffectCardProps) {
               >
                 <X className="w-5 h-5" />
               </button>
-            </motion.div>
+            </m.div>
           )}
         </AnimatePresence>
 
@@ -345,6 +345,6 @@ export default function EffectCard(props: EffectCardProps) {
           />
         </div>
       </div>
-    </motion.div>
+    </m.div>
   );
 }

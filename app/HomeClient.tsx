@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { ArrowRight, Sparkles, Flame, Activity, Zap, Users, CheckCircle, Clock, Hash, ChevronDown, AlertTriangle } from 'lucide-react';
 import EffectCard from '@/components/EffectCard';
 import ImageWithSkeleton from '@/components/ui/ImageWithSkeleton';
@@ -135,7 +135,7 @@ export default function HomeClient({
           
           {/* Title & Stats */}
           <div className="text-center max-w-5xl mx-auto mb-12 w-full">
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="space-y-8">
+            <m.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="space-y-8">
               <h1 className="text-4xl md:text-7xl font-black text-white tracking-tight glitch-text" data-text="ЭФФЕКТ МАНДЕЛЫ">
                 ЭФФЕКТ <span className={`text-transparent bg-clip-text bg-gradient-to-r ${isUpsideDown ? 'from-red-500 to-purple-600' : 'from-cyan-400 to-purple-500'}`}>МАНДЕЛЫ</span>
               </h1>
@@ -160,12 +160,12 @@ export default function HomeClient({
                 {/* 4-я карточка: Твой вклад */}
                 <UserContribution />
               </div>
-            </motion.div>
+            </m.div>
           </div>
 
           {/* EFFECT OF THE DAY */}
           {effectOfDay && (
-            <motion.div 
+            <m.div 
               initial={{ opacity: 0, scale: 0.95 }} 
               animate={{ opacity: 1, scale: 1 }} 
               transition={{ delay: 0.3 }}
@@ -187,6 +187,10 @@ export default function HomeClient({
                                 alt={effectOfDay.title} 
                                 fill 
                                 priority={true}
+                                // @ts-ignore - fetchPriority пока не во всех типах React, но работает в браузере
+                                fetchPriority="high"
+                                decoding="sync"
+                                sizes="(max-width: 768px) 100vw, 50vw"
                                 className="object-cover transition-transform duration-1000 group-hover:scale-105 relative z-[1]" 
                               />
                               <div className="absolute inset-0 bg-gradient-to-t from-dark via-transparent to-transparent lg:bg-gradient-to-r lg:from-transparent lg:to-dark opacity-80 z-[1]"></div>
@@ -269,11 +273,11 @@ export default function HomeClient({
                   </div>
                 </div>
               </div>
-            </motion.div>
+            </m.div>
           )}
 
           {/* Scroll Indicator */}
-          <motion.button
+          <m.button
             initial={{ opacity: 0 }} 
             animate={{ opacity: 1 }} 
             transition={{ delay: 1, duration: 1 }}
@@ -289,7 +293,7 @@ export default function HomeClient({
             className="mt-8 text-light/30 hover:text-light/60 transition-colors cursor-pointer animate-bounce flex items-center justify-center"
           >
             <ChevronDown className="w-8 h-8" />
-          </motion.button>
+          </m.button>
         </div>
       </section>
 
@@ -323,7 +327,7 @@ export default function HomeClient({
 
       {/* Warning Block */}
       <section className="max-w-7xl mx-auto px-4 mt-6 mb-6">
-        <motion.div
+        <m.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
@@ -361,7 +365,7 @@ export default function HomeClient({
               </p>
             </div>
           </div>
-        </motion.div>
+        </m.div>
       </section>
     </div>
   );

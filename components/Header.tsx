@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Menu, X, PlusCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
@@ -84,7 +84,7 @@ export default function Header() {
                 )}
               >
                 {isActive && (
-                  <motion.div
+                  <m.div
                     layoutId="nav-pill"
                     className={cn(
                       "absolute inset-0 rounded-full border",
@@ -127,7 +127,7 @@ export default function Header() {
       </div>
 
       {isMobileMenuOpen && (
-        <motion.div
+        <m.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -20 }}
@@ -156,7 +156,7 @@ export default function Header() {
             <PlusCircle className="w-5 h-5" />
             Предложить эффект
           </Link>
-        </motion.div>
+        </m.div>
       )}
     </header>
   );

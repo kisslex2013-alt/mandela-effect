@@ -1,7 +1,7 @@
 'use client';
 
 import { useReality } from '@/lib/context/RealityContext';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence } from 'framer-motion';
 
 export default function RealityTransition() {
   const { isTransitioning } = useReality();
@@ -9,7 +9,7 @@ export default function RealityTransition() {
   return (
     <AnimatePresence>
       {isTransitioning && (
-        <motion.div
+        <m.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -17,7 +17,7 @@ export default function RealityTransition() {
           className="fixed inset-0 z-[9999] bg-black pointer-events-none overflow-hidden flex items-center justify-center"
         >
           {/* RGB Сдвиг - Красный канал */}
-          <motion.div
+          <m.div
             animate={{ x: [-5, 5, -5, 5, 0], opacity: [0.5, 0.8, 0.5] }}
             transition={{ duration: 0.8, ease: "easeInOut" }}
             className="absolute inset-0 bg-red-600 mix-blend-screen"
@@ -25,7 +25,7 @@ export default function RealityTransition() {
           />
           
           {/* RGB Сдвиг - Синий канал */}
-          <motion.div
+          <m.div
             animate={{ x: [5, -5, 5, -5, 0], opacity: [0.5, 0.8, 0.5] }}
             transition={{ duration: 0.8, ease: "easeInOut" }}
             className="absolute inset-0 bg-blue-600 mix-blend-screen"
@@ -33,7 +33,7 @@ export default function RealityTransition() {
           />
 
           {/* Основная вспышка и тряска */}
-          <motion.div
+          <m.div
             animate={{ 
               scale: [1, 1.1, 1],
               filter: ['brightness(1)', 'brightness(3) contrast(2)', 'brightness(1)']
@@ -44,7 +44,7 @@ export default function RealityTransition() {
           
           {/* Scanlines */}
           <div className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(0,0,0,0.5)_50%,rgba(0,0,0,0)_50%)] bg-[length:100%_4px]" />
-        </motion.div>
+        </m.div>
       )}
     </AnimatePresence>
   );

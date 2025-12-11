@@ -11,12 +11,16 @@ const withBundleAnalyzer = process.env.ANALYZE === 'true'
 const nextConfig: NextConfig = {
   // Настройки Server Actions для стабильности
   experimental: {
+    // Временно отключаем PPR и React Compiler, так как они вызывают ошибки версий
+    // ppr: 'incremental', 
+    // reactCompiler: true,
+    
     serverActions: {
       bodySizeLimit: '10mb', // Увеличено для загрузки изображений до 10MB
       // Увеличиваем таймаут для AI генерации
       allowedOrigins: ['localhost:3000'],
     },
-    // Оптимизация компиляции в dev режиме
+    // Оптимизация компиляции в dev режиме + Tree-shaking для тяжелых библиотек
     optimizePackageImports: ['lucide-react', 'framer-motion', 'recharts'],
   },
 
@@ -34,9 +38,10 @@ const nextConfig: NextConfig = {
 
   // Оптимизация изображений
   images: {
-    formats: ['image/webp', 'image/avif'],
-    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
-    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+    formats: ['image/avif', 'image/webp'], // AVIF приоритетнее (лучше сжатие)
+    minimumCacheTTL: 31536000, // Кэш на 1 год
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256],
     remotePatterns: [
       // Cloudinary
       {

@@ -2,6 +2,7 @@
 
 import { Prisma } from '@prisma/client';
 import { redirect } from 'next/navigation';
+import { unstable_cache } from 'next/cache';
 import prisma from '@/lib/prisma';
 
 // Типы для параметров фильтрации
@@ -561,23 +562,57 @@ export async function getEffectsByIds(ids: string[]): Promise<{ success: boolean
 }
 
 /**
- * Получить список всех ID активных эффектов, отсортированных по дате создания
- * Используется для навигации "Следующий/Случайный непройденный"
+ * Кэшированная версия получения всех эффектов (для списков)
+ * Revalidate: 3600 секунд (1 час)
  */
-export async function getAllEffectIds(): Promise<{ success: boolean; data?: Array<{ id: string }>; error?: string }> {
-  try {
-    const effects = await prisma.effect.findMany({
+export const getAllEffectsCached = unstable_cache(
+  async () => {
+    return await prisma.effect.findMany({
       where: { isVisible: true },
       orderBy: { createdAt: 'desc' },
-      select: { id: true },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        category: true,
+        imageUrl: true,
+        votesFor: true,
+        votesAgainst: true,
+        views: true,
+        createdAt: true,
+        _count: {
+          select: { comments: true }
+        }
+      }
     });
+  },
+  ['all-effects-list'], // Ключ кэша
+  { revalidate: 3600, tags: ['effects'] }
+);
 
-    return { success: true, data: effects };
-  } catch (error) {
-    console.error('Error fetching all effect ids:', error);
-    return { success: false, error: 'Failed to fetch effect ids' };
-  }
-}
+/**
+ * Получить список всех ID активных эффектов, отсортированных по дате создания
+ * Используется для навигации "Следующий/Случайный непройденный"
+ * КЭШИРОВАНО для уменьшения TTFB
+ */
+export const getAllEffectIds = unstable_cache(
+  async (): Promise<{ success: boolean; data?: Array<{ id: string }>; error?: string }> => {
+    try {
+      const effects = await prisma.effect.findMany({
+        where: { isVisible: true },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true },
+      });
+
+      return { success: true, data: effects };
+    } catch (error) {
+      console.error('Error fetching all effect ids:', error);
+      return { success: false, error: 'Failed to fetch effect ids' };
+    }
+  },
+  ['all-effect-ids'],
+  { revalidate: 3600, tags: ['effects'] }
+);
 
 /**
  * Получить похожие эффекты из той же категории

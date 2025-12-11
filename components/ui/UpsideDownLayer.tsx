@@ -2,7 +2,7 @@
 
 import { useReality } from '@/lib/context/RealityContext';
 import { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence } from 'framer-motion';
 
 // Генератор случайных фраз для подсознания
 const generateSubliminalText = () => {
@@ -90,7 +90,7 @@ export default function UpsideDownLayer() {
       {/* 6. Скрытые послания */}
       <AnimatePresence mode="wait">
         {message && (
-          <motion.div
+          <m.div
             key={message.text + message.x + message.y}
             initial={{ opacity: 0 }}
             animate={{ opacity: 0.30 }} // Увеличена видимость
@@ -105,7 +105,7 @@ export default function UpsideDownLayer() {
             }}
           >
             {message.text}
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
     </div>

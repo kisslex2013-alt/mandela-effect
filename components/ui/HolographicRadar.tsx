@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo, useRef } from 'react';
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { makePath, generateSeed, polarToCartesian } from '@/lib/radar-utils';
 
 interface HolographicRadarProps {
@@ -152,7 +152,7 @@ export default function HolographicRadar({ data, isUpsideDown, className = '' }:
         {/* --- ГРАФИК --- */}
 
         {/* Слой 2 (Эхо/Призрак) - Анимированный */}
-        <motion.path
+        <m.path
           d={layer2Path}
           fill="none"
           stroke={primaryColor}
@@ -167,7 +167,7 @@ export default function HolographicRadar({ data, isUpsideDown, className = '' }:
         />
 
         {/* Слой 1 (Основной) */}
-        <motion.path
+        <m.path
           d={mainPath}
           fill="url(#radarGradient)"
           stroke={primaryColor}
@@ -182,7 +182,7 @@ export default function HolographicRadar({ data, isUpsideDown, className = '' }:
 
         {/* --- ТОЧКИ НА ВЕРШИНАХ --- */}
         {points.map((p, i) => (
-          <motion.circle
+          <m.circle
             key={i}
             cx={p.x}
             cy={p.y}

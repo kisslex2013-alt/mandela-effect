@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence } from 'framer-motion';
 import { useReality } from '@/lib/context/RealityContext';
 import EffectCard from '@/components/EffectCard';
 import CustomSelect, { type SelectOption } from '@/components/ui/CustomSelect';
@@ -244,7 +244,7 @@ export default function CatalogClient({ initialEffects, categories }: CatalogCli
                         }[colorKey] || 'hover:bg-white/5 hover:text-light';
 
                         return (
-                            <motion.button
+                            <m.button
                                 key={cat.id}
                                 onClick={() => setSelectedCategory(cat.slug)}
                                 initial="collapsed"
@@ -257,7 +257,7 @@ export default function CatalogClient({ initialEffects, categories }: CatalogCli
                                     }`}
                             >
                                 {getCategoryIcon(cat)}
-                                <motion.span
+                                <m.span
                                     variants={{
                                         collapsed: { width: 0, opacity: 0, marginLeft: 0, display: 'none' },
                                         expanded: { width: 'auto', opacity: 1, marginLeft: 8, display: 'block' }
@@ -266,15 +266,15 @@ export default function CatalogClient({ initialEffects, categories }: CatalogCli
                                     className="overflow-hidden"
                                 >
                                     {cat.name}
-                                </motion.span>
-                            </motion.button>
+                                </m.span>
+                            </m.button>
                         );
                     })}
                 </div>
                 
                 <label className="flex items-center gap-2 cursor-pointer group bg-darkCard/95 backdrop-blur-sm border border-light/10 rounded-lg px-3 py-2 shadow-lg shrink-0 self-center md:self-auto">
                     <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all shrink-0 ${hideVoted ? 'bg-primary border-primary' : 'border-light/30 group-hover:border-light/60'}`}>
-                        {hideVoted && <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}><div className="w-2 h-2 bg-black rounded-sm" /></motion.div>}
+                        {hideVoted && <m.div initial={{ scale: 0 }} animate={{ scale: 1 }}><div className="w-2 h-2 bg-black rounded-sm" /></m.div>}
                     </div>
                     <input type="checkbox" checked={hideVoted} onChange={(e) => setHideVoted(e.target.checked)} className="hidden" />
                     <span className={`text-sm font-medium transition-colors whitespace-nowrap ${hideVoted ? 'text-light' : 'text-light/50 group-hover:text-light/80'}`}>Скрыть исследованные</span>
@@ -282,7 +282,7 @@ export default function CatalogClient({ initialEffects, categories }: CatalogCli
             </div>
         </div>
 
-        <motion.div layout className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <m.div layout className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <AnimatePresence mode='popLayout'>
                     {filteredEffects.length > 0 ? (
                     filteredEffects.map((effect, index) => {
@@ -296,7 +296,7 @@ export default function CatalogClient({ initialEffects, categories }: CatalogCli
                       })();
                       
                       return (
-                        <motion.div
+                        <m.div
                             key={`${effect.id}-${mounted ? 'mounted' : 'unmounted'}-${readData?.lastCommentCount || 0}`}
                             layout
                             initial={{ opacity: 0, scale: 0.9 }}
@@ -313,19 +313,19 @@ export default function CatalogClient({ initialEffects, categories }: CatalogCli
                                 className="bg-darkCard/80 backdrop-blur-sm border border-light/10 hover:border-primary/50 hover:shadow-[0_0_30px_-10px_rgba(59,130,246,0.3)] transition-all"
                                 hasNewComments={hasNew}
                             />
-                        </motion.div>
+                        </m.div>
                       );
                     })
                 ) : (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="col-span-full py-20 text-center border border-dashed border-light/10 rounded-3xl bg-white/5">
+                    <m.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="col-span-full py-20 text-center border border-dashed border-light/10 rounded-3xl bg-white/5">
                         <div className="flex justify-center mb-4"><div className="p-4 bg-red-500/10 rounded-full animate-pulse"><FileWarning className="w-12 h-12 text-red-500" /></div></div>
                         <h3 className="text-2xl font-black text-white mb-2 glitch-text" data-text="DATA CORRUPTED">DATA CORRUPTED</h3>
                         <p className="text-light/50">Объект не найден в текущем секторе памяти.</p>
                         <button onClick={() => { setSearchQuery(''); setSelectedCategory('all'); setHideVoted(false); }} className="mt-6 px-6 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg font-mono text-sm transition-colors">&gt; Reset_filters</button>
-                    </motion.div>
+                    </m.div>
                 )}
             </AnimatePresence>
-        </motion.div>
+        </m.div>
       </div>
     </div>
   );

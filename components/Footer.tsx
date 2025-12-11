@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { Github, Mail, Send, Database, Server, Cpu } from 'lucide-react';
 
 // Мини-компонент для глитч-статуса
@@ -93,7 +93,7 @@ export default function Footer() {
       
       {/* 1. RUNNING TICKER (Бегущая строка) - ЗАКОММЕНТИРОВАНО ДЛЯ ОПТИМИЗАЦИИ */}
       {/* <div className="w-full bg-white/5 border-b border-white/5 py-2 overflow-hidden flex select-none relative z-10">
-        <motion.div 
+        <m.div 
           className="flex gap-12 whitespace-nowrap"
           animate={{ x: ["0%", "-50%"] }}
           transition={{ repeat: Infinity, ease: "linear", duration: 40 }}
@@ -104,7 +104,7 @@ export default function Footer() {
               {log}
             </span>
           ))}
-        </motion.div>
+        </m.div>
       </div> */}
 
       <div className="max-w-7xl mx-auto px-6 py-12 relative z-10">
