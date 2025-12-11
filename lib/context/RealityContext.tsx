@@ -252,7 +252,7 @@ export function RealityProvider({ children }: { children: React.ReactNode }) {
   }, [isUnlocked, debouncedCheckStatus]);
   
   // Обновленная версия refreshVotes с debounce
-  const refreshVotes = useCallback(() => {
+  const refreshVotes = useCallback(async () => {
     debouncedCheckStatus();
   }, [debouncedCheckStatus]);
 
