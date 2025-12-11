@@ -36,10 +36,10 @@ export default function LiveLog() {
       const text = randomTemplate.replace('####', Math.floor(Math.random() * 9999).toString());
       
       setLogs(prev => {
-        const newLogs = [{ 
+        const newLogs: { id: number, text: string, type: 'info' | 'error' }[] = [{ 
           id: Date.now(), 
           text, 
-          type: isUpsideDown ? 'error' : 'info' 
+          type: (isUpsideDown ? 'error' : 'info') as 'info' | 'error'
         }, ...prev].slice(0, 8); // Храним только последние 8
         return newLogs;
       });
