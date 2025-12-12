@@ -893,11 +893,12 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
       fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EffectPageClient.tsx:703',message:'saveVote COMPLETE',data:{duration:voteEnd-voteStart,success:result.success,hasError:!!result.error},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
       // #endregion
       if (!result.success) {
-        if (result.vote) { 
+        const existingVote = result.vote;
+        if (existingVote) { 
           startTransition(() => {
-            setUserVote(result.vote.variant as 'A' | 'B'); 
+            setUserVote(existingVote.variant as 'A' | 'B'); 
           });
-          votesStore.set(effect.id, result.vote.variant as 'A' | 'B');
+          votesStore.set(effect.id, existingVote.variant as 'A' | 'B');
           queueMicrotask(() => {
             toast.success('Вы уже голосовали'); 
           });
