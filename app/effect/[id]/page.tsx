@@ -7,12 +7,14 @@ import { unstable_cache } from 'next/cache';
 // УДАЛЕН force-dynamic - улучшает TTFB с 2.5s до <0.8s
 export const revalidate = 60;
 
-// Генерация статических путей для популярных эффектов (улучшает TTFB)
+// Генерация статических путей для всех эффектов (улучшает SEO и индексацию)
+// Предгенерация всех страниц позволяет Google быстрее их индексировать
 export async function generateStaticParams() {
   const effects = await prisma.effect.findMany({
     where: { isVisible: true },
     select: { id: true },
-    take: 50, // Топ 50 эффектов будут предгенерированы
+    // Убрали take: 50 - теперь предгенерируются все эффекты
+    // Это улучшает индексацию в Google Search Console
     orderBy: { views: 'desc' }
   });
   
