@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono, Ruslan_Display } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -41,16 +41,7 @@ const mono = JetBrains_Mono({
   adjustFontFallback: true,
 });
 
-// Декоративный шрифт для Изнанки - НЕ preload, загружается только при активации
-const ruslan = Ruslan_Display({
-  weight: "400",
-  subsets: ["cyrillic"],
-  variable: "--font-ruslan",
-  display: "optional", // Не блокирует рендеринг вообще
-  preload: false,
-  fallback: ["Impact", "Arial Black", "sans-serif"],
-  adjustFontFallback: true,
-});
+// Ruslan Display удален - не используется в проекте и вызывал таймауты при загрузке
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'),
@@ -132,7 +123,7 @@ export default function RootLayout({
   };
 
   return (
-    <html lang="ru" className={`${inter.variable} ${mono.variable} ${ruslan.variable} scroll-smooth`}>
+    <html lang="ru" className={`${inter.variable} ${mono.variable} scroll-smooth`}>
       <head>
         {/* JSON-LD для WebSite с SearchAction */}
         <script

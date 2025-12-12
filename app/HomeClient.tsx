@@ -82,7 +82,17 @@ export default function HomeClient({
   }, [effectOfDay?.nextReset]);
 
   const handleDayVote = async (variant: 'A' | 'B') => {
-    if (!effectOfDay || isDayVoting || dayVote) return;
+    // #region agent log
+    const startTime = performance.now();
+    fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'HomeClient.tsx:84',message:'handleDayVote START',data:{variant,isDayVoting,dayVote,effectId:effectOfDay?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'ALL'})}).catch(()=>{});
+    // #endregion
+    
+    if (!effectOfDay || isDayVoting || dayVote) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'HomeClient.tsx:85',message:'handleDayVote BLOCKED',data:{isDayVoting,dayVote},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H4'})}).catch(()=>{});
+      // #endregion
+      return;
+    }
 
     // Проверяем, голосовал ли пользователь за этот эффект ДО установки нового голоса
     const hasVoted = !!votesStore.get()[effectOfDay.id];
@@ -90,21 +100,57 @@ export default function HomeClient({
     setIsDayVoting(true);
     setDayVote(variant);
     setDayVotes(prev => ({ for: variant === 'A' ? prev.for + 1 : prev.for, against: variant === 'B' ? prev.against + 1 : prev.against }));
+    
+    // #region agent log
+    const localStorageStart = performance.now();
+    // #endregion
     votesStore.set(effectOfDay.id, variant);
+    // #region agent log
+    const localStorageEnd = performance.now();
+    fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'HomeClient.tsx:93',message:'localStorage SET',data:{duration:localStorageEnd-localStorageStart},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H6'})}).catch(()=>{});
+    // #endregion
 
     // Если пользователь еще не голосовал за этот эффект, обновляем счетчик
     if (!hasVoted) {
+      // #region agent log
+      const incrementStart = performance.now();
+      // #endregion
       incrementVotes();
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'HomeClient.tsx:97',message:'incrementVotes called',data:{duration:performance.now()-incrementStart},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H5'})}).catch(()=>{});
+      // #endregion
     }
 
     try {
+      // #region agent log
+      const saveVoteStart = performance.now();
+      fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'HomeClient.tsx:101',message:'saveVote START',data:{effectId:effectOfDay.id,variant},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+      // #endregion
+      
       const visitorId = getClientVisitorId();
       const result = await saveVote({ visitorId, effectId: effectOfDay.id, variant });
+      
+      // #region agent log
+      const saveVoteEnd = performance.now();
+      fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'HomeClient.tsx:102',message:'saveVote COMPLETE',data:{duration:saveVoteEnd-saveVoteStart,success:result.success},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+      // #endregion
+      
       if (!result.success) {
         if (result.vote) { setDayVote(result.vote.variant as 'A' | 'B'); toast.success('Вы уже голосовали'); }
         else { setDayVote(null); setDayVotes({ for: effectOfDay.votesFor, against: effectOfDay.votesAgainst }); toast.error('Ошибка'); }
       } else toast.success('Голос записан');
-    } catch (error) { setDayVote(null); } finally { setIsDayVoting(false); }
+    } catch (error) { 
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'HomeClient.tsx:107',message:'handleDayVote ERROR',data:{error:error instanceof Error?error.message:String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+      // #endregion
+      setDayVote(null); 
+    } finally { 
+      // #region agent log
+      const totalDuration = performance.now() - startTime;
+      fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'HomeClient.tsx:107',message:'handleDayVote FINALLY',data:{totalDuration},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'ALL'})}).catch(()=>{});
+      // #endregion
+      setIsDayVoting(false); 
+    }
   };
 
   // В превью используем стандартные тексты для вариантов ответа

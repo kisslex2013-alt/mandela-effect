@@ -3,6 +3,9 @@
 import prisma from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 
+// Счетчик активных запросов для отслеживания одновременных операций
+let activeVoteRequests = 0;
+
 // Интерфейс для голоса
 export interface VoteData {
   visitorId: string;
@@ -44,6 +47,13 @@ export interface UserVoteStats {
  * Сохранить или обновить голос пользователя
  */
 export async function saveVote(data: VoteData): Promise<VoteResult> {
+  const serverStartTime = Date.now();
+  
+  // #region agent log
+  activeVoteRequests++;
+  fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'votes.ts:46',message:'saveVote SERVER START',data:{effectId:data.effectId,variant:data.variant,activeRequests:activeVoteRequests},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+  // #endregion
+  
   try {
     const { visitorId, effectId, variant } = data;
 
@@ -70,9 +80,15 @@ export async function saveVote(data: VoteData): Promise<VoteResult> {
     }
 
     // Проверяем существование эффекта
+    // #region agent log
+    const dbCheckStart = Date.now();
+    // #endregion
     const effect = await prisma.effect.findUnique({
       where: { id: effectId },
     });
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'votes.ts:73',message:'DB effect findUnique',data:{duration:Date.now()-dbCheckStart},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H3'})}).catch(()=>{});
+    // #endregion
 
     if (!effect) {
       console.error('[saveVote] ❌ Эффект не найден:', effectId);
@@ -82,11 +98,17 @@ export async function saveVote(data: VoteData): Promise<VoteResult> {
     console.log('[saveVote] ✅ Эффект найден:', effect.title);
 
     // Проверяем, есть ли уже голос
+    // #region agent log
+    const voteCheckStart = Date.now();
+    // #endregion
     const existingVote = await prisma.vote.findUnique({
       where: {
         visitorId_effectId: { visitorId, effectId },
       },
     });
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'votes.ts:85',message:'DB vote findUnique',data:{duration:Date.now()-voteCheckStart,hasExisting:!!existingVote},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H3'})}).catch(()=>{});
+    // #endregion
 
     let vote;
     let isNewVote = false;
@@ -122,12 +144,21 @@ export async function saveVote(data: VoteData): Promise<VoteResult> {
 
     // Создаём новый голос (если дошли сюда, значит голоса еще нет)
     console.log('[saveVote] Создание нового голоса...');
+    // #region agent log
+    const voteCreateStart = Date.now();
+    // #endregion
     vote = await prisma.vote.create({
       data: { visitorId, effectId, variant },
     });
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'votes.ts:125',message:'DB vote create',data:{duration:Date.now()-voteCreateStart},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H3'})}).catch(()=>{});
+    // #endregion
     console.log('[saveVote] ✅ Голос создан:', vote.id);
 
     // Обновляем статистику эффекта
+    // #region agent log
+    const effectUpdateStart = Date.now();
+    // #endregion
     await prisma.effect.update({
       where: { id: effectId },
       data: {
@@ -135,23 +166,41 @@ export async function saveVote(data: VoteData): Promise<VoteResult> {
         votesAgainst: variant === 'B' ? { increment: 1 } : undefined,
       },
     });
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'votes.ts:131',message:'DB effect update',data:{duration:Date.now()-effectUpdateStart},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H3'})}).catch(()=>{});
+    // #endregion
     console.log('[saveVote] ✅ Статистика эффекта обновлена');
 
     isNewVote = true;
 
     // Получаем обновлённую статистику
+    // #region agent log
+    const statsFetchStart = Date.now();
+    // #endregion
     const updatedEffect = await prisma.effect.findUnique({
       where: { id: effectId },
       select: { votesFor: true, votesAgainst: true },
     });
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'votes.ts:143',message:'DB effect findUnique stats',data:{duration:Date.now()-statsFetchStart},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H3'})}).catch(()=>{});
+    // #endregion
 
     const totalVotes = (updatedEffect?.votesFor || 0) + (updatedEffect?.votesAgainst || 0);
 
     // Ревалидируем кэш
+    // #region agent log
+    const revalidateStart = Date.now();
+    // #endregion
     revalidatePath(`/effect/${effectId}`);
     revalidatePath('/');
     revalidatePath('/catalog');
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'votes.ts:151',message:'revalidatePath',data:{duration:Date.now()-revalidateStart},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H3'})}).catch(()=>{});
+    // #endregion
 
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'votes.ts:201',message:'saveVote SERVER SUCCESS',data:{totalDuration:Date.now()-serverStartTime,activeRequests:activeVoteRequests},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+    // #endregion
     return {
       success: true,
       vote: {
@@ -170,8 +219,16 @@ export async function saveVote(data: VoteData): Promise<VoteResult> {
       isNewVote,
     };
   } catch (error) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'votes.ts:222',message:'saveVote SERVER ERROR',data:{error:error instanceof Error?error.message:String(error),totalDuration:Date.now()-serverStartTime,activeRequests:activeVoteRequests},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+    // #endregion
     console.error('[saveVote] Ошибка:', error);
     return { success: false, error: 'Не удалось сохранить голос' };
+  } finally {
+    // #region agent log
+    activeVoteRequests--;
+    fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'votes.ts:228',message:'saveVote SERVER FINALLY',data:{activeRequests:activeVoteRequests,totalDuration:Date.now()-serverStartTime},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+    // #endregion
   }
 }
 

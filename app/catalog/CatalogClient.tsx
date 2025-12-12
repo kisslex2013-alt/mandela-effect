@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, startTransition, useRef } from 'react';
 import { m, AnimatePresence } from 'framer-motion';
 import { useReality } from '@/lib/context/RealityContext';
 import EffectCard from '@/components/EffectCard';
@@ -91,9 +91,37 @@ export default function CatalogClient({ initialEffects, categories }: CatalogCli
   const [displayCount, setDisplayCount] = useState(INITIAL_LOAD);
 
   useEffect(() => {
-    const loadVotes = () => {
+    const loadVotes = (event?: Event) => {
+      // #region agent log
+      const startTime = performance.now();
+      const effectCount = initialEffects?.length || 0;
+      fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CatalogClient.tsx:94',message:'loadVotes START',data:{effectCount,hasEventDetail:event && 'detail' in event},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H7'})}).catch(()=>{});
+      // #endregion
+
+      // Если данные пришли в событии, используем их (самый быстрый путь)
+      if (event && 'detail' in event) {
+         const newVotes = (event as CustomEvent<Record<string, 'A' | 'B'>>).detail;
+         const stateUpdateStart = performance.now();
+         startTransition(() => {
+            setUserVotes(newVotes);
+         });
+         // #region agent log
+         const stateUpdateEnd = performance.now();
+         fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CatalogClient.tsx:102',message:'loadVotes COMPLETE (from event)',data:{totalDuration:stateUpdateEnd-startTime,stateUpdateDuration:stateUpdateEnd-stateUpdateStart,effectCount},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H7'})}).catch(()=>{});
+         // #endregion
+         return;
+      }
+
+      // Иначе берем из быстрого кэша
       const votes = votesStore.get();
-      setUserVotes(votes);
+      const stateUpdateStart = performance.now();
+      startTransition(() => {
+        setUserVotes({ ...votes });
+      });
+      // #region agent log
+      const stateUpdateEnd = performance.now();
+      fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CatalogClient.tsx:113',message:'loadVotes COMPLETE (from cache)',data:{totalDuration:stateUpdateEnd-startTime,stateUpdateDuration:stateUpdateEnd-stateUpdateStart,effectCount},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H7'})}).catch(()=>{});
+      // #endregion
     };
     
     const loadReadComments = () => {
@@ -105,7 +133,7 @@ export default function CatalogClient({ initialEffects, categories }: CatalogCli
     loadReadComments();
     setMounted(true);
     
-    const handleCommentsRead = (event: Event) => {
+    const handleCommentsRead = () => {
       loadReadComments();
       setMounted(false);
       setTimeout(() => {
@@ -116,6 +144,7 @@ export default function CatalogClient({ initialEffects, categories }: CatalogCli
     
     window.addEventListener('votes-updated', loadVotes);
     window.addEventListener('comments-read', handleCommentsRead);
+    
     return () => {
       window.removeEventListener('votes-updated', loadVotes);
       window.removeEventListener('comments-read', handleCommentsRead);

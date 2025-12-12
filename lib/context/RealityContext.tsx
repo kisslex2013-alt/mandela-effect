@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo, startTransition } from 'react';
 import { getUserVoteCount } from '@/app/actions/user-stats';
 import { getClientVisitorId } from '@/lib/client-visitor'; // ИМПОРТ
 import { getUserVotedEffects, migrateLocalVotes } from '@/app/actions/votes';
@@ -37,8 +37,16 @@ export function RealityProvider({ children }: { children: React.ReactNode }) {
   const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const checkStatus = useCallback(async () => {
+    // #region agent log
+    const startTime = performance.now();
+    fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RealityContext.tsx:39',message:'checkStatus START',data:{isSyncing:isSyncingRef.current},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H5'})}).catch(()=>{});
+    // #endregion
+    
     // Предотвращаем множественные одновременные вызовы
     if (isSyncingRef.current) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RealityContext.tsx:41',message:'checkStatus BLOCKED (already syncing)',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H5'})}).catch(()=>{});
+      // #endregion
       return;
     }
     
@@ -58,8 +66,16 @@ export function RealityProvider({ children }: { children: React.ReactNode }) {
       );
       
       // 1. Получаем голоса с сервера (источник правды)
+      // #region agent log
+      const serverVotesStart = performance.now();
+      // #endregion
       const serverVotesPromise = getUserVotedEffects(vid);
       let serverVotes = await Promise.race([serverVotesPromise, timeoutPromise]) as Awaited<ReturnType<typeof getUserVotedEffects>>;
+      // #region agent log
+      const serverVotesEnd = performance.now();
+      fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RealityContext.tsx:61',message:'getUserVotedEffects COMPLETE',data:{duration:serverVotesEnd-serverVotesStart,count:serverVotes.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H5'})}).catch(()=>{});
+      // #endregion
+      
       const serverVotesMap = new Map(
         serverVotes.map(v => [v.effectId, v.variant])
       );
@@ -81,12 +97,22 @@ export function RealityProvider({ children }: { children: React.ReactNode }) {
 
       // 4. Мигрируем локальные голоса на сервер (если есть)
       if (localVotesToMigrate.length > 0) {
+        // #region agent log
+        const migrationStart = performance.now();
+        fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RealityContext.tsx:83',message:'Migration START',data:{count:localVotesToMigrate.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H5'})}).catch(()=>{});
+        // #endregion
+        
         try {
           const migrationPromise = migrateLocalVotes(vid, localVotesToMigrate);
           const migrationResult = await Promise.race([
             migrationPromise,
             new Promise((_, reject) => setTimeout(() => reject(new Error('Migration timeout')), 10000))
           ]) as Awaited<ReturnType<typeof migrateLocalVotes>>;
+          
+          // #region agent log
+          const migrationEnd = performance.now();
+          fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RealityContext.tsx:86',message:'Migration COMPLETE',data:{duration:migrationEnd-migrationStart,migrated:migrationResult.migrated},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H5'})}).catch(()=>{});
+          // #endregion
           
           // После миграции перезагружаем список серверных голосов
           if (migrationResult.migrated > 0) {
@@ -140,10 +166,14 @@ export function RealityProvider({ children }: { children: React.ReactNode }) {
           count = serverVotesMap.size;
         }
       }
-      setVoteCount(count);
-      setIsUnlocked(count >= REQUIRED_VOTES);
       
-      // Проверка на выход из Изнанки, если голоса сбросились
+      // Используем startTransition для неблокирующих обновлений состояния
+      startTransition(() => {
+        setVoteCount(count);
+        setIsUnlocked(count >= REQUIRED_VOTES);
+      });
+      
+      // Проверка на выход из Изнанки, если голоса сбросились (синхронно, так как это критично)
       if (count < REQUIRED_VOTES && isUpsideDown) {
         setIsUpsideDown(false);
         sessionStorage.setItem('reality-mode', 'normal');
@@ -160,26 +190,39 @@ export function RealityProvider({ children }: { children: React.ReactNode }) {
           }
       }
     } catch (error) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RealityContext.tsx:170',message:'checkStatus ERROR',data:{error:error instanceof Error?error.message:String(error),duration:performance.now()-startTime},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H5'})}).catch(()=>{});
+      // #endregion
       // В случае ошибки используем только локальный счетчик
       const localCount = Object.keys(votesStore.get()).length;
-      setVoteCount(localCount);
-      setIsUnlocked(localCount >= REQUIRED_VOTES);
+      startTransition(() => {
+        setVoteCount(localCount);
+        setIsUnlocked(localCount >= REQUIRED_VOTES);
+      });
     } finally {
+      // #region agent log
+      const totalDuration = performance.now() - startTime;
+      fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RealityContext.tsx:175',message:'checkStatus FINALLY',data:{totalDuration},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H5'})}).catch(()=>{});
+      // #endregion
       isSyncingRef.current = false;
     }
   }, [isUpsideDown, mounted, isTransitioning]);
   
   // Debounced версия checkStatus для использования из компонентов
   const debouncedCheckStatus = useCallback(() => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RealityContext.tsx:181',message:'debouncedCheckStatus called',data:{hasExistingTimeout:!!syncTimeoutRef.current},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H5'})}).catch(()=>{});
+    // #endregion
+    
     // Очищаем предыдущий таймаут
     if (syncTimeoutRef.current) {
       clearTimeout(syncTimeoutRef.current);
     }
     
-    // Устанавливаем новый таймаут (1 секунда задержка для быстрого отклика)
+    // Увеличиваем debounce до 3 секунд для снижения нагрузки на UI
     syncTimeoutRef.current = setTimeout(() => {
       checkStatus();
-    }, 1000);
+    }, 3000);
   }, [checkStatus]);
 
   // Загружаем данные ТОЛЬКО ОДИН РАЗ при старте
@@ -223,6 +266,11 @@ export function RealityProvider({ children }: { children: React.ReactNode }) {
 
   // Мгновенное обновление (Optimistic UI)
   const incrementVotes = useCallback(() => {
+    // #region agent log
+    const startTime = performance.now();
+    fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RealityContext.tsx:225',message:'incrementVotes START',data:{currentVoteCount:voteCount,isSyncing:isSyncingRef.current},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H5'})}).catch(()=>{});
+    // #endregion
+    
     setVoteCount(prev => {
       const newCount = prev + 1;
       if (newCount >= REQUIRED_VOTES && !isUnlocked) {
@@ -231,14 +279,40 @@ export function RealityProvider({ children }: { children: React.ReactNode }) {
       return newCount;
     });
     
+    // #region agent log
+    const debounceStart = performance.now();
+    // #endregion
     // Запускаем отложенную синхронизацию (debounced)
     debouncedCheckStatus();
-  }, [isUnlocked, debouncedCheckStatus]);
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'RealityContext.tsx:235',message:'incrementVotes COMPLETE',data:{duration:performance.now()-startTime,debounceDuration:performance.now()-debounceStart},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H5'})}).catch(()=>{});
+    // #endregion
+  }, [isUnlocked, debouncedCheckStatus, voteCount]);
   
   // Обновленная версия refreshVotes с debounce
   const refreshVotes = useCallback(async () => {
     debouncedCheckStatus();
   }, [debouncedCheckStatus]);
+
+  // Быстрое обновление счетчика при голосовании
+  useEffect(() => {
+    const handleLocalVoteUpdate = () => {
+      const votes = votesStore.get();
+      const count = Object.keys(votes).length;
+      
+      setVoteCount(prev => {
+         if (prev !== count) return count;
+         return prev;
+      });
+      
+      if (count >= REQUIRED_VOTES && !isUnlocked) {
+        setIsUnlocked(true);
+      }
+    };
+
+    window.addEventListener('votes-updated', handleLocalVoteUpdate);
+    return () => window.removeEventListener('votes-updated', handleLocalVoteUpdate);
+  }, [isUnlocked]);
 
   // Мемоизируем значение контекста для предотвращения лишних ре-рендеров
   const contextValue = useMemo(() => ({

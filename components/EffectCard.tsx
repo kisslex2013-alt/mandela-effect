@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, startTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { m, AnimatePresence } from 'framer-motion';
@@ -110,39 +110,92 @@ export default function EffectCard(props: EffectCardProps) {
     }
 
     const handleUpdate = () => {
+      // #region agent log
+      const startTime = performance.now();
+      fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EffectCard.tsx:112',message:'handleUpdate START',data:{effectId:effectData.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H7'})}).catch(()=>{});
+      // #endregion
       const updatedVotes = votesStore.get();
-      if (updatedVotes[effectData.id]) {
-        setUserVote(updatedVotes[effectData.id]);
+      const newVote = updatedVotes[effectData.id];
+      // Оптимизация: обновляем только если значение изменилось
+      if (newVote && newVote !== userVote) {
+        const stateUpdateStart = performance.now();
+        // Используем startTransition для неблокирующего обновления
+        startTransition(() => {
+          setUserVote(newVote);
+        });
+        // #region agent log
+        const stateUpdateEnd = performance.now();
+        fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EffectCard.tsx:115',message:'handleUpdate COMPLETE',data:{totalDuration:stateUpdateEnd-startTime,stateUpdateDuration:stateUpdateEnd-stateUpdateStart,effectId:effectData.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H7'})}).catch(()=>{});
+        // #endregion
       }
     };
 
     window.addEventListener('votes-updated', handleUpdate);
     return () => window.removeEventListener('votes-updated', handleUpdate);
-  }, [effectData.id]);
+  }, [effectData.id, userVote]);
 
   // В превью используем стандартные тексты для вариантов ответа
   const vA = "Как я помню";
   const vB = "Как в реальности";
 
   const handleVote = async (variant: 'A' | 'B') => {
-    if (isVoting || userVote) return;
+    // #region agent log
+    const startTime = performance.now();
+    fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EffectCard.tsx:127',message:'handleVote START',data:{variant,isVoting,userVote,effectId:effectData.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'ALL'})}).catch(()=>{});
+    // #endregion
+    
+    if (isVoting || userVote) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EffectCard.tsx:129',message:'handleVote BLOCKED',data:{isVoting,userVote},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H4'})}).catch(()=>{});
+      // #endregion
+      return;
+    }
     
     // Проверяем, голосовал ли пользователь за этот эффект ДО установки нового голоса
     const hasVoted = !!votesStore.get()[effectData.id];
     
+    // #region agent log
+    const stateUpdateStart = performance.now();
+    // #endregion
+    
     setIsVoting(true);
     setUserVote(variant);
     setVotes(prev => ({ for: variant === 'A' ? prev.for + 1 : prev.for, against: variant === 'B' ? prev.against + 1 : prev.against }));
+    
+    // #region agent log
+    const localStorageStart = performance.now();
+    // #endregion
     votesStore.set(effectData.id, variant);
+    // #region agent log
+    const localStorageEnd = performance.now();
+    fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EffectCard.tsx:136',message:'localStorage SET',data:{duration:localStorageEnd-localStorageStart},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H6'})}).catch(()=>{});
+    // #endregion
 
     // Если пользователь еще не голосовал за этот эффект, обновляем счетчик
     if (!hasVoted) {
+      // #region agent log
+      const incrementStart = performance.now();
+      // #endregion
       incrementVotes();
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EffectCard.tsx:140',message:'incrementVotes called',data:{duration:performance.now()-incrementStart},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H5'})}).catch(()=>{});
+      // #endregion
     }
 
     try {
+      // #region agent log
+      const saveVoteStart = performance.now();
+      fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EffectCard.tsx:144',message:'saveVote START',data:{effectId:effectData.id,variant},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+      // #endregion
+      
       const visitorId = getClientVisitorId(); // ИСПОЛЬЗУЕМ ЕДИНУЮ ФУНКЦИЮ
       const result = await saveVote({ visitorId, effectId: effectData.id, variant });
+      
+      // #region agent log
+      const saveVoteEnd = performance.now();
+      fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EffectCard.tsx:146',message:'saveVote COMPLETE',data:{duration:saveVoteEnd-saveVoteStart,success:result.success},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+      // #endregion
+      
       if (!result.success) { 
         if (result.vote) {
           setUserVote(result.vote.variant as 'A' | 'B');
@@ -158,10 +211,19 @@ export default function EffectCard(props: EffectCardProps) {
         }
       }
     } catch (error) { 
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EffectCard.tsx:160',message:'handleVote ERROR',data:{error:error instanceof Error?error.message:String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+      // #endregion
       setUserVote(null);
       setVotes({ for: effectData.votesFor, against: effectData.votesAgainst });
       toast.error('Ошибка');
-    } finally { setIsVoting(false); }
+    } finally { 
+      // #region agent log
+      const totalDuration = performance.now() - startTime;
+      fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EffectCard.tsx:164',message:'handleVote FINALLY',data:{totalDuration},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'ALL'})}).catch(()=>{});
+      // #endregion
+      setIsVoting(false); 
+    }
   };
 
   const safeImageUrl = effectData.imageUrl ? effectData.imageUrl.replace(/'/g, '%27') : null;

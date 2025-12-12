@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, startTransition } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ArrowLeft, Share2, Eye, Calendar, MessageSquare, ChevronRight, ChevronLeft, 
@@ -472,6 +472,15 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
   // Защита от повторных вызовов голосования
   const isVotingRef = useRef(false);
   
+  // Защита от множественных одновременных вызовов updateUnvotedEffects
+  const updateUnvotedEffectsRef = useRef(false);
+  
+  // Глобальный debounce таймер для updateUnvotedEffects
+  const updateUnvotedEffectsDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Глобальный throttle для updateUnvotedEffects (храним время последнего обновления)
+  const lastUpdateUnvotedEffectsTimeRef = useRef<number>(0);
+  
   // Состояние для взаимоисключающих аккордеонов (Остатки, История, Теории)
   const [openExclusiveAccordion, setOpenExclusiveAccordion] = useState<string | null>(null);
   
@@ -590,48 +599,178 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
 
   // Функция для обновления списка непроголосованных эффектов
   const updateUnvotedEffects = useCallback(async () => {
-    if (showUnvotedOnly) {
-      const votes = votesStore.get();
-      const votedIds = Object.keys(votes);
-      const [nextResult, prevResult] = await Promise.all([
-        getNextUnvotedEffect(effect.id, votedIds),
-        getPrevUnvotedEffect(effect.id, votedIds),
-      ]);
-      if (nextResult.success) {
-        setNextUnvotedEffect(nextResult.data ?? null);
-      }
-      if (prevResult.success) {
-        setPrevUnvotedEffect(prevResult.data ?? null);
-      }
-      
-      // Проверяем, есть ли вообще непроголосованные эффекты
-      const hasUnvoted = !!(nextResult.data || prevResult.data);
-      setHasUnvotedEffects(hasUnvoted);
-    } else {
-      setNextUnvotedEffect(null);
-      setPrevUnvotedEffect(null);
-      setHasUnvotedEffects(true); // При выключенном фильтре считаем, что есть эффекты
+    // #region agent log
+    const updateStart = Date.now();
+    const callStack = new Error().stack?.split('\n').slice(1, 4).join(' -> ') || 'unknown';
+    // #endregion
+    
+    // КРИТИЧЕСКАЯ ЗАЩИТА: не обновляем во время голосования
+    if (isVotingRef.current || isVoting) {
+      // #region agent log
+      queueMicrotask(() => {
+        fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EffectPageClient.tsx:592',message:'updateUnvotedEffects SKIP (voting in progress)',data:{callStack:callStack.substring(0,100)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H5'})}).catch(()=>{});
+      });
+      // #endregion
+      return;
     }
-  }, [effect.id, showUnvotedOnly]);
+    
+    // Защита от множественных одновременных вызовов
+    if (updateUnvotedEffectsRef.current) {
+      // #region agent log
+      queueMicrotask(() => {
+        fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EffectPageClient.tsx:592',message:'updateUnvotedEffects SKIP (already running)',data:{callStack:callStack.substring(0,100)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H5'})}).catch(()=>{});
+      });
+      // #endregion
+      return;
+    }
+    
+    updateUnvotedEffectsRef.current = true;
+    
+    try {
+      if (showUnvotedOnly) {
+        const votes = votesStore.get();
+        const votedIds = Object.keys(votes);
+        const [nextResult, prevResult] = await Promise.all([
+          getNextUnvotedEffect(effect.id, votedIds),
+          getPrevUnvotedEffect(effect.id, votedIds),
+        ]);
+        
+        // Используем startTransition для неблокирующих обновлений
+        startTransition(() => {
+          if (nextResult.success) {
+            setNextUnvotedEffect(nextResult.data ?? null);
+          }
+          if (prevResult.success) {
+            setPrevUnvotedEffect(prevResult.data ?? null);
+          }
+          
+          // Проверяем, есть ли вообще непроголосованные эффекты
+          const hasUnvoted = !!(nextResult.data || prevResult.data);
+          setHasUnvotedEffects(hasUnvoted);
+        });
+        
+        // #region agent log
+        queueMicrotask(() => {
+          fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EffectPageClient.tsx:592',message:'updateUnvotedEffects COMPLETE',data:{duration:Date.now()-updateStart},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H5'})}).catch(()=>{});
+        });
+        // #endregion
+      } else {
+        startTransition(() => {
+          setNextUnvotedEffect(null);
+          setPrevUnvotedEffect(null);
+          setHasUnvotedEffects(true); // При выключенном фильтре считаем, что есть эффекты
+        });
+      }
+    } catch (error) {
+      console.error('[EffectPageClient] Ошибка в updateUnvotedEffects:', error);
+      // #region agent log
+      queueMicrotask(() => {
+        fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EffectPageClient.tsx:592',message:'updateUnvotedEffects ERROR',data:{error:error instanceof Error?error.message:String(error),duration:Date.now()-updateStart},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H5'})}).catch(()=>{});
+      });
+      // #endregion
+    } finally {
+      updateUnvotedEffectsRef.current = false;
+    }
+  }, [effect.id, showUnvotedOnly, isVoting]);
 
   // Получаем следующий и предыдущий не проголосованные эффекты (только если фильтр включен)
   useEffect(() => {
-    updateUnvotedEffects();
-  }, [updateUnvotedEffects]);
+    // Отложенное выполнение, чтобы не блокировать первоначальную загрузку страницы
+    // И только если не идет голосование
+    if (isVoting || isVotingRef.current) {
+      return;
+    }
+    
+    const THROTTLE_MS = 10000; // Throttle 10 секунд
+    const now = Date.now();
+    const timeSinceLastUpdate = now - lastUpdateUnvotedEffectsTimeRef.current;
+    
+    // Если прошло меньше THROTTLE_MS с последнего обновления, игнорируем
+    if (timeSinceLastUpdate < THROTTLE_MS) {
+      return;
+    }
+    
+    // Используем глобальный debounce таймер
+    if (updateUnvotedEffectsDebounceRef.current) {
+      clearTimeout(updateUnvotedEffectsDebounceRef.current);
+    }
+    
+    // КРИТИЧНО: Обновляем время сразу при создании таймера
+    lastUpdateUnvotedEffectsTimeRef.current = now;
+    
+    updateUnvotedEffectsDebounceRef.current = setTimeout(() => {
+      if (!isVoting && !isVotingRef.current && !updateUnvotedEffectsRef.current) {
+        updateUnvotedEffects().catch(err => {
+          console.error('[EffectPageClient] Ошибка инициализации непроголосованных эффектов:', err);
+        });
+      }
+      updateUnvotedEffectsDebounceRef.current = null;
+    }, 5000); // Используем тот же debounce, что и для votes-updated
+    
+    return () => {
+      if (updateUnvotedEffectsDebounceRef.current) {
+        clearTimeout(updateUnvotedEffectsDebounceRef.current);
+        updateUnvotedEffectsDebounceRef.current = null;
+      }
+    };
+  }, [updateUnvotedEffects, isVoting]);
 
   // Обновляем список непроголосованных эффектов при изменении голосов
   useEffect(() => {
+    const THROTTLE_MS = 10000; // Throttle 10 секунд - обновляем максимум раз в 10 секунд
+    
     const handleVotesUpdate = () => {
-      if (showUnvotedOnly) {
-        updateUnvotedEffects();
+      // КРИТИЧЕСКАЯ ЗАЩИТА: не обновляем во время голосования
+      if (isVoting || isVotingRef.current) {
+        return;
+      }
+      if (showUnvotedOnly && !updateUnvotedEffectsRef.current) {
+        const now = Date.now();
+        const timeSinceLastUpdate = now - lastUpdateUnvotedEffectsTimeRef.current;
+        
+        // Если прошло меньше THROTTLE_MS с последнего обновления, игнорируем событие
+        if (timeSinceLastUpdate < THROTTLE_MS) {
+          return;
+        }
+        
+        // Используем глобальный debounce таймер
+        if (updateUnvotedEffectsDebounceRef.current) {
+          clearTimeout(updateUnvotedEffectsDebounceRef.current);
+        }
+        
+        // КРИТИЧНО: Обновляем время сразу при создании таймера, чтобы throttle работал правильно
+        lastUpdateUnvotedEffectsTimeRef.current = now;
+        
+        updateUnvotedEffectsDebounceRef.current = setTimeout(() => {
+          // Еще одна проверка перед выполнением (может измениться за время debounce)
+          if (isVoting || isVotingRef.current || updateUnvotedEffectsRef.current) {
+            // Если началось голосование или уже выполняется, не запускаем
+            updateUnvotedEffectsDebounceRef.current = null;
+            return;
+          }
+          
+          // Вызываем updateUnvotedEffects напрямую (debounce уже применен)
+          updateUnvotedEffects().catch(err => {
+            console.error('[EffectPageClient] Ошибка обновления непроголосованных эффектов:', err);
+          });
+          updateUnvotedEffectsDebounceRef.current = null;
+        }, 5000); // Debounce 5 секунд для снижения нагрузки на UI
       }
     };
+    
     window.addEventListener('votes-updated', handleVotesUpdate);
-    return () => window.removeEventListener('votes-updated', handleVotesUpdate);
-  }, [showUnvotedOnly, updateUnvotedEffects]);
+    return () => {
+      window.removeEventListener('votes-updated', handleVotesUpdate);
+      if (updateUnvotedEffectsDebounceRef.current) {
+        clearTimeout(updateUnvotedEffectsDebounceRef.current);
+        updateUnvotedEffectsDebounceRef.current = null;
+      }
+    };
+  }, [showUnvotedOnly, updateUnvotedEffects, isVoting]);
 
-  // Парсим варианты из content
-  const parseVariantsFromContent = (content: string): { variantA: string; variantB: string } => {
+  // Парсим варианты из content (мемоизировано для избежания повторных вычислений)
+  const { variantA: vA, variantB: vB } = useMemo(() => {
+    const content = effect.content || '';
     const lines = content.split('\n');
     const variantALine = lines.find((l) => l.startsWith('Вариант А:'));
     const variantBLine = lines.find((l) => l.startsWith('Вариант Б:'));
@@ -639,70 +778,198 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
       variantA: variantALine?.replace('Вариант А: ', '').trim() || 'Как я помню',
       variantB: variantBLine?.replace('Вариант Б: ', '').trim() || 'Как в реальности',
     };
-  };
-
-  const { variantA: vA, variantB: vB } = parseVariantsFromContent(effect.content || '');
+  }, [effect.content]);
 
   const handleVote = async (variant: 'A' | 'B') => {
+    // #region agent log
+    // Отправляем лог асинхронно, чтобы не блокировать
+    queueMicrotask(() => {
+      fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EffectPageClient.tsx:646',message:'handleVote START',data:{variant,isVoting,userVote,hasRef:isVotingRef.current,effectId:effect.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'ALL'})}).catch(()=>{});
+    });
+    // #endregion
     // Защита от повторных вызовов
-    if (isVoting || userVote || isVotingRef.current) return;
+    if (isVoting || userVote || isVotingRef.current) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EffectPageClient.tsx:649',message:'handleVote BLOCKED',data:{isVoting,userVote,hasRef:isVotingRef.current},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H4'})}).catch(()=>{});
+      // #endregion
+      return;
+    }
 
+    const startTime = Date.now();
+    // #region agent log
+    const localStorageStart = performance.now();
+    // #endregion
     isVotingRef.current = true;
-    setIsVoting(true);
-    setUserVote(variant);
-    setVotes(prev => ({ ...prev }));
+    
+    // Используем startTransition для неблокирующих обновлений UI
+    // #region agent log
+    const transitionStart = performance.now();
+    // #endregion
+    startTransition(() => {
+      setIsVoting(true);
+      setUserVote(variant);
+      // Оптимизация: обновляем votes только если значения действительно изменились
+      setVotes(prev => {
+        const newVotes = { for: effect.votesFor, against: effect.votesAgainst };
+        if (prev.for !== newVotes.for || prev.against !== newVotes.against) {
+          return newVotes;
+        }
+        return prev; // Возвращаем тот же объект, если значения не изменились
+      });
+      // #region agent log
+      const transitionEnd = performance.now();
+      queueMicrotask(() => {
+        fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EffectPageClient.tsx:805',message:'startTransition COMPLETE',data:{duration:transitionEnd-transitionStart},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H8'})}).catch(()=>{});
+      });
+      // #endregion
+    });
+    
+    // localStorage операции выполняем синхронно, но не блокируем React
     votesStore.set(effect.id, variant); // локально фиксируем голос для синхронизации превью
+    // #region agent log
+    const localStorageEnd = performance.now();
+    queueMicrotask(() => {
+      fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EffectPageClient.tsx:654',message:'localStorage SET',data:{duration:localStorageEnd-localStorageStart},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
+    });
+    // #endregion
 
     try {
+      // #region agent log
+      const visitorIdStart = performance.now();
+      // #endregion
       const visitorId = getClientVisitorId();
+      // #region agent log
+      const visitorIdEnd = performance.now();
+      fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EffectPageClient.tsx:657',message:'getClientVisitorId',data:{duration:visitorIdEnd-visitorIdStart,hasId:!!visitorId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
+      // #endregion
+      
+      if (!visitorId) {
+        throw new Error('Не удалось получить ID посетителя');
+      }
+
+      // Используем флаг отмены для предотвращения обработки результата после таймаута
+      let isCancelled = false;
+      let timeoutId: NodeJS.Timeout | null = null;
       
       // Таймаут для предотвращения зависания
-      const votePromise = saveVote({ visitorId, effectId: effect.id, variant });
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Vote timeout')), 8000)
-      );
+      // #region agent log
+      const voteStart = Date.now();
+      // Отправляем лог асинхронно, чтобы не блокировать
+      queueMicrotask(() => {
+        fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EffectPageClient.tsx:682',message:'saveVote START',data:{effectId:effect.id,variant,visitorId:visitorId.substring(0,10)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+      });
+      // #endregion
       
-      const result = await Promise.race([votePromise, timeoutPromise]) as Awaited<ReturnType<typeof saveVote>>;
+      const votePromise = saveVote({ visitorId, effectId: effect.id, variant });
+      
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EffectPageClient.tsx:689',message:'TIMEOUT TRIGGERED',data:{elapsed:Date.now()-voteStart},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+          // #endregion
+          isCancelled = true;
+          reject(new Error('Vote timeout'));
+        }, 8000);
+      });
+      
+      // Запускаем голосование и таймаут параллельно
+      const result = await Promise.race([
+        votePromise.then(result => {
+          // Игнорируем результат, если был таймаут
+          if (isCancelled) {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EffectPageClient.tsx:697',message:'saveVote RESULT IGNORED (cancelled)',data:{elapsed:Date.now()-voteStart},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+            // #endregion
+            throw new Error('Request was cancelled');
+          }
+          if (timeoutId) clearTimeout(timeoutId);
+          return result;
+        }),
+        timeoutPromise
+      ]) as Awaited<ReturnType<typeof saveVote>>;
+      
+      // #region agent log
+      const voteEnd = Date.now();
+      fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EffectPageClient.tsx:703',message:'saveVote COMPLETE',data:{duration:voteEnd-voteStart,success:result.success,hasError:!!result.error},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+      // #endregion
       if (!result.success) {
         if (result.vote) { 
-          setUserVote(result.vote.variant as 'A' | 'B'); 
+          startTransition(() => {
+            setUserVote(result.vote.variant as 'A' | 'B'); 
+          });
           votesStore.set(effect.id, result.vote.variant as 'A' | 'B');
-          toast.success('Вы уже голосовали'); 
+          queueMicrotask(() => {
+            toast.success('Вы уже голосовали'); 
+          });
         }
         else { 
-          setUserVote(null); 
-          setVotes({ for: effect.votesFor, against: effect.votesAgainst }); 
+          startTransition(() => {
+            setUserVote(null); 
+            setVotes({ for: effect.votesFor, against: effect.votesAgainst }); 
+          });
           // откат локального голоса: если был initialUserVote, восстановим; иначе удалим запись
-          if (initialUserVote) votesStore.set(effect.id, initialUserVote);
-          else {
+          if (initialUserVote) {
+            votesStore.set(effect.id, initialUserVote);
+          } else {
             const votes = votesStore.get();
             delete votes[effect.id];
             localStorage.setItem('mandela_votes', JSON.stringify(votes));
-            window.dispatchEvent(new Event('votes-updated'));
+            // Отложенная отправка события, чтобы не блокировать
+            queueMicrotask(() => {
+              window.dispatchEvent(new Event('votes-updated'));
+            });
           }
-          toast.error('Ошибка'); 
+          queueMicrotask(() => {
+            toast.error('Ошибка'); 
+          });
         }
       } else { 
-        toast.success('Голос записан');
+        // Неблокирующий toast через queueMicrotask
+        queueMicrotask(() => {
+          toast.success('Голос записан');
+        });
         votesStore.set(effect.id, variant);
-        // Обновляем список непроголосованных эффектов после голосования
-        if (showUnvotedOnly) {
-          updateUnvotedEffects();
-        }
+        // updateUnvotedEffects будет вызван через событие votes-updated из votesStore.set()
+        // Не нужно вызывать его вручную здесь, но оно будет отложено до завершения голосования
       }
     } catch (error) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EffectPageClient.tsx:693',message:'handleVote ERROR',data:{error:error instanceof Error?error.message:String(error),elapsed:Date.now()-startTime},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+      // #endregion
       console.error('[EffectPageClient] Ошибка при голосовании:', error);
-      setUserVote(null); 
-      if (initialUserVote) votesStore.set(effect.id, initialUserVote);
-      else {
+      startTransition(() => {
+        setUserVote(null); 
+      });
+      if (initialUserVote) {
+        votesStore.set(effect.id, initialUserVote);
+      } else {
         const votes = votesStore.get();
         delete votes[effect.id];
         localStorage.setItem('mandela_votes', JSON.stringify(votes));
-        window.dispatchEvent(new Event('votes-updated'));
+        // Отложенная отправка события, чтобы не блокировать
+        queueMicrotask(() => {
+          window.dispatchEvent(new Event('votes-updated'));
+        });
       }
-      toast.error('Ошибка при сохранении голоса');
+      queueMicrotask(() => {
+        toast.error('Ошибка при сохранении голоса');
+      });
     } finally { 
-      setIsVoting(false);
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EffectPageClient.tsx:705',message:'handleVote FINALLY',data:{totalElapsed:Date.now()-startTime},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'ALL'})}).catch(()=>{});
+      // #endregion
+      // #region agent log
+      const finalTransitionStart = performance.now();
+      // #endregion
+      startTransition(() => {
+        setIsVoting(false);
+        // #region agent log
+        const finalTransitionEnd = performance.now();
+        queueMicrotask(() => {
+          fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EffectPageClient.tsx:961',message:'final startTransition COMPLETE',data:{duration:finalTransitionEnd-finalTransitionStart},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H8'})}).catch(()=>{});
+        });
+        // #endregion
+      });
       isVotingRef.current = false;
     }
   };

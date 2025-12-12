@@ -15,7 +15,9 @@
     "db:reset-demo": "cross-env SEED_MODE=demo npx prisma db push --force-reset && cross-env SEED_MODE=demo npx prisma db seed",
     "db:reset-prod": "cross-env SEED_MODE=production npx prisma db push --force-reset && cross-env SEED_MODE=production npx prisma db seed",
     "db:check-comments": "npx ts-node --project tsconfig.scripts.json scripts/check-comments.ts",
-    "db:studio": "npx prisma studio"
+    "db:studio": "npx prisma studio",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "prisma": {
     "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
@@ -49,6 +51,7 @@
   },
   "devDependencies": {
     "@next/bundle-analyzer": "^16.0.3",
+    "@playwright/test": "^1.57.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

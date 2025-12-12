@@ -205,8 +205,17 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
     initData();
 
     const handleVotesUpdate = () => {
+      // #region agent log
+      const startTime = performance.now();
+      fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EffectClient.tsx:207',message:'handleVotesUpdate START',data:{effectId:effect.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H7'})}).catch(()=>{});
+      // #endregion
       const votes = votesStore.get();
+      const calcStart = performance.now();
       calculateNavigation(allIds, votes);
+      // #region agent log
+      const calcEnd = performance.now();
+      fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EffectClient.tsx:209',message:'handleVotesUpdate COMPLETE',data:{totalDuration:calcEnd-startTime,calcDuration:calcEnd-calcStart,effectId:effect.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H7'})}).catch(()=>{});
+      // #endregion
     };
     window.addEventListener('votes-updated', handleVotesUpdate);
     return () => window.removeEventListener('votes-updated', handleVotesUpdate);
@@ -273,11 +282,23 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
   }, [allIds, effect.id, router]);
 
   const handleVote = async (variant: 'A' | 'B') => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EffectClient.tsx:275',message:'handleVote START',data:{variant,isVoting,userVote,hasRef:isVotingRef.current,effectId:effect.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'ALL'})}).catch(()=>{});
+    // #endregion
     // Защита от повторных вызовов
-    if (isVoting || userVote || isVotingRef.current) return;
+    if (isVoting || userVote || isVotingRef.current) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EffectClient.tsx:277',message:'handleVote BLOCKED',data:{isVoting,userVote,hasRef:isVotingRef.current},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H4'})}).catch(()=>{});
+      // #endregion
+      return;
+    }
     
+    const startTime = Date.now();
     const hasVoted = !!votesStore.get()[effect.id];
     
+    // #region agent log
+    const localStorageStart = performance.now();
+    // #endregion
     isVotingRef.current = true;
     setIsVoting(true);
     setGlitchTrigger(prev => prev + 1);
@@ -285,6 +306,10 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
     try {
       setUserVote(variant);
       votesStore.set(effect.id, variant);
+      // #region agent log
+      const localStorageEnd = performance.now();
+      fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EffectClient.tsx:287',message:'localStorage SET',data:{duration:localStorageEnd-localStorageStart},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
+      // #endregion
       
       if (!hasVoted) {
         incrementVotes();
@@ -296,26 +321,69 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
         votesAgainst: variant === 'B' ? prev.votesAgainst + 1 : prev.votesAgainst
       }));
 
+      // #region agent log
+      const visitorIdStart = performance.now();
+      // #endregion
       const visitorId = getClientVisitorId();
+      // #region agent log
+      const visitorIdEnd = performance.now();
+      fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EffectClient.tsx:299',message:'getClientVisitorId',data:{duration:visitorIdEnd-visitorIdStart,hasId:!!visitorId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
+      // #endregion
       if (visitorId) {
+        // Используем флаг отмены для предотвращения обработки результата после таймаута
+        let isCancelled = false;
+        let timeoutId: NodeJS.Timeout | null = null;
+        
         // Таймаут для предотвращения зависания
+        // #region agent log
+        const voteStart = Date.now();
+        fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EffectClient.tsx:307',message:'saveVote START',data:{effectId:effect.id,variant,visitorId:visitorId.substring(0,10)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+        // #endregion
+        
         const votePromise = saveVote({
           visitorId,
           effectId: effect.id,
           variant
         });
         
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Timeout')), 10000)
-        );
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          timeoutId = setTimeout(() => {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EffectClient.tsx:316',message:'TIMEOUT TRIGGERED',data:{elapsed:Date.now()-voteStart},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+            // #endregion
+            isCancelled = true;
+            reject(new Error('Timeout'));
+          }, 10000);
+        });
         
-        await Promise.race([votePromise, timeoutPromise]);
+        // Запускаем голосование и таймаут параллельно
+        await Promise.race([
+          votePromise.then(() => {
+            // Игнорируем результат, если был таймаут
+            if (isCancelled) {
+              // #region agent log
+              fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EffectClient.tsx:324',message:'saveVote RESULT IGNORED (cancelled)',data:{elapsed:Date.now()-voteStart},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+              // #endregion
+              throw new Error('Request was cancelled');
+            }
+            if (timeoutId) clearTimeout(timeoutId);
+          }),
+          timeoutPromise
+        ]);
+        
+        // #region agent log
+        const voteEnd = Date.now();
+        fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EffectClient.tsx:332',message:'saveVote COMPLETE',data:{duration:voteEnd-voteStart},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+        // #endregion
       }
       
       toast.success('Зафиксировано');
       calculateNavigation(allIds, { ...votesStore.get(), [effect.id]: variant });
 
     } catch (error) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EffectClient.tsx:318',message:'handleVote ERROR',data:{error:error instanceof Error?error.message:String(error),elapsed:Date.now()-startTime},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+      // #endregion
       console.error('[EffectClient] Ошибка при голосовании:', error);
       toast.error('Ошибка при голосовании');
       // Откатываем изменения при ошибке
@@ -327,6 +395,9 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
         votesAgainst: variant === 'B' ? prev.votesAgainst - 1 : prev.votesAgainst
       }));
     } finally {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/2b04a9b9-bf85-49f7-8069-5a78c9435350',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'EffectClient.tsx:329',message:'handleVote FINALLY',data:{totalElapsed:Date.now()-startTime},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'ALL'})}).catch(()=>{});
+      // #endregion
       setIsVoting(false);
       isVotingRef.current = false;
     }
