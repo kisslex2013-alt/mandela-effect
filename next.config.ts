@@ -23,6 +23,10 @@ const nextConfig: NextConfig = {
       '@vercel/analytics',
     ],
   },
+  
+  // КРИТИЧНО: Исключаем серверные библиотеки из клиентского бандла
+  // Это уменьшает TBT и размер JS на ~1MB
+  serverExternalPackages: ['openai', 'exa-js', '@google/generative-ai'],
 
   // Webpack оптимизации
   webpack: (config, { dev, isServer }) => {

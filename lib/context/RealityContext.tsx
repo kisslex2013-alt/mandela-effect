@@ -39,7 +39,6 @@ export function RealityProvider({ children }: { children: React.ReactNode }) {
   const checkStatus = useCallback(async () => {
     // Предотвращаем множественные одновременные вызовы
     if (isSyncingRef.current) {
-      console.log('[RealityContext] Синхронизация уже выполняется, пропускаем...');
       return;
     }
     
@@ -53,8 +52,6 @@ export function RealityProvider({ children }: { children: React.ReactNode }) {
     isSyncingRef.current = true;
 
     try {
-      console.log('[RealityContext] Начало синхронизации...');
-      
       // Таймаут для предотвращения зависания
       const timeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error('Sync timeout')), 15000)
@@ -63,7 +60,6 @@ export function RealityProvider({ children }: { children: React.ReactNode }) {
       // 1. Получаем голоса с сервера (источник правды)
       const serverVotesPromise = getUserVotedEffects(vid);
       let serverVotes = await Promise.race([serverVotesPromise, timeoutPromise]) as Awaited<ReturnType<typeof getUserVotedEffects>>;
-      console.log(`[RealityContext] Голосов на сервере: ${serverVotes.length}`);
       const serverVotesMap = new Map(
         serverVotes.map(v => [v.effectId, v.variant])
       );
@@ -74,7 +70,6 @@ export function RealityProvider({ children }: { children: React.ReactNode }) {
         effectId,
         variant,
       }));
-      console.log(`[RealityContext] Голосов в localStorage: ${localVotesArray.length}`);
 
       // 3. Находим голоса в localStorage, которых нет на сервере (для миграции)
       const localVotesToMigrate: Array<{ effectId: string; variant: 'A' | 'B' }> = [];
@@ -86,15 +81,12 @@ export function RealityProvider({ children }: { children: React.ReactNode }) {
 
       // 4. Мигрируем локальные голоса на сервер (если есть)
       if (localVotesToMigrate.length > 0) {
-        console.log(`[RealityContext] Миграция ${localVotesToMigrate.length} голосов с localStorage на сервер...`);
         try {
           const migrationPromise = migrateLocalVotes(vid, localVotesToMigrate);
           const migrationResult = await Promise.race([
             migrationPromise,
             new Promise((_, reject) => setTimeout(() => reject(new Error('Migration timeout')), 10000))
           ]) as Awaited<ReturnType<typeof migrateLocalVotes>>;
-          
-          console.log(`[RealityContext] Миграция завершена: ${migrationResult.migrated} мигрировано, ${migrationResult.errors} ошибок`);
           
           // После миграции перезагружаем список серверных голосов
           if (migrationResult.migrated > 0) {
@@ -110,7 +102,6 @@ export function RealityProvider({ children }: { children: React.ReactNode }) {
             });
           }
         } catch (migrationError) {
-          console.error('[RealityContext] Ошибка при миграции:', migrationError);
           // Продолжаем работу даже если миграция не удалась
         }
       }
@@ -133,9 +124,7 @@ export function RealityProvider({ children }: { children: React.ReactNode }) {
         }
       }
       
-      if (syncedCount > 0) {
-        console.log(`[RealityContext] Синхронизировано ${syncedCount} голосов с сервера в localStorage`);
-      }
+      // syncedCount учитывается внутренне
 
       // 6. Получаем финальный счетчик голосов (после синхронизации)
       let count = serverVotesMap.size;
@@ -147,15 +136,12 @@ export function RealityProvider({ children }: { children: React.ReactNode }) {
             new Promise<number>((_, reject) => setTimeout(() => reject(new Error('Count timeout')), 5000))
           ]) as number;
         } catch (countError) {
-          console.error('[RealityContext] Ошибка при получении счетчика:', countError);
           // Используем размер мапы как fallback
           count = serverVotesMap.size;
         }
       }
       setVoteCount(count);
       setIsUnlocked(count >= REQUIRED_VOTES);
-      
-      console.log(`[RealityContext] Синхронизация завершена. Всего голосов: ${count}`);
       
       // Проверка на выход из Изнанки, если голоса сбросились
       if (count < REQUIRED_VOTES && isUpsideDown) {
@@ -174,7 +160,6 @@ export function RealityProvider({ children }: { children: React.ReactNode }) {
           }
       }
     } catch (error) {
-      console.error('[RealityContext] Ошибка при синхронизации:', error);
       // В случае ошибки используем только локальный счетчик
       const localCount = Object.keys(votesStore.get()).length;
       setVoteCount(localCount);
@@ -238,7 +223,6 @@ export function RealityProvider({ children }: { children: React.ReactNode }) {
 
   // Мгновенное обновление (Optimistic UI)
   const incrementVotes = useCallback(() => {
-    console.log("Incrementing votes...");
     setVoteCount(prev => {
       const newCount = prev + 1;
       if (newCount >= REQUIRED_VOTES && !isUnlocked) {

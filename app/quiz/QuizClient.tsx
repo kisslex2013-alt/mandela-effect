@@ -181,9 +181,8 @@ export default function QuizClient() {
                     <div className="flex items-center justify-between mb-3">
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${selectedVariant === 'A' ? 'bg-purple-500 text-white' : 'bg-purple-500/10 text-purple-400'}`}>A</div>
                     </div>
-                    {/* Парсинг текста вариантов лучше делать на уровне данных, здесь упрощенно */}
                     <div className="text-lg font-bold text-light group-hover:text-purple-300 transition-colors">
-                        {currentEffect.content.split('\n').find(l => l.startsWith('Вариант А:'))?.replace('Вариант А: ', '') || 'Вариант А'}
+                        Как я помню
                     </div>
                 </button>
 
@@ -201,7 +200,7 @@ export default function QuizClient() {
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${selectedVariant === 'B' ? 'bg-green-500 text-white' : 'bg-green-500/10 text-green-400'}`}>B</div>
                     </div>
                     <div className="text-lg font-bold text-light group-hover:text-green-300 transition-colors">
-                        {currentEffect.content.split('\n').find(l => l.startsWith('Вариант Б:'))?.replace('Вариант Б: ', '') || 'Вариант Б'}
+                        Как в реальности
                     </div>
                 </button>
             </div>

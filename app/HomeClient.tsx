@@ -107,18 +107,9 @@ export default function HomeClient({
     } catch (error) { setDayVote(null); } finally { setIsDayVoting(false); }
   };
 
-  const parseDayVariants = () => {
-    let vA = "Как я помню";
-    let vB = "Как в реальности";
-    if (effectOfDay?.content) {
-      const matchA = effectOfDay.content.match(/Вариант А:\s*(.*?)(?:\n|$)/);
-      const matchB = effectOfDay.content.match(/Вариант Б:\s*(.*?)(?:\n|$)/);
-      if (matchA && matchA[1]) vA = matchA[1].trim();
-      if (matchB && matchB[1]) vB = matchB[1].trim();
-    }
-    return { vA, vB };
-  };
-  const { vA, vB } = parseDayVariants();
+  // Всегда используем стандартные тексты для вариантов ответа
+  const vA = "Как я помню";
+  const vB = "Как в реальности";
 
   if (!mounted) return <div className="min-h-screen bg-dark" />;
 

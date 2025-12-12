@@ -55,8 +55,6 @@ const ImageLightbox = ({ src, onClose }: { src: string | null, onClose: () => vo
 
 // 1. Аккордеон (контролируемый компонент)
 const AccordionItem = ({ title, icon: Icon, children, color = "cyan", sourceLink, isOpen, onToggle, isLocked = false }: any) => {
-  console.log(`🟣 [AccordionItem ${title}] Рендер. isOpen: ${isOpen}, isLocked: ${isLocked}`);
-  
   const colorClassesMap: Record<string, string> = {
     cyan: "text-cyan-400 border-cyan-500/30 bg-cyan-950/20",
     red: "text-red-400 border-red-500/30 bg-red-950/20",
@@ -66,7 +64,6 @@ const AccordionItem = ({ title, icon: Icon, children, color = "cyan", sourceLink
   const colorClasses = colorClassesMap[color] || "text-cyan-400 border-cyan-500/30 bg-cyan-950/20";
 
   const handleToggle = () => {
-    console.log(`🟣 [AccordionItem ${title}] handleToggle вызван. isLocked: ${isLocked}`);
     if (isLocked || !onToggle) return;
     onToggle();
   };
@@ -385,22 +382,13 @@ const LockedContent = ({ isVisible, isUpsideDown = false, effectId }: { isVisibl
 
 // --- MAIN COMPONENT ---
 export default function EffectPageClient({ effect, initialUserVote, prevEffect, nextEffect }: EffectPageClientProps) {
-  console.log('🚀🚀🚀 [EffectPageClient] ========== КОМПОНЕНТ НАЧАЛ РЕНДЕРИТЬСЯ ==========');
-  console.log('🚀 [EffectPageClient] effect.id:', effect.id);
-  console.log('🚀 [EffectPageClient] effect.title:', effect.title);
-  
   // Получаем контекст Reality
   let isUpsideDown = false;
   try {
     const reality = useReality();
     isUpsideDown = reality.isUpsideDown;
-    console.log('⚪ [EffectPageClient] Контекст получен:', {
-      isUpsideDown,
-      isUnlocked: reality.isUnlocked,
-      voteCount: reality.voteCount,
-    });
   } catch (error) {
-    console.error('[EffectPageClient] Error getting Reality context:', error);
+    // Fallback to false
   }
   
   const [userVote, setUserVote] = useState(initialUserVote);
@@ -419,11 +407,9 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
   
   // Состояние для взаимоисключающих аккордеонов (Остатки, История, Теории)
   const [openExclusiveAccordion, setOpenExclusiveAccordion] = useState<string | null>(null);
-  console.log('⚪ [EffectPageClient] openExclusiveAccordion =', openExclusiveAccordion);
   
   // Состояния для независимых аккордеонов (Факты)
   const [isFactsOpen, setIsFactsOpen] = useState<boolean>(false);
-  console.log('⚪ [EffectPageClient] isFactsOpen =', isFactsOpen);
   
   const votingCardRef = useRef<HTMLDivElement>(null);
   const infoBlockRef = useRef<HTMLDivElement>(null);
@@ -435,34 +421,21 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
   
   // Логика доступа к аккордеонам: только в режиме Изнанка И с голосом
   const hasAccess = isUpsideDown && !!userVote;
-  console.log('⚪ [EffectPageClient] hasAccess =', hasAccess, '(isUpsideDown:', isUpsideDown, ', userVote:', userVote, ')');
   
   // Логика доступа к комментариям: после голосования в любом режиме
   const hasAccessComments = !!userVote;
-  console.log('⚪ [EffectPageClient] hasAccessComments =', hasAccessComments, '(userVote:', userVote, ')');
   
   // Функция для переключения взаимоисключающих аккордеонов
   const handleExclusiveAccordionToggle = useCallback((id: string) => {
-    console.log(`🔵 [handleExclusiveAccordionToggle] Вызвано для: ${id}, текущий: ${openExclusiveAccordion}`);
-    setOpenExclusiveAccordion(current => {
-      if (current === id) {
-        console.log(`🔵 [handleExclusiveAccordionToggle] Закрываем аккордеон: ${id}`);
-        return null;
-      }
-      console.log(`🔵 [handleExclusiveAccordionToggle] Открываем аккордеон: ${id}`);
-      return id;
-    });
-  }, [openExclusiveAccordion]);
+    setOpenExclusiveAccordion(current => current === id ? null : id);
+  }, []);
   
   // Синхронизация состояния аккордеонов при переключении режима
   useEffect(() => {
-    console.log(`🟢 [useEffect isUpsideDown] isUpsideDown изменился на: ${isUpsideDown}`);
     if (!isUpsideDown) {
-      console.log('🟢 [useEffect isUpsideDown] Переход в Реальность: закрываем все аккордеоны.');
       setOpenExclusiveAccordion(null);
       setIsFactsOpen(false);
     } else {
-      console.log('🟢 [useEffect isUpsideDown] Переход в Изнанку: сбрасываем взаимоисключающие аккордеоны.');
       setOpenExclusiveAccordion(null);
     }
   }, [isUpsideDown]);
@@ -799,15 +772,8 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
 
           {/* Accordions - ЛОГИКА ОТОБРАЖЕНИЯ */}
           {(() => {
-            console.log('🟡 [RENDER LOGIC] isUpsideDown =', isUpsideDown);
-            console.log('🟡 [RENDER LOGIC] userVote =', userVote);
-            console.log('🟡 [RENDER LOGIC] hasAccess =', hasAccess);
-            console.log('🟡 [RENDER LOGIC] openExclusiveAccordion =', openExclusiveAccordion);
-            console.log('🟡 [RENDER LOGIC] isFactsOpen =', isFactsOpen);
-            
-            // В режиме Реальности: показываем только заглушку (Факты уже показаны после голосования)
+            // В режиме Реальности: показываем только заглушку
             if (!isUpsideDown) {
-              console.log('🟡 [RENDER LOGIC] Режим Реальности: показываем только заглушку');
               return (
                 <div ref={lockedContentRef}>
                   <LockedContent isVisible={true} isUpsideDown={false} effectId={effect.id} />
@@ -817,7 +783,6 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
             
             // В режиме Изнанки БЕЗ голоса: показываем заглушку
             if (isUpsideDown && !userVote) {
-              console.log('🟡 [RENDER LOGIC] Режим Изнанки БЕЗ голоса: показываем заглушку');
               return (
                 <div ref={lockedContentRef}>
                   <LockedContent isVisible={true} isUpsideDown={true} effectId={effect.id} />
@@ -825,8 +790,7 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
               );
             }
             
-            // В режиме Изнанки С голосом: показываем все аккордеоны (кроме Фактов, они уже показаны после голосования)
-            console.log('🟡 [RENDER LOGIC] Режим Изнанки С голосом: показываем все аккордеоны (кроме Фактов)');
+            // В режиме Изнанки С голосом: показываем все аккордеоны
             return (
               <AnimatePresence mode="wait">
                 <motion.div 
@@ -847,10 +811,7 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
                       color="red" 
                       sourceLink={effect.residueSource}
                       isOpen={openExclusiveAccordion === 'residue'}
-                      onToggle={() => {
-                        console.log('🟠 [AccordionItem residue] onClick вызван');
-                        handleExclusiveAccordionToggle('residue');
-                      }}
+                      onToggle={() => handleExclusiveAccordionToggle('residue')}
                       isLocked={false}
                     >
                       {effect.residue}
@@ -865,10 +826,7 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
                       color="orange" 
                       sourceLink={effect.historySource}
                       isOpen={openExclusiveAccordion === 'history'}
-                      onToggle={() => {
-                        console.log('🟠 [AccordionItem history] onClick вызван');
-                        handleExclusiveAccordionToggle('history');
-                      }}
+                      onToggle={() => handleExclusiveAccordionToggle('history')}
                       isLocked={false}
                     >
                       {effect.history}
@@ -882,10 +840,7 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
                       icon={BrainCircuit} 
                       color="purple"
                       isOpen={openExclusiveAccordion === 'theories'}
-                      onToggle={() => {
-                        console.log('🟠 [AccordionItem theories] onClick вызван');
-                        handleExclusiveAccordionToggle('theories');
-                      }}
+                      onToggle={() => handleExclusiveAccordionToggle('theories')}
                       isLocked={false}
                     >
                       {effect.interpretations?.scientific && (

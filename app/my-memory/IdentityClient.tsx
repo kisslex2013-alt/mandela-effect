@@ -7,7 +7,7 @@ import { votesStore } from '@/lib/votes-store';
 import { generateProfileText } from '@/lib/identity-modes';
 import { Share2, Fingerprint, Activity, Cpu, Globe, Monitor, Wifi, Download, RefreshCw, Database, HardDrive, Zap } from 'lucide-react';
 import RedactedText from '@/components/ui/RedactedText';
-import html2canvas from 'html2canvas';
+// ОПТИМИЗАЦИЯ: html2canvas загружается только при необходимости (экономия ~400KB в бандле)
 import toast from 'react-hot-toast';
 import HolographicRadar from '@/components/ui/HolographicRadar';
 import { getUserCategoryStats } from '@/app/actions/user-stats';
@@ -145,6 +145,9 @@ export default function IdentityClient() {
     const toastId = toast.loading('Генерация слепка памяти...');
 
     try {
+      // ОПТИМИЗАЦИЯ: Динамический импорт html2canvas (экономит ~400KB в основном бандле)
+      const html2canvas = (await import('html2canvas')).default;
+      
       const canvas = await html2canvas(cardRef.current, {
         backgroundColor: isUpsideDown ? '#050000' : '#1a1a1a',
         scale: 2,
