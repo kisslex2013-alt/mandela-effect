@@ -9,7 +9,6 @@ import { RealityProvider } from "@/lib/context/RealityContext";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import ScrollToTop from "@/components/ScrollToTop";
-import StructuredData from "@/components/seo/StructuredData";
 
 // Client-only компоненты (lazy loaded)
 import { 
@@ -134,9 +133,23 @@ export default function RootLayout({
 
   return (
     <html lang="ru" className={`${inter.variable} ${mono.variable} ${ruslan.variable} scroll-smooth`}>
+      <head>
+        {/* JSON-LD для WebSite с SearchAction */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(websiteStructuredData),
+          }}
+        />
+        {/* JSON-LD для Organization */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(organizationStructuredData),
+          }}
+        />
+      </head>
       <body className="bg-dark text-light antialiased selection:bg-primary/30 selection:text-white overflow-x-hidden" suppressHydrationWarning>
-        <StructuredData data={websiteStructuredData} />
-        <StructuredData data={organizationStructuredData} />
         <RealityProvider>
           {/* ОПТИМИЗАЦИЯ: LazyMotion загружает анимации асинхронно */}
           <LazyMotion features={domAnimation}>

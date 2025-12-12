@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import prisma from '@/lib/prisma';
-import StructuredData from '@/components/seo/StructuredData';
 
 export async function generateMetadata({
   params,
@@ -132,8 +131,14 @@ export default async function EffectLayout({
 
   return (
     <>
+      {/* JSON-LD для Article - Next.js должен поместить script в head */}
       {articleStructuredData && (
-        <StructuredData data={articleStructuredData} />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(articleStructuredData),
+          }}
+        />
       )}
       {children}
     </>
