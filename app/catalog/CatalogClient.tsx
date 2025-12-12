@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { m, AnimatePresence } from 'framer-motion';
 import { useReality } from '@/lib/context/RealityContext';
 import EffectCard from '@/components/EffectCard';
@@ -12,9 +12,13 @@ import {
   Film, Music, Tag, User, Globe, Gamepad2, Baby, Ghost, HelpCircle,
   Flame, Scale, Clock, ArrowDownAZ, LayoutGrid, X,
   Atom, Landmark, Cpu, Utensils, Tv, Brain, Zap, Star, AlertTriangle,
-  Camera, Video, Mic
+  Camera, Video, Mic, ChevronDown
 } from 'lucide-react';
 import { CATEGORY_MAP } from '@/lib/constants';
+
+// Количество карточек для начальной загрузки и подгрузки
+const INITIAL_LOAD = 12;
+const LOAD_MORE = 12;
 
 interface Category {
   id: string;
@@ -82,6 +86,9 @@ export default function CatalogClient({ initialEffects, categories }: CatalogCli
   const [userVotes, setUserVotes] = useState<Record<string, 'A' | 'B'>>({});
   const [mounted, setMounted] = useState(false);
   const [readCommentsData, setReadCommentsData] = useState<Record<string, { lastReadAt: string; lastCommentCount: number }>>({});
+  
+  // Пагинация для производительности
+  const [displayCount, setDisplayCount] = useState(INITIAL_LOAD);
 
   useEffect(() => {
     const loadVotes = () => {
@@ -173,6 +180,24 @@ export default function CatalogClient({ initialEffects, categories }: CatalogCli
 
     return result;
   }, [initialEffects, searchQuery, selectedCategory, sortBy, hideVoted, userVotes]);
+
+  // Сбрасываем пагинацию при изменении фильтров
+  useEffect(() => {
+    setDisplayCount(INITIAL_LOAD);
+  }, [searchQuery, selectedCategory, sortBy, hideVoted]);
+
+  // Отображаемые эффекты с учетом пагинации
+  const displayedEffects = useMemo(() => {
+    return filteredEffects.slice(0, displayCount);
+  }, [filteredEffects, displayCount]);
+
+  // Есть ли еще эффекты для загрузки
+  const hasMore = displayCount < filteredEffects.length;
+
+  // Загрузить еще
+  const loadMore = useCallback(() => {
+    setDisplayCount(prev => Math.min(prev + LOAD_MORE, filteredEffects.length));
+  }, [filteredEffects.length]);
 
   const sortOptions: SelectOption[] = [
     { value: 'popular', label: 'Популярные', icon: <Flame className="w-4 h-4" /> },
@@ -282,10 +307,11 @@ export default function CatalogClient({ initialEffects, categories }: CatalogCli
             </div>
         </div>
 
-        <m.div layout className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Сетка карточек с виртуальной пагинацией */}
+        <m.div layout className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 content-visibility-auto">
             <AnimatePresence mode='popLayout'>
-                    {filteredEffects.length > 0 ? (
-                    filteredEffects.map((effect, index) => {
+                    {displayedEffects.length > 0 ? (
+                    displayedEffects.map((effect, index) => {
                       const readData = readCommentsData[effect.id];
                       const commentCount = effect.commentsCount || 0;
                       const hasNew = mounted && (() => {
@@ -302,7 +328,7 @@ export default function CatalogClient({ initialEffects, categories }: CatalogCli
                             initial={{ opacity: 0, scale: 0.9 }}
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.9 }}
-                            transition={{ duration: 0.2, delay: index * 0.05 }}
+                            transition={{ duration: 0.2, delay: Math.min(index * 0.03, 0.3) }}
                         >
                             <EffectCard 
                                 {...effect} 
@@ -326,6 +352,26 @@ export default function CatalogClient({ initialEffects, categories }: CatalogCli
                 )}
             </AnimatePresence>
         </m.div>
+
+        {/* Кнопка "Загрузить еще" для производительности */}
+        {hasMore && (
+          <div className="mt-12 text-center">
+            <button
+              onClick={loadMore}
+              className={`inline-flex items-center gap-3 px-8 py-4 rounded-xl font-bold transition-all transform hover:scale-105 ${
+                isUpsideDown
+                  ? 'bg-red-600/20 border border-red-500/50 text-red-400 hover:bg-red-600/30'
+                  : 'bg-white/5 border border-white/10 text-light hover:bg-white/10'
+              }`}
+            >
+              <span>Загрузить еще ({filteredEffects.length - displayCount})</span>
+              <ChevronDown className="w-5 h-5" />
+            </button>
+            <p className="mt-2 text-xs text-light/40 font-mono">
+              Показано {displayCount} из {filteredEffects.length}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

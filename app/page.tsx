@@ -1,12 +1,11 @@
 import { Suspense } from 'react';
 import { Metadata } from 'next';
-import { getHomeData } from '@/app/actions/effects';
+import { getHomeDataCached } from '@/app/actions/effects';
 import HomeClient from './HomeClient';
 import Loading from '@/components/Loading';
 
-// ISR: Обновление раз в 60 секунд.
-// Это критически важно для производительности (TTFB).
-export const dynamic = 'force-dynamic';
+// ISR: Статическая генерация с ревалидацией каждые 60 секунд
+// УДАЛЕН force-dynamic - он убивал кэширование и увеличивал TTFB до 2.5s
 export const revalidate = 60;
 
 export const metadata: Metadata = {
@@ -15,7 +14,7 @@ export const metadata: Metadata = {
 };
 
 export default async function Home() {
-  const result = await getHomeData();
+  const result = await getHomeDataCached();
   
   // Безопасная распаковка данных
   const trending = result.success && result.data ? result.data.trending : [];

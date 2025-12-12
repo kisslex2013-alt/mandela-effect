@@ -164,9 +164,9 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
     setOpenAccordion(current => current === id ? null : id);
   }, []);
 
-  const contentLines = effect.content.split('\n');
-  const variantA = contentLines.find(l => l.startsWith('Вариант А:'))?.replace('Вариант А: ', '') || 'Вариант А';
-  const variantB = contentLines.find(l => l.startsWith('Вариант Б:'))?.replace('Вариант Б: ', '') || 'Вариант Б';
+  // Всегда используем стандартные тексты для вариантов ответа
+  const variantA = "Как я помню";
+  const variantB = "Как в реальности";
 
   const interp = effect.interpretations || {};
   const scientificText = interp.scientific || "";

@@ -562,18 +562,9 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
     }
   }, [effect.id, showUnvotedOnly]);
 
-  const parseVariants = () => {
-    let vA = "Как я помню";
-    let vB = "Как в реальности";
-    if (effect.content) {
-      const matchA = effect.content.match(/Вариант А:\s*(.*?)(?:\n|$)/);
-      const matchB = effect.content.match(/Вариант Б:\s*(.*?)(?:\n|$)/);
-      if (matchA && matchA[1]) vA = matchA[1].trim();
-      if (matchB && matchB[1]) vB = matchB[1].trim();
-    }
-    return { vA, vB };
-  };
-  const { vA, vB } = parseVariants();
+  // Всегда используем стандартные тексты для вариантов ответа
+  const vA = "Как я помню";
+  const vB = "Как в реальности";
 
   const handleVote = async (variant: 'A' | 'B') => {
     // Защита от повторных вызовов

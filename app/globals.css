@@ -398,7 +398,7 @@ html { scroll-behavior: smooth; }
 /* Применять к контейнерам карточек в длинных списках */
 .content-visibility-auto {
   content-visibility: auto;
-  contain-intrinsic-size: 1px 400px; /* Примерная высота карточки */
+  contain-intrinsic-size: 1px 400px;
 }
 
 /* Аппаратное ускорение для анимаций */
@@ -406,4 +406,51 @@ html { scroll-behavior: smooth; }
   transform: translateZ(0);
   backface-visibility: hidden;
   will-change: transform, opacity;
+}
+
+/* Оптимизация рендеринга для списков */
+.optimize-rendering {
+  contain: layout style paint;
+}
+
+/* Отложенная загрузка для элементов ниже fold */
+.lazy-load {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 300px;
+}
+
+/* Критический CSS для FCP - избегаем layout shifts */
+.hero-image {
+  aspect-ratio: 16 / 9;
+  background: linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%);
+}
+
+/* Оптимизация анимаций - только transform и opacity */
+.animate-optimized {
+  will-change: transform, opacity;
+  transform: translateZ(0);
+}
+
+/* Отключение тяжелых эффектов на слабых устройствах */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  
+  .glitch-text::before,
+  .glitch-text::after {
+    display: none;
+  }
+  
+  .glitch-layers {
+    display: none;
+  }
+  
+  .spores-container {
+    display: none;
+  }
 }

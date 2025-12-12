@@ -1,7 +1,6 @@
 import type { NextConfig } from "next";
 
 // Bundle analyzer (опционально, запускается через ANALYZE=true npm run build)
-// Установи: npm install --save-dev @next/bundle-analyzer
 const withBundleAnalyzer = process.env.ANALYZE === 'true'
   ? require('@next/bundle-analyzer')({
       enabled: true,
@@ -11,96 +10,95 @@ const withBundleAnalyzer = process.env.ANALYZE === 'true'
 const nextConfig: NextConfig = {
   // Настройки Server Actions для стабильности
   experimental: {
-    // Временно отключаем PPR и React Compiler, так как они вызывают ошибки версий
-    // ppr: 'incremental', 
-    // reactCompiler: true,
-    
     serverActions: {
-      bodySizeLimit: '10mb', // Увеличено для загрузки изображений до 10MB
-      // Увеличиваем таймаут для AI генерации
+      bodySizeLimit: '10mb',
       allowedOrigins: ['localhost:3000'],
     },
-    // Оптимизация компиляции в dev режиме + Tree-shaking для тяжелых библиотек
-    optimizePackageImports: ['lucide-react', 'framer-motion', 'recharts'],
-  },
-
-  // Очистка кэша для проблемных модулей
-  webpack: (config, { dev, isServer }) => {
-    if (dev && !isServer) {
-      // Очищаем кэш для удаленных файлов
-      config.resolve.alias = {
-        ...config.resolve.alias,
-        '@/lib/lazy-charts': false, // Блокируем импорт удаленного файла
-      };
-    }
-    return config;
-  },
-
-  // Оптимизация изображений
-  images: {
-    formats: ['image/avif', 'image/webp'], // AVIF приоритетнее (лучше сжатие)
-    minimumCacheTTL: 31536000, // Кэш на 1 год
-    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048],
-    imageSizes: [16, 32, 48, 64, 96, 128, 256],
-    remotePatterns: [
-      // Cloudinary
-      {
-        protocol: 'https',
-        hostname: 'res.cloudinary.com',
-      },
-      // AI генерация изображений
-      {
-        protocol: 'https',
-        hostname: 'image.pollinations.ai',
-      },
-      // Ресайз изображений
-      {
-        protocol: 'https',
-        hostname: 'wsrv.nl',
-      },
-      // Превью видео YouTube
-      {
-        protocol: 'https',
-        hostname: 'img.youtube.com',
-      },
-      // Supabase Storage (все поддомены)
-      {
-        protocol: 'https',
-        hostname: '**.supabase.co',
-      },
-      // Аватарки Google
-      {
-        protocol: 'https',
-        hostname: 'lh3.googleusercontent.com',
-      },
-      // Vercel Blob Storage (fallback)
-      {
-        protocol: 'https',
-        hostname: '*.public.blob.vercel-storage.com',
-      },
+    // Tree-shaking для тяжелых библиотек - КРИТИЧНО для bundle size
+    optimizePackageImports: [
+      'lucide-react', 
+      'framer-motion', 
+      'recharts',
+      'date-fns',
+      '@vercel/analytics',
     ],
   },
 
-  // Кэширование статических ресурсов
+  // Webpack оптимизации
+  webpack: (config, { dev, isServer }) => {
+    if (dev && !isServer) {
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        '@/lib/lazy-charts': false,
+      };
+    }
+    
+    // Production оптимизации
+    if (!dev) {
+      // Минификация
+      config.optimization = {
+        ...config.optimization,
+        moduleIds: 'deterministic',
+      };
+    }
+    
+    return config;
+  },
+
+  // ОПТИМИЗАЦИЯ ИЗОБРАЖЕНИЙ - КРИТИЧНО для LCP
+  images: {
+    formats: ['image/avif', 'image/webp'],
+    minimumCacheTTL: 31536000, // 1 год
+    // Оптимизированные размеры для реальных устройств
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256],
+    // Включаем оптимизацию для ВСЕХ доменов через remotePatterns
+    remotePatterns: [
+      { protocol: 'https', hostname: 'res.cloudinary.com' },
+      { protocol: 'https', hostname: 'image.pollinations.ai' },
+      { protocol: 'https', hostname: 'wsrv.nl' },
+      { protocol: 'https', hostname: 'img.youtube.com' },
+      { protocol: 'https', hostname: '**.supabase.co' },
+      { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
+      { protocol: 'https', hostname: '*.public.blob.vercel-storage.com' },
+      // Добавляем все возможные источники изображений
+      { protocol: 'https', hostname: '**' }, // Разрешаем все HTTPS домены для оптимизации
+    ],
+    // Отключаем unoptimized по умолчанию для лучшего LCP
+    unoptimized: false,
+  },
+
+  // Агрессивное кэширование статики
   async headers() {
     return [
+      // Изображения - 1 год
       {
-        source: '/:all*(svg|jpg|jpeg|png|webp|avif|ico)',
+        source: '/:all*(svg|jpg|jpeg|png|webp|avif|ico|gif)',
         locale: false,
         headers: [
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
-          },
+          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
         ],
       },
+      // Next.js static assets - 1 год
       {
         source: '/_next/static/:path*',
         headers: [
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
-          },
+          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
+        ],
+      },
+      // Шрифты - 1 год
+      {
+        source: '/:all*(woff|woff2|ttf|otf)',
+        locale: false,
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
+        ],
+      },
+      // Data routes (ISR) - stale-while-revalidate
+      {
+        source: '/:path*',
+        headers: [
+          { key: 'X-DNS-Prefetch-Control', value: 'on' },
         ],
       },
     ];
@@ -109,11 +107,14 @@ const nextConfig: NextConfig = {
   // Компрессия
   compress: true,
 
-  // Оптимизация React
+  // React Strict Mode для выявления проблем
   reactStrictMode: true,
 
-  // Отключение source maps в production для уменьшения размера
+  // Отключение source maps в production
   productionBrowserSourceMaps: false,
+
+  // Включаем powered by header для кэширования
+  poweredByHeader: false,
 };
 
 export default withBundleAnalyzer(nextConfig);

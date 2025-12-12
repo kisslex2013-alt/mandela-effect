@@ -6,41 +6,49 @@ import Footer from "@/components/Footer";
 import { Toaster } from "react-hot-toast";
 import { LazyMotion, domAnimation } from "framer-motion";
 import { RealityProvider } from "@/lib/context/RealityContext";
-import UpsideDownLayer from "@/components/ui/UpsideDownLayer";
-import RealityTransition from "@/components/ui/RealityTransition"; // НОВЫЙ КОМПОНЕНТ
-import DevTools from "@/components/debug/DevTools";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import ScrollToTop from "@/components/ScrollToTop";
-import SoundToggle from "@/components/ui/SoundToggle";
 
-// Настройки шрифтов с обработкой ошибок и fallback
+// Client-only компоненты (lazy loaded)
+import { 
+  UpsideDownLayer, 
+  RealityTransition, 
+  SoundToggle, 
+  DevTools 
+} from "@/components/ClientOnlyComponents";
+
+// ОПТИМИЗАЦИЯ ШРИФТОВ для FCP:
+// 1. display: "swap" - показывает fallback сразу, потом меняет на загруженный
+// 2. preload: true только для Inter (основной шрифт)
+// 3. Ограниченные subsets для уменьшения размера
 const inter = Inter({
   subsets: ["latin", "cyrillic"],
   variable: "--font-inter",
   display: "swap",
   preload: true,
-  fallback: ["system-ui", "arial"], // Fallback если не загрузится
+  fallback: ["system-ui", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"],
   adjustFontFallback: true,
 });
 
+// Моноширинный шрифт - НЕ preload, загружается по требованию
 const mono = JetBrains_Mono({
-  subsets: ["latin", "cyrillic"],
+  subsets: ["latin"], // Только latin для уменьшения размера
   variable: "--font-mono",
   display: "swap",
-  preload: false, // Не блокируем сборку
-  fallback: ["Courier New", "monospace"], // Fallback если не загрузится
+  preload: false,
+  fallback: ["ui-monospace", "SFMono-Regular", "Menlo", "Monaco", "Consolas", "monospace"],
   adjustFontFallback: true,
 });
 
-// Шрифт для Изнанки - опциональный, не блокирует сборку
+// Декоративный шрифт для Изнанки - НЕ preload, загружается только при активации
 const ruslan = Ruslan_Display({
   weight: "400",
-  subsets: ["cyrillic", "latin"],
+  subsets: ["cyrillic"],
   variable: "--font-ruslan",
-  display: "swap",
-  preload: false, // Не блокируем сборку
-  fallback: ["Impact", "Arial Black", "sans-serif"], // Fallback если не загрузится
+  display: "optional", // Не блокирует рендеринг вообще
+  preload: false,
+  fallback: ["Impact", "Arial Black", "sans-serif"],
   adjustFontFallback: true,
 });
 

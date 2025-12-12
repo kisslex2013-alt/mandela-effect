@@ -191,7 +191,8 @@ export default function HomeClient({
                                 fetchPriority="high"
                                 decoding="sync"
                                 sizes="(max-width: 768px) 100vw, 50vw"
-                                className="object-cover transition-transform duration-1000 group-hover:scale-105 relative z-[1]" 
+                                className="object-cover transition-transform duration-1000 group-hover:scale-105 relative z-[1]"
+                                disableBlurBackground={true} // Отключаем blur-фон для LCP изображения
                               />
                               <div className="absolute inset-0 bg-gradient-to-t from-dark via-transparent to-transparent lg:bg-gradient-to-r lg:from-transparent lg:to-dark opacity-80 z-[1]"></div>
                               

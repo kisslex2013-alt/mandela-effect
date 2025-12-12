@@ -15,6 +15,8 @@ interface ImageWithSkeletonProps {
   fetchPriority?: 'high' | 'low' | 'auto';
   decoding?: 'sync' | 'async' | 'auto';
   sizes?: string;
+  /** Отключить blur-фон для улучшения LCP на критичных изображениях */
+  disableBlurBackground?: boolean;
 }
 
 export default function ImageWithSkeleton({
@@ -29,15 +31,16 @@ export default function ImageWithSkeleton({
   fetchPriority,
   decoding,
   sizes,
+  disableBlurBackground = false,
 }: ImageWithSkeletonProps) {
-  const [isLoading, setIsLoading] = useState(true);
+  // Для priority изображений показываем сразу без loading state для улучшения LCP
+  const [isLoading, setIsLoading] = useState(!priority);
   const [hasError, setHasError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const prevSrcRef = useRef<string | null | undefined>(src);
   const imageKeyRef = useRef(0);
 
   // Проверяем, нужно ли проксировать через API для обхода CORS
-  // для URL из Google, которые блокируются CORS
   const isGoogleUrl = src?.includes('googleusercontent.com') || src?.includes('googleapis.com');
   
   // Для Google URL используем прокси через API
@@ -46,40 +49,22 @@ export default function ImageWithSkeleton({
     : src;
 
   // Определяем, нужно ли использовать обычный <img> вместо Next.js Image
-  // для проксированных URL (они содержат query параметры)
   const useNativeImg = proxiedSrc?.startsWith('/api/image-proxy');
-
-  // Логирование для отладки
-  useEffect(() => {
-    if (isGoogleUrl && src) {
-      console.log('[ImageWithSkeleton] Google URL обнаружен:', {
-        original: src,
-        willProxy: true,
-        proxiedSrc,
-      });
-    }
-  }, [src, isGoogleUrl, proxiedSrc]);
-
-  useEffect(() => {
-    if (proxiedSrc?.startsWith('/api/image-proxy')) {
-      console.log('[ImageWithSkeleton] Используется прокси:', proxiedSrc);
-    }
-  }, [proxiedSrc]);
 
   // Сбрасываем состояния только при РЕАЛЬНОМ изменении src
   useEffect(() => {
     if (src && src !== prevSrcRef.current) {
       prevSrcRef.current = src;
-      setIsLoading(true);
+      setIsLoading(!priority); // Для priority не показываем loading
       setHasError(false);
       setRetryCount(0);
-      imageKeyRef.current = Date.now(); // Уникальный ключ для принудительной пересборки
+      imageKeyRef.current = Date.now();
     } else if (!src) {
       prevSrcRef.current = null;
       setIsLoading(false);
       setHasError(false);
     }
-  }, [src]);
+  }, [src, priority]);
 
   // Всегда возвращаем обертку с relative для правильной работы fill
   const imageSrc = retryCount > 0 && proxiedSrc 
@@ -143,13 +128,13 @@ export default function ImageWithSkeleton({
         </>
       ) : (
         <>
-          {/* Скелетон загрузки */}
-          {isLoading && (
+          {/* Скелетон загрузки - скрыт для priority изображений */}
+          {isLoading && !priority && (
             <div className="absolute inset-0 animate-pulse bg-white/5 z-20" />
           )}
 
-          {/* 1. Размытый фон (для красоты) */}
-          {imageSrc && (
+          {/* 1. Размытый фон (ОТКЛЮЧЕН для priority изображений и если disableBlurBackground=true) */}
+          {imageSrc && !priority && !disableBlurBackground && (
             <Image
               key={`bg-${imageKeyRef.current}-${retryCount}`}
               src={imageSrc}
@@ -161,10 +146,10 @@ export default function ImageWithSkeleton({
               style={fill ? {} : { position: 'absolute', inset: 0 }}
               className="object-cover blur-3xl scale-110 opacity-50 pointer-events-none"
               aria-hidden="true"
+              loading="lazy"
               onError={() => {
                 // Игнорируем ошибки фона
               }}
-              unoptimized={typeof imageSrc === 'string' && imageSrc.startsWith('http')}
             />
           )}
 
@@ -206,7 +191,7 @@ export default function ImageWithSkeleton({
             // @ts-ignore - fetchPriority пока не во всех типах Next.js Image
             fetchPriority={fetchPriority}
             decoding={decoding}
-            unoptimized={typeof imageSrc === 'string' && imageSrc.startsWith('http')}
+            // Используем Next.js оптимизацию для всех изображений (улучшает LCP)
           />
         </>
       )}

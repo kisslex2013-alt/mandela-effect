@@ -120,19 +120,9 @@ export default function EffectCard(props: EffectCardProps) {
     return () => window.removeEventListener('votes-updated', handleUpdate);
   }, [effectData.id]);
 
-  const parseVariants = () => {
-    let vA = "Как я помню";
-    let vB = "Как в реальности";
-    if (effectData.content) {
-      const matchA = effectData.content.match(/Вариант А:\s*(.*?)(?:\n|$)/);
-      const matchB = effectData.content.match(/Вариант Б:\s*(.*?)(?:\n|$)/);
-      if (matchA && matchA[1]) vA = matchA[1].trim();
-      if (matchB && matchB[1]) vB = matchB[1].trim();
-    }
-    return { vA, vB };
-  };
-
-  const { vA, vB } = parseVariants();
+  // Всегда используем стандартные тексты для вариантов ответа
+  const vA = "Как я помню";
+  const vB = "Как в реальности";
 
   const handleVote = async (variant: 'A' | 'B') => {
     if (isVoting || userVote) return;
