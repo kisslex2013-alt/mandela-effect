@@ -288,7 +288,17 @@ const generateSystemMessage = (id: string = 'default') => {
 };
 
 // 4. Заглушка (С размытым текстом)
-const LockedContent = ({ isVisible, isUpsideDown = false, effectId }: { isVisible: boolean; isUpsideDown?: boolean; effectId?: string }) => {
+const LockedContent = ({ 
+  isVisible, 
+  isUpsideDown = false, 
+  effectId,
+  isHighlighted = false 
+}: { 
+  isVisible: boolean; 
+  isUpsideDown?: boolean; 
+  effectId?: string;
+  isHighlighted?: boolean;
+}) => {
   // Получаем контекст для определения стадии иконки
   let voteCount = 0;
   let requiredVotes = 25;
@@ -365,10 +375,22 @@ const LockedContent = ({ isVisible, isUpsideDown = false, effectId }: { isVisibl
 
                 {/* Нижняя часть: Панель управления (Кнопка) */}
                 {!isUpsideDown && (
-                    <div className="bg-white/5 p-2 flex justify-center items-center relative">
-                        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-red-900/10 pointer-events-none" />
-                        <div className="relative z-50 scale-90 transform transition-transform hover:scale-100 pointer-events-auto cursor-pointer">
-                            <RealitySwitch />
+                    <div className={`
+                      bg-white/5 p-2 flex justify-center items-center relative
+                      transition-all duration-500 rounded-b-lg
+                      ${isHighlighted 
+                        ? 'bg-red-950/40 border-t border-red-500/70 shadow-[0_0_25px_rgba(220,38,38,0.5)] ring-2 ring-red-500/40 ring-inset' 
+                        : ''
+                      }
+                    `}>
+                        <div className={`absolute inset-0 bg-gradient-to-b from-transparent pointer-events-none transition-all duration-500 rounded-b-lg ${
+                          isHighlighted ? 'to-red-900/40' : 'to-red-900/10'
+                        }`} />
+                        <div className={`
+                          relative z-50 scale-90 transform transition-all duration-500 pointer-events-auto cursor-pointer
+                          ${isHighlighted ? 'scale-100' : 'hover:scale-100'}
+                        `}>
+                            <RealitySwitch isHighlighted={isHighlighted} />
                         </div>
                     </div>
                 )}
@@ -410,6 +432,9 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
   
   // Состояния для независимых аккордеонов (Факты)
   const [isFactsOpen, setIsFactsOpen] = useState<boolean>(false);
+  
+  // Состояние для подсветки блока LockedContent при наведении на зачеркнутые слова
+  const [isRedactHovered, setIsRedactHovered] = useState<boolean>(false);
   
   const votingCardRef = useRef<HTMLDivElement>(null);
   const infoBlockRef = useRef<HTMLDivElement>(null);
@@ -756,7 +781,13 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
                     <h3 className="font-bold text-lg text-cyan-400">Текущее состояние | Факты</h3>
                   </div>
                   <div className="text-light/80 leading-relaxed whitespace-pre-line">
-                    <RedactedWords text={effect.currentState} minWords={1} maxWords={5} seed={effect.id} />
+                    <RedactedWords 
+                      text={effect.currentState} 
+                      minWords={1} 
+                      maxWords={5} 
+                      seed={effect.id}
+                      onRedactHover={setIsRedactHovered}
+                    />
                   </div>
                   {effect.interpretations?.sourceLink && (
                     <div className="mt-4 pt-3 border-t border-white/10">
@@ -776,7 +807,12 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
             if (!isUpsideDown) {
               return (
                 <div ref={lockedContentRef}>
-                  <LockedContent isVisible={true} isUpsideDown={false} effectId={effect.id} />
+                  <LockedContent 
+                    isVisible={true} 
+                    isUpsideDown={false} 
+                    effectId={effect.id}
+                    isHighlighted={isRedactHovered}
+                  />
                 </div>
               );
             }
@@ -785,7 +821,12 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
             if (isUpsideDown && !userVote) {
               return (
                 <div ref={lockedContentRef}>
-                  <LockedContent isVisible={true} isUpsideDown={true} effectId={effect.id} />
+                  <LockedContent 
+                    isVisible={true} 
+                    isUpsideDown={true} 
+                    effectId={effect.id}
+                    isHighlighted={isRedactHovered}
+                  />
                 </div>
               );
             }

@@ -4,7 +4,11 @@ import { useReality } from '@/lib/context/RealityContext';
 import { Lock, Biohazard, Sun } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export default function RealitySwitch() {
+interface RealitySwitchProps {
+  isHighlighted?: boolean;
+}
+
+export default function RealitySwitch({ isHighlighted = false }: RealitySwitchProps) {
   const { isUpsideDown, toggleReality, isUnlocked, voteCount, requiredVotes } = useReality();
 
   // Рассчитываем прогресс и стадию
@@ -24,13 +28,14 @@ export default function RealitySwitch() {
   const statusText = isUpsideDown ? "В РЕАЛЬНОСТЬ" : "В ИЗНАНКУ";
 
   return (
-    <div className="flex items-center gap-3 mr-1">
+    <div className={`flex items-center gap-3 mr-1 transition-all duration-500 ${isHighlighted ? 'drop-shadow-[0_0_15px_rgba(220,38,38,0.8)]' : ''}`}>
       {/* Текстовый индикатор (Скрыт на экранах меньше XL) */}
       <div className="hidden xl:flex flex-col items-end">
         <div className="inline-flex flex-col items-end">
           <div className={cn(
-            "text-[9px] font-mono uppercase tracking-wider transition-colors duration-300 leading-none font-bold whitespace-nowrap",
-            isUpsideDown ? "text-yellow-400" : "text-stranger-red"
+            "text-[9px] font-mono uppercase tracking-wider transition-all duration-500 leading-none font-bold whitespace-nowrap",
+            isUpsideDown ? "text-yellow-400" : "text-stranger-red",
+            isHighlighted && !isUpsideDown && "text-red-400 drop-shadow-[0_0_8px_rgba(220,38,38,1)]"
           )}>
             {statusText}
           </div>
@@ -49,7 +54,8 @@ export default function RealitySwitch() {
                     isActive && stage === 1 && "bg-cyan-500 shadow-[0_0_5px_rgba(6,182,212,0.5)]",
                     isActive && stage === 2 && "bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.8)]",
                     isActive && stage === 3 && !isUpsideDown && "bg-stranger-red shadow-[0_0_10px_rgba(197,30,58,1)]",
-                    isActive && isUpsideDown && "bg-yellow-400 shadow-[0_0_10px_rgba(250,204,21,0.8)]"
+                    isActive && isUpsideDown && "bg-yellow-400 shadow-[0_0_10px_rgba(250,204,21,0.8)]",
+                    isHighlighted && isActive && !isUpsideDown && "shadow-[0_0_15px_rgba(220,38,38,1)]"
                   )}
                   style={{ minWidth: '3px' }}
                 />
@@ -74,7 +80,10 @@ export default function RealitySwitch() {
           stage === 3 && !isUpsideDown && "bg-stranger-red/10 border-stranger-red text-stranger-red cursor-pointer animate-bounce-slight shadow-[0_0_15px_rgba(197,30,58,0.3)] hover:bg-stranger-red/20 hover:scale-105",
           
           // В ИЗНАНКЕ (Светлая кнопка "Домой")
-          isUpsideDown && "bg-yellow-500/10 border-yellow-400 text-yellow-400 cursor-pointer shadow-[0_0_15px_rgba(250,204,21,0.2)] hover:bg-yellow-500/20 hover:scale-105"
+          isUpsideDown && "bg-yellow-500/10 border-yellow-400 text-yellow-400 cursor-pointer shadow-[0_0_15px_rgba(250,204,21,0.2)] hover:bg-yellow-500/20 hover:scale-105",
+          
+          // Подсветка при наведении на зачеркнутые слова
+          isHighlighted && stage === 3 && !isUpsideDown && "shadow-[0_0_25px_rgba(220,38,38,0.8)] border-red-500 scale-105"
         )}
       >
         {/* Иконка */}
