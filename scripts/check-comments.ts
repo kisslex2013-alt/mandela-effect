@@ -41,11 +41,12 @@ async function checkComments() {
     console.log(`📊 Всего комментариев: ${allComments.length}\n`);
 
     // Группируем комментарии
-    const withImage = allComments.filter(c => c.imageUrl);
-    const withVideo = allComments.filter(c => c.videoUrl);
-    const withAudio = allComments.filter(c => c.audioUrl);
-    const withoutMedia = allComments.filter(c => !c.imageUrl && !c.videoUrl && !c.audioUrl);
-    const pendingComments = allComments.filter(c => c.status === 'PENDING');
+    type CommentWithEffect = typeof allComments[number];
+    const withImage = allComments.filter((c: CommentWithEffect) => c.imageUrl);
+    const withVideo = allComments.filter((c: CommentWithEffect) => c.videoUrl);
+    const withAudio = allComments.filter((c: CommentWithEffect) => c.audioUrl);
+    const withoutMedia = allComments.filter((c: CommentWithEffect) => !c.imageUrl && !c.videoUrl && !c.audioUrl);
+    const pendingComments = allComments.filter((c: CommentWithEffect) => c.status === 'PENDING');
 
     console.log(`📷 С изображениями: ${withImage.length}`);
     console.log(`🎥 С видео: ${withVideo.length}`);
@@ -91,7 +92,7 @@ async function checkComments() {
     }
 
     // Показываем примеры комментариев со ссылками
-    const commentsWithMedia = allComments.filter(c => c.imageUrl || c.videoUrl || c.audioUrl);
+    const commentsWithMedia = allComments.filter((c: CommentWithEffect) => c.imageUrl || c.videoUrl || c.audioUrl);
     if (commentsWithMedia.length > 0) {
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       console.log('🔗 КОММЕНТАРИИ СО ССЫЛКАМИ:\n');
