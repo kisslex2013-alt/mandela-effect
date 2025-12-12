@@ -772,8 +772,8 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
   const { variantA: vA, variantB: vB } = useMemo(() => {
     const content = effect.content || '';
     const lines = content.split('\n');
-    const variantALine = lines.find((l) => l.startsWith('Вариант А:'));
-    const variantBLine = lines.find((l) => l.startsWith('Вариант Б:'));
+    const variantALine = lines.find((l: string) => l.startsWith('Вариант А:'));
+    const variantBLine = lines.find((l: string) => l.startsWith('Вариант Б:'));
     return {
       variantA: variantALine?.replace('Вариант А: ', '').trim() || 'Как я помню',
       variantB: variantBLine?.replace('Вариант Б: ', '').trim() || 'Как в реальности',
