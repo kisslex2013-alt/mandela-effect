@@ -102,6 +102,7 @@ export default async function EffectLayout({
     author: {
       '@type': 'Organization',
       name: 'Mandela Effect Team',
+      url: baseUrl,
     },
     publisher: {
       '@type': 'Organization',
@@ -119,9 +120,9 @@ export default async function EffectLayout({
     ...(effect.votesFor + effect.votesAgainst > 0 && {
       aggregateRating: {
         '@type': 'AggregateRating',
-        ratingValue: effect.votesFor > effect.votesAgainst ? '4' : '3',
-        bestRating: '5',
-        worstRating: '1',
+        ratingValue: effect.votesFor > effect.votesAgainst ? 4 : 3,
+        bestRating: 5,
+        worstRating: 1,
         ratingCount: effect.votesFor + effect.votesAgainst,
       },
     }),
