@@ -1,8 +1,11 @@
 'use client';
 
 import { m } from 'framer-motion';
+import { useReality } from '@/lib/context/RealityContext';
 
 export default function GlitchTitle({ text }: { text: string }) {
+  const { isUpsideDown } = useReality();
+  
   // Разделяем текст по первому пробелу: первое слово белое, остальное - градиент
   const parts = text.split(' ');
   const firstWord = parts[0];
@@ -18,7 +21,11 @@ export default function GlitchTitle({ text }: { text: string }) {
     >
       {firstWord}
       {restWords && (
-        <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-600">
+        <span className={`text-transparent bg-clip-text bg-gradient-to-r ${
+          isUpsideDown 
+            ? 'from-red-500 to-purple-600' 
+            : 'from-cyan-400 to-purple-600'
+        }`}>
           {' '}{restWords}
         </span>
       )}

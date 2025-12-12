@@ -2,14 +2,15 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import toast from 'react-hot-toast';
 import confetti from 'canvas-confetti';
 import { submitEffect, getSubmitCategories } from '@/app/actions/submission';
 import { generateEffectData } from '@/app/actions/generate-content';
 import CustomSelect, { type SelectOption } from '@/components/ui/CustomSelect';
 import GlitchTitle from '@/components/ui/GlitchTitle';
-import { Send, Link as LinkIcon, Mail, MessageSquare, FileText, Sparkles, Brain, Link2, Users, Lightbulb, ChevronRight, List, CheckCircle, Film, Music, Tag, User, Globe, Gamepad2, Baby, Ghost, HelpCircle } from 'lucide-react';
+import { useReality } from '@/lib/context/RealityContext';
+import { Send, Link as LinkIcon, Mail, MessageSquare, FileText, Sparkles, Brain, Link2, Users, Lightbulb, ChevronRight, List, CheckCircle, Film, Music, Tag, User, Globe, Gamepad2, Baby, Ghost, HelpCircle, Radio, Biohazard, AlertTriangle } from 'lucide-react';
 
 interface Category {
   category: string;
@@ -42,6 +43,7 @@ interface FormErrors {
 }
 
 export default function SubmitPage() {
+  const { isUpsideDown } = useReality();
   const [categories, setCategories] = useState<Category[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -439,7 +441,7 @@ export default function SubmitPage() {
           particleCount: 100,
           spread: 70,
           origin: { y: 0.6 },
-          colors: ['#3b82f6', '#f59e0b'],
+          colors: isUpsideDown ? ['#dc2626', '#ef4444'] : ['#3b82f6', '#f59e0b'],
         });
         toast.success(result.message || 'Эффект отправлен на модерацию! ✓');
         resetForm();
@@ -485,10 +487,14 @@ export default function SubmitPage() {
       {/* Фоновая сетка */}
       <div className="fixed inset-0 pointer-events-none z-0">
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]" />
-        <div className="absolute top-0 left-0 w-full h-96 bg-gradient-to-b from-blue-900/10 to-transparent blur-3xl opacity-30" />
+        <div className={`absolute top-0 left-0 w-full h-96 bg-gradient-to-b blur-3xl opacity-30 transition-colors duration-1000 ${
+          isUpsideDown 
+            ? 'from-red-900/20 to-transparent' 
+            : 'from-blue-900/10 to-transparent'
+        }`} />
       </div>
 
-      <motion.div 
+      <m.div 
         className="max-w-2xl mx-auto relative z-10"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -496,25 +502,43 @@ export default function SubmitPage() {
       >
         {/* Заголовок */}
         <div className="text-center mb-12">
-          <GlitchTitle text="ДОБАВИТЬ ЭФФЕКТ" />
-          <p className="text-lg text-light/60 mt-4">Помоги расширить коллекцию эффектов Манделы</p>
+          <GlitchTitle text={isUpsideDown ? "ПЕРЕДАТЬ ДАННЫЕ" : "ДОБАВИТЬ ЭФФЕКТ"} />
+          <p className={`text-lg mt-4 ${isUpsideDown ? 'font-mono text-red-400' : 'text-light/60'}`}>
+            {isUpsideDown 
+              ? "Отправь аномалию в Архив Сопротивления" 
+              : "Помоги расширить коллекцию эффектов Манделы"}
+          </p>
         </div>
 
         {/* Сообщение об успехе */}
         {isSubmitted && (
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-green-500/20 border border-green-500/50 rounded-xl p-6 mb-8 text-center"
+            className={`rounded-xl p-6 mb-8 text-center border ${
+              isUpsideDown 
+                ? 'bg-red-500/20 border-red-500/50 glitch-mirror' 
+                : 'bg-green-500/20 border-green-500/50'
+            }`}
           >
             <div className="flex justify-center mb-2">
-              <CheckCircle className="w-12 h-12 text-green-400" />
+              {isUpsideDown ? (
+                <Radio className="w-12 h-12 text-red-400" />
+              ) : (
+                <CheckCircle className="w-12 h-12 text-green-400" />
+              )}
             </div>
-            <h3 className="text-xl font-semibold text-light mb-2">
-              Спасибо! Эффект отправлен на модерацию
+            <h3 className={`text-xl font-semibold mb-2 ${isUpsideDown ? 'font-mono text-red-400' : 'text-light'}`}>
+              {isUpsideDown 
+                ? "ДАННЫЕ ПЕРЕХВАЧЕНЫ. Ожидай ответа из Архива."
+                : "Спасибо! Эффект отправлен на модерацию"}
             </h3>
-            <p className="text-light/80">Мы проверим его и добавим в каталог</p>
-          </motion.div>
+            <p className={isUpsideDown ? 'font-mono text-red-300/80' : 'text-light/80'}>
+              {isUpsideDown 
+                ? "[Статус: В обработке]"
+                : "Мы проверим его и добавим в каталог"}
+            </p>
+          </m.div>
         )}
 
         {/* Форма */}
@@ -522,21 +546,21 @@ export default function SubmitPage() {
           <form onSubmit={handleSubmit} noValidate className="space-y-6">
             {/* Категория */}
             <CustomSelect
-              label="Категория *"
+              label={isUpsideDown ? "СЕКТОР *" : "Категория *"}
               value={formData.category}
               onChange={(value) => {
                 handleChange('category', value);
                 handleBlur('category');
               }}
               options={categoryOptions}
-              placeholder="Выберите категорию"
+              placeholder={isUpsideDown ? "[ВЫБЕРИ СЕКТОР]" : "Выберите категорию"}
               error={errors.category}
             />
 
             {/* Название */}
             <div>
-              <label htmlFor="title" className="block text-sm font-semibold mb-2 text-light">
-                Название эффекта <span className="text-red-400">*</span>
+              <label htmlFor="title" className={`block text-sm font-semibold mb-2 ${isUpsideDown ? 'font-mono text-red-400' : 'text-light'}`}>
+                {isUpsideDown ? "ИДЕНТИФИКАТОР АНОМАЛИИ" : "Название эффекта"} <span className="text-red-400">*</span>
               </label>
               <input
                 type="text"
@@ -544,9 +568,13 @@ export default function SubmitPage() {
                 value={formData.title}
                 onChange={(e) => handleChange('title', e.target.value)}
                 onBlur={() => handleBlur('title')}
-                placeholder="Например: Логотип Volkswagen"
-                className={`w-full p-3 rounded-lg bg-darkCard border text-light placeholder:text-light/40 focus:outline-none transition-colors ${
-                  errors.title ? 'border-red-500 focus:border-red-500' : 'border-light/20 focus:border-primary'
+                placeholder={isUpsideDown ? "// ВВЕДИТЕ КОД АНОМАЛИИ" : "Например: Логотип Volkswagen"}
+                className={`w-full p-3 rounded-lg bg-darkCard border text-light placeholder:text-light/40 focus:outline-none transition-colors ${isUpsideDown ? 'font-mono' : ''} ${
+                  errors.title 
+                    ? 'border-red-500 focus:border-red-500' 
+                    : isUpsideDown
+                      ? 'border-light/20 focus:border-red-500'
+                      : 'border-light/20 focus:border-primary'
                 }`}
               />
               {errors.title && (
@@ -556,8 +584,8 @@ export default function SubmitPage() {
 
             {/* Вопрос */}
             <div>
-              <label htmlFor="question" className="block text-sm font-semibold mb-2 text-light">
-                Вопрос для голосования <span className="text-red-400">*</span>
+              <label htmlFor="question" className={`block text-sm font-semibold mb-2 ${isUpsideDown ? 'font-mono text-red-400' : 'text-light'}`}>
+                {isUpsideDown ? "ЗАПРОС ДЛЯ ВЕРИФИКАЦИИ" : "Вопрос для голосования"} <span className="text-red-400">*</span>
               </label>
               <textarea
                 id="question"
@@ -565,9 +593,13 @@ export default function SubmitPage() {
                 onChange={(e) => handleChange('question', e.target.value)}
                 onBlur={() => handleBlur('question')}
                 rows={3}
-                placeholder="Как вы помните логотип Volkswagen?"
-                className={`w-full p-3 rounded-lg bg-darkCard border text-light placeholder:text-light/40 focus:outline-none transition-colors resize-none ${
-                  errors.question ? 'border-red-500 focus:border-red-500' : 'border-light/20 focus:border-primary'
+                placeholder={isUpsideDown ? "// ОПИШИТЕ РАСХОЖДЕНИЕ В ПАМЯТИ?" : "Как вы помните логотип Volkswagen?"}
+                className={`w-full p-3 rounded-lg bg-darkCard border text-light placeholder:text-light/40 focus:outline-none transition-colors resize-none ${isUpsideDown ? 'font-mono' : ''} ${
+                  errors.question 
+                    ? 'border-red-500 focus:border-red-500' 
+                    : isUpsideDown
+                      ? 'border-light/20 focus:border-red-500'
+                      : 'border-light/20 focus:border-primary'
                 }`}
               />
               {errors.question && (
@@ -578,8 +610,8 @@ export default function SubmitPage() {
             {/* Варианты */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label htmlFor="variantA" className="block text-sm font-semibold mb-2 text-light">
-                  Вариант А <span className="text-red-400">*</span>
+                <label htmlFor="variantA" className={`block text-sm font-semibold mb-2 ${isUpsideDown ? 'font-mono text-red-400' : 'text-light'}`}>
+                  {isUpsideDown ? "ВАРИАНТ ИСТОРИИ А" : "Вариант А"} <span className="text-red-400">*</span>
                 </label>
                 <input
                   type="text"
@@ -587,9 +619,13 @@ export default function SubmitPage() {
                   value={formData.variantA}
                   onChange={(e) => handleChange('variantA', e.target.value)}
                   onBlur={() => handleBlur('variantA')}
-                  placeholder="С разрывом между буквами"
-                  className={`w-full p-3 rounded-lg bg-darkCard border text-light placeholder:text-light/40 focus:outline-none transition-colors ${
-                    errors.variantA ? 'border-red-500 focus:border-red-500' : 'border-light/20 focus:border-primary'
+                  placeholder={isUpsideDown ? "> Вариант А (как помнишь)" : "С разрывом между буквами"}
+                  className={`w-full p-3 rounded-lg bg-darkCard border text-light placeholder:text-light/40 focus:outline-none transition-colors ${isUpsideDown ? 'font-mono' : ''} ${
+                    errors.variantA 
+                      ? 'border-red-500 focus:border-red-500' 
+                      : isUpsideDown
+                        ? 'border-light/20 focus:border-red-500'
+                        : 'border-light/20 focus:border-primary'
                   }`}
                 />
                 {errors.variantA && (
@@ -597,8 +633,8 @@ export default function SubmitPage() {
                 )}
               </div>
               <div>
-                <label htmlFor="variantB" className="block text-sm font-semibold mb-2 text-light">
-                  Вариант Б <span className="text-red-400">*</span>
+                <label htmlFor="variantB" className={`block text-sm font-semibold mb-2 ${isUpsideDown ? 'font-mono text-red-400' : 'text-light'}`}>
+                  {isUpsideDown ? "ВАРИАНТ ИСТОРИИ Б" : "Вариант Б"} <span className="text-red-400">*</span>
                 </label>
                 <input
                   type="text"
@@ -606,9 +642,13 @@ export default function SubmitPage() {
                   value={formData.variantB}
                   onChange={(e) => handleChange('variantB', e.target.value)}
                   onBlur={() => handleBlur('variantB')}
-                  placeholder="Без разрыва"
-                  className={`w-full p-3 rounded-lg bg-darkCard border text-light placeholder:text-light/40 focus:outline-none transition-colors ${
-                    errors.variantB ? 'border-red-500 focus:border-red-500' : 'border-light/20 focus:border-primary'
+                  placeholder={isUpsideDown ? "> Вариант Б (как в матрице)" : "Без разрыва"}
+                  className={`w-full p-3 rounded-lg bg-darkCard border text-light placeholder:text-light/40 focus:outline-none transition-colors ${isUpsideDown ? 'font-mono' : ''} ${
+                    errors.variantB 
+                      ? 'border-red-500 focus:border-red-500' 
+                      : isUpsideDown
+                        ? 'border-light/20 focus:border-red-500'
+                        : 'border-light/20 focus:border-primary'
                   }`}
                 />
                 {errors.variantB && (
@@ -618,17 +658,39 @@ export default function SubmitPage() {
             </div>
 
             {/* Кнопка AI заполнения */}
-            <div className="p-4 bg-gradient-to-r from-purple-500/10 to-blue-500/10 border border-purple-500/30 rounded-xl">
+            <div className={`p-4 rounded-xl border ${
+              isUpsideDown 
+                ? 'bg-gradient-to-r from-red-500/10 to-purple-900/10 border-red-500/30' 
+                : 'bg-gradient-to-r from-purple-500/10 to-blue-500/10 border-purple-500/30'
+            }`}>
               <div className="flex flex-col md:flex-row items-center gap-4">
-                <div className="text-light/80 text-sm text-center md:text-left flex-1 flex items-center gap-2">
-                  <Lightbulb className="w-4 h-4 text-yellow-400 flex-shrink-0" />
-                  <span><span className="font-medium">Подсказка:</span> Заполните название, вопрос и варианты, затем нажмите кнопку — AI заполнит остальные поля (историю, факты, ссылки)</span>
+                <div className={`text-sm text-center md:text-left flex-1 flex items-center gap-2 ${isUpsideDown ? 'font-mono text-red-300/80' : 'text-light/80'}`}>
+                  {isUpsideDown ? (
+                    <Radio className="w-4 h-4 text-red-400 flex-shrink-0" />
+                  ) : (
+                    <Lightbulb className="w-4 h-4 text-yellow-400 flex-shrink-0" />
+                  )}
+                  <span>
+                    {isUpsideDown ? (
+                      <>
+                        <span className="font-medium">ВНИМАНИЕ:</span> AI может сгенерировать ложные данные. Проверяй источники.
+                      </>
+                    ) : (
+                      <>
+                        <span className="font-medium">Подсказка:</span> Заполните название, вопрос и варианты, затем нажмите кнопку — AI заполнит остальные поля (историю, факты, ссылки)
+                      </>
+                    )}
+                  </span>
                 </div>
                 <button
                   type="button"
                   onClick={handleAiFill}
                   disabled={aiLoading || !formData.title.trim() || !formData.question.trim() || !formData.variantA.trim() || !formData.variantB.trim()}
-                  className="w-full md:w-auto px-6 py-2 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white rounded-lg transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 whitespace-nowrap"
+                  className={`w-full md:w-auto px-6 py-2 text-white rounded-lg transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 whitespace-nowrap ${
+                    isUpsideDown
+                      ? 'bg-gradient-to-r from-red-600 to-purple-900 hover:from-red-700 hover:to-purple-800 font-mono'
+                      : 'bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600'
+                  }`}
                 >
                   {aiLoading ? (
                     <>
@@ -636,12 +698,12 @@ export default function SubmitPage() {
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                       </svg>
-                      Генерация...
+                      {isUpsideDown ? "ОБРАБОТКА..." : "Генерация..."}
                     </>
                   ) : (
                     <>
-                      <Sparkles className="w-4 h-4" />
-                      Заполнить через AI
+                      {isUpsideDown ? <Radio className="w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
+                      {isUpsideDown ? "ЗАПОЛНИТЬ ЧЕРЕЗ AI" : "Заполнить через AI"}
                     </>
                   )}
                 </button>
@@ -650,25 +712,31 @@ export default function SubmitPage() {
 
             {/* Текущее состояние */}
             <div>
-              <label htmlFor="currentState" className="block text-sm font-semibold mb-2 text-light">
-                Текущее состояние (как на самом деле)
+              <label htmlFor="currentState" className={`block text-sm font-semibold mb-2 ${isUpsideDown ? 'font-mono text-red-400' : 'text-light'}`}>
+                {isUpsideDown ? "ТЕКУЩЕЕ СОСТОЯНИЕ (КАК В МАТРИЦЕ)" : "Текущее состояние (как на самом деле)"}
               </label>
               <textarea
                 id="currentState"
                 value={formData.currentState}
                 onChange={(e) => handleChange('currentState', e.target.value)}
                 rows={3}
-                placeholder="Опишите, как это выглядит в реальности..."
-                className="w-full p-3 rounded-lg bg-darkCard border border-light/20 text-light placeholder:text-light/40 focus:outline-none focus:border-primary transition-colors resize-none"
+                placeholder={isUpsideDown ? "// ОПИШИ ОФИЦИАЛЬНУЮ ВЕРСИЮ..." : "Опишите, как это выглядит в реальности..."}
+                className={`w-full p-3 rounded-lg bg-darkCard border text-light placeholder:text-light/40 focus:outline-none transition-colors resize-none ${isUpsideDown ? 'font-mono' : ''} ${
+                  isUpsideDown
+                    ? 'border-light/20 focus:border-red-500'
+                    : 'border-light/20 focus:border-primary'
+                }`}
               />
-              <p className="text-light/50 text-sm mt-1">Необязательное поле</p>
+              <p className={`text-sm mt-1 ${isUpsideDown ? 'font-mono text-red-400/60' : 'text-light/50'}`}>
+                {isUpsideDown ? "[ОПЦИОНАЛЬНО]" : "Необязательное поле"}
+              </p>
             </div>
 
             {/* Ссылка на источник */}
             <div>
-              <label htmlFor="sourceLink" className="block text-sm font-semibold mb-2 text-light flex items-center gap-2">
-                <LinkIcon className="w-4 h-4" />
-                Ссылка на источник
+              <label htmlFor="sourceLink" className={`block text-sm font-semibold mb-2 flex items-center gap-2 ${isUpsideDown ? 'font-mono text-red-400' : 'text-light'}`}>
+                <LinkIcon className={`w-4 h-4 ${isUpsideDown ? 'text-red-400' : ''}`} />
+                {isUpsideDown ? "ССЫЛКА НА ИСТОЧНИК" : "Ссылка на источник"}
               </label>
               <input
                 type="url"
@@ -676,53 +744,67 @@ export default function SubmitPage() {
                 value={formData.sourceLink}
                 onChange={(e) => handleChange('sourceLink', e.target.value)}
                 onBlur={() => handleBlur('sourceLink')}
-                placeholder="https://... или google.com"
-                className={`w-full p-3 rounded-lg bg-darkCard border text-light placeholder:text-light/40 focus:outline-none transition-colors ${
-                  errors.sourceLink ? 'border-red-500 focus:border-red-500' : 'border-light/20 focus:border-primary'
+                placeholder={isUpsideDown ? "// https://... или google.com" : "https://... или google.com"}
+                className={`w-full p-3 rounded-lg bg-darkCard border text-light placeholder:text-light/40 focus:outline-none transition-colors ${isUpsideDown ? 'font-mono' : ''} ${
+                  errors.sourceLink 
+                    ? 'border-red-500 focus:border-red-500' 
+                    : isUpsideDown
+                      ? 'border-light/20 focus:border-red-500'
+                      : 'border-light/20 focus:border-primary'
                 }`}
               />
               {errors.sourceLink && (
                 <p className="text-red-500 text-xs mt-1">{errors.sourceLink}</p>
               )}
               {!errors.sourceLink && (
-                <p className="text-light/50 text-sm mt-1">Необязательное поле (протокол добавится автоматически)</p>
+                <p className={`text-sm mt-1 ${isUpsideDown ? 'font-mono text-red-400/60' : 'text-light/50'}`}>
+                  {isUpsideDown ? "[ОПЦИОНАЛЬНО] (протокол добавится автоматически)" : "Необязательное поле (протокол добавится автоматически)"}
+                </p>
               )}
             </div>
 
             {/* Интерпретации (аккордеон) */}
-            <div className="border border-light/10 rounded-xl overflow-hidden">
+            <div className={`border rounded-xl overflow-hidden ${isUpsideDown ? 'border-red-500/30' : 'border-light/10'}`}>
               <button
                 type="button"
                 onClick={() => setShowInterpretations(!showInterpretations)}
-                className="w-full flex items-center justify-between p-4 bg-darkCard hover:bg-darkCard/80 transition-colors"
+                className={`w-full flex items-center justify-between p-4 bg-darkCard hover:bg-darkCard/80 transition-colors ${
+                  isUpsideDown ? 'hover:border-red-500/50' : ''
+                }`}
               >
                 <div className="flex items-center gap-2">
-                  <Brain className="w-5 h-5 text-primary" />
-                  <span className="font-medium text-light">Добавить интерпретации (необязательно)</span>
+                  {isUpsideDown ? (
+                    <Biohazard className="w-5 h-5 text-red-500" />
+                  ) : (
+                    <Brain className="w-5 h-5 text-primary" />
+                  )}
+                  <span className={`font-medium ${isUpsideDown ? 'font-mono text-red-400' : 'text-light'}`}>
+                    {isUpsideDown ? "РАСКРЫТЬ ТЕОРИИ ЗАГОВОРА (ОПЦИОНАЛЬНО)" : "Добавить интерпретации (необязательно)"}
+                  </span>
                 </div>
-                <motion.svg
+                <m.svg
                   animate={{ rotate: showInterpretations ? 180 : 0 }}
-                  className="w-5 h-5 text-light/60"
+                  className={`w-5 h-5 ${isUpsideDown ? 'text-red-400/60' : 'text-light/60'}`}
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
                 >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </motion.svg>
+                </m.svg>
               </button>
 
               {showInterpretations && (
-                <motion.div
+                <m.div
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
-                  className="p-4 border-t border-light/10 space-y-4"
+                  className={`p-4 border-t space-y-4 ${isUpsideDown ? 'border-red-500/30' : 'border-light/10'}`}
                 >
                   {/* Научное объяснение */}
                   <div>
-                    <label className="block text-sm font-semibold mb-2 text-light flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-blue-400" />
-                      Научное объяснение
+                    <label className={`block text-sm font-semibold mb-2 flex items-center gap-2 ${isUpsideDown ? 'font-mono text-red-400' : 'text-light'}`}>
+                      <FileText className={`w-4 h-4 ${isUpsideDown ? 'text-red-500' : 'text-blue-400'}`} />
+                      {isUpsideDown ? "ОФИЦИАЛЬНАЯ ВЕРСИЯ" : "Научное объяснение"}
                     </label>
                     <textarea
                       value={interpretations.scientific}
@@ -730,16 +812,20 @@ export default function SubmitPage() {
                         setInterpretations((prev) => ({ ...prev, scientific: e.target.value }))
                       }
                       rows={3}
-                      placeholder="Психологическое или научное объяснение..."
-                      className="w-full p-3 rounded-lg bg-dark border border-light/20 text-light placeholder:text-light/40 focus:outline-none focus:border-blue-500 transition-colors resize-none"
+                      placeholder={isUpsideDown ? "// ОФИЦИАЛЬНОЕ ОБЪЯСНЕНИЕ..." : "Психологическое или научное объяснение..."}
+                      className={`w-full p-3 rounded-lg bg-dark border text-light placeholder:text-light/40 focus:outline-none transition-colors resize-none ${isUpsideDown ? 'font-mono' : ''} ${
+                        isUpsideDown
+                          ? 'border-light/20 focus:border-red-500'
+                          : 'border-light/20 focus:border-blue-500'
+                      }`}
                     />
                   </div>
 
                   {/* Ссылка на научный источник */}
                   <div>
-                    <label className="block text-sm font-semibold mb-2 text-light flex items-center gap-2">
-                      <Link2 className="w-4 h-4 text-blue-400" />
-                      Ссылка на научный источник
+                    <label className={`block text-sm font-semibold mb-2 flex items-center gap-2 ${isUpsideDown ? 'font-mono text-red-400' : 'text-light'}`}>
+                      <Link2 className={`w-4 h-4 ${isUpsideDown ? 'text-red-500' : 'text-blue-400'}`} />
+                      {isUpsideDown ? "ССЫЛКА НА ОФИЦИАЛЬНЫЙ ИСТОЧНИК" : "Ссылка на научный источник"}
                     </label>
                     <input
                       type="url"
@@ -747,9 +833,13 @@ export default function SubmitPage() {
                       onChange={(e) =>
                         setInterpretations((prev) => ({ ...prev, scientificSource: e.target.value }))
                       }
-                      placeholder="https://... или scholar.google.com"
-                      className={`w-full p-3 rounded-lg bg-dark border text-light placeholder:text-light/40 focus:outline-none transition-colors ${
-                        errors.scientificSource ? 'border-red-500 focus:border-red-500' : 'border-light/20 focus:border-blue-500'
+                      placeholder={isUpsideDown ? "// https://... или scholar.google.com" : "https://... или scholar.google.com"}
+                      className={`w-full p-3 rounded-lg bg-dark border text-light placeholder:text-light/40 focus:outline-none transition-colors ${isUpsideDown ? 'font-mono' : ''} ${
+                        errors.scientificSource 
+                          ? 'border-red-500 focus:border-red-500' 
+                          : isUpsideDown
+                            ? 'border-light/20 focus:border-red-500'
+                            : 'border-light/20 focus:border-blue-500'
                       }`}
                     />
                     {errors.scientificSource && (
@@ -759,9 +849,9 @@ export default function SubmitPage() {
 
                   {/* Версия сообщества */}
                   <div>
-                    <label className="block text-sm font-semibold mb-2 text-light flex items-center gap-2">
-                      <Users className="w-4 h-4 text-orange-400" />
-                      Версия сообщества
+                    <label className={`block text-sm font-semibold mb-2 flex items-center gap-2 ${isUpsideDown ? 'font-mono text-red-400' : 'text-light'}`}>
+                      <Users className={`w-4 h-4 ${isUpsideDown ? 'text-red-500' : 'text-orange-400'}`} />
+                      {isUpsideDown ? "ВЕРСИЯ СОПРОТИВЛЕНИЯ" : "Версия сообщества"}
                     </label>
                     <textarea
                       value={interpretations.community}
@@ -769,16 +859,20 @@ export default function SubmitPage() {
                         setInterpretations((prev) => ({ ...prev, community: e.target.value }))
                       }
                       rows={3}
-                      placeholder="Что думает сообщество об этом эффекте..."
-                      className="w-full p-3 rounded-lg bg-dark border border-light/20 text-light placeholder:text-light/40 focus:outline-none focus:border-orange-500 transition-colors resize-none"
+                      placeholder={isUpsideDown ? "// ЧТО ДУМАЕТ СОПРОТИВЛЕНИЕ..." : "Что думает сообщество об этом эффекте..."}
+                      className={`w-full p-3 rounded-lg bg-dark border text-light placeholder:text-light/40 focus:outline-none transition-colors resize-none ${isUpsideDown ? 'font-mono' : ''} ${
+                        isUpsideDown
+                          ? 'border-light/20 focus:border-red-500'
+                          : 'border-light/20 focus:border-orange-500'
+                      }`}
                     />
                   </div>
 
                   {/* Ссылка на источник сообщества */}
                   <div>
-                    <label className="block text-sm font-semibold mb-2 text-light flex items-center gap-2">
-                      <Link2 className="w-4 h-4 text-orange-400" />
-                      Ссылка на источник сообщества
+                    <label className={`block text-sm font-semibold mb-2 flex items-center gap-2 ${isUpsideDown ? 'font-mono text-red-400' : 'text-light'}`}>
+                      <Link2 className={`w-4 h-4 ${isUpsideDown ? 'text-red-500' : 'text-orange-400'}`} />
+                      {isUpsideDown ? "ССЫЛКА НА ИСТОЧНИК СОПРОТИВЛЕНИЯ" : "Ссылка на источник сообщества"}
                     </label>
                     <input
                       type="url"
@@ -786,24 +880,28 @@ export default function SubmitPage() {
                       onChange={(e) =>
                         setInterpretations((prev) => ({ ...prev, communitySource: e.target.value }))
                       }
-                      placeholder="https://... или reddit.com/r/MandelaEffect"
-                      className={`w-full p-3 rounded-lg bg-dark border text-light placeholder:text-light/40 focus:outline-none transition-colors ${
-                        errors.communitySource ? 'border-red-500 focus:border-red-500' : 'border-light/20 focus:border-orange-500'
+                      placeholder={isUpsideDown ? "// https://... или reddit.com/r/MandelaEffect" : "https://... или reddit.com/r/MandelaEffect"}
+                      className={`w-full p-3 rounded-lg bg-dark border text-light placeholder:text-light/40 focus:outline-none transition-colors ${isUpsideDown ? 'font-mono' : ''} ${
+                        errors.communitySource 
+                          ? 'border-red-500 focus:border-red-500' 
+                          : isUpsideDown
+                            ? 'border-light/20 focus:border-red-500'
+                            : 'border-light/20 focus:border-orange-500'
                       }`}
                     />
                     {errors.communitySource && (
                       <p className="text-red-500 text-xs mt-1">{errors.communitySource}</p>
                     )}
                   </div>
-                </motion.div>
+                </m.div>
               )}
             </div>
 
             {/* Email */}
             <div>
-              <label htmlFor="email" className="block text-sm font-semibold mb-2 text-light flex items-center gap-2">
-                <Mail className="w-4 h-4" />
-                Ваш email
+              <label htmlFor="email" className={`block text-sm font-semibold mb-2 flex items-center gap-2 ${isUpsideDown ? 'font-mono text-red-400' : 'text-light'}`}>
+                <Mail className={`w-4 h-4 ${isUpsideDown ? 'text-red-400' : ''}`} />
+                {isUpsideDown ? "ВАШ EMAIL" : "Ваш email"}
               </label>
               <input
                 type="email"
@@ -811,16 +909,22 @@ export default function SubmitPage() {
                 value={formData.email}
                 onChange={(e) => handleChange('email', e.target.value)}
                 onBlur={() => handleBlur('email')}
-                placeholder="для связи (необязательно)"
-                className={`w-full p-3 rounded-lg bg-darkCard border text-light placeholder:text-light/40 focus:outline-none transition-colors ${
-                  errors.email ? 'border-red-500 focus:border-red-500' : 'border-light/20 focus:border-primary'
+                placeholder={isUpsideDown ? "[ДЛЯ ОБРАТНОЙ СВЯЗИ - ОПЦИОНАЛЬНО]" : "для связи (необязательно)"}
+                className={`w-full p-3 rounded-lg bg-darkCard border text-light placeholder:text-light/40 focus:outline-none transition-colors ${isUpsideDown ? 'font-mono' : ''} ${
+                  errors.email 
+                    ? 'border-red-500 focus:border-red-500' 
+                    : isUpsideDown
+                      ? 'border-light/20 focus:border-red-500'
+                      : 'border-light/20 focus:border-primary'
                 }`}
               />
               {errors.email && (
                 <p className="text-red-500 text-xs mt-1">{errors.email}</p>
               )}
               {!errors.email && (
-                <p className="text-light/50 text-sm mt-1">Необязательное поле</p>
+                <p className={`text-sm mt-1 ${isUpsideDown ? 'font-mono text-red-400/60' : 'text-light/50'}`}>
+                  {isUpsideDown ? "[ОПЦИОНАЛЬНО]" : "Необязательное поле"}
+                </p>
               )}
             </div>
 
@@ -828,7 +932,11 @@ export default function SubmitPage() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="btn-glitch w-full px-6 py-4 bg-primary text-white font-bold rounded-xl shadow-[0_0_20px_rgba(59,130,246,0.4)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className={`w-full px-6 py-4 text-white font-bold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${
+                isUpsideDown
+                  ? 'bg-gradient-to-r from-red-600 via-red-500 to-red-600 border-2 border-red-400/80 shadow-[0_0_30px_rgba(239,68,68,1),0_0_60px_rgba(220,38,38,0.5)] font-mono'
+                  : 'bg-primary shadow-[0_0_20px_rgba(59,130,246,0.4)]'
+              }`}
             >
               {isSubmitting ? (
                 <>
@@ -848,12 +956,12 @@ export default function SubmitPage() {
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
                     />
                   </svg>
-                  Отправка...
+                  {isUpsideDown ? "ПЕРЕДАЧА..." : "Отправка..."}
                 </>
               ) : (
                 <>
                   <Send className="w-5 h-5" />
-                  Отправить на модерацию
+                  {isUpsideDown ? "ПЕРЕДАТЬ В АРХИВ" : "Отправить на модерацию"}
                 </>
               )}
             </button>
@@ -864,13 +972,17 @@ export default function SubmitPage() {
         <div className="mt-12 text-center">
           <Link
             href="/catalog"
-            className="inline-flex items-center gap-2 text-primary hover:text-secondary transition-colors"
+            className={`inline-flex items-center gap-2 transition-colors ${
+              isUpsideDown 
+                ? 'text-red-400 hover:text-red-300 font-mono' 
+                : 'text-primary hover:text-secondary'
+            }`}
           >
             <List className="w-5 h-5" />
-            Посмотреть каталог эффектов
+            {isUpsideDown ? "ПРОСМОТР АРХИВА АНОМАЛИЙ" : "Посмотреть каталог эффектов"}
           </Link>
         </div>
-      </motion.div>
+      </m.div>
     </main>
   );
 }

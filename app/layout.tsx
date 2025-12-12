@@ -9,6 +9,7 @@ import { RealityProvider } from "@/lib/context/RealityContext";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import ScrollToTop from "@/components/ScrollToTop";
+import StructuredData from "@/components/seo/StructuredData";
 
 // Client-only компоненты (lazy loaded)
 import { 
@@ -100,9 +101,42 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://mandela-effect.ru';
+  
+  // JSON-LD для WebSite с SearchAction
+  const websiteStructuredData = {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: 'Эффект Манделы',
+    url: baseUrl,
+    description: 'Интерактивный каталог коллективных ложных воспоминаний. Голосуй, обсуждай и исследуй сбои в матрице.',
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: {
+        '@type': 'EntryPoint',
+        urlTemplate: `${baseUrl}/catalog?q={search_term_string}`,
+      },
+      'query-input': 'required name=search_term_string',
+    },
+  };
+
+  // JSON-LD для Organization
+  const organizationStructuredData = {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: 'Эффект Манделы',
+    url: baseUrl,
+    description: 'Интерактивный каталог коллективных ложных воспоминаний',
+    sameAs: [
+      'https://github.com/kisslex2013-alt',
+    ],
+  };
+
   return (
     <html lang="ru" className={`${inter.variable} ${mono.variable} ${ruslan.variable} scroll-smooth`}>
       <body className="bg-dark text-light antialiased selection:bg-primary/30 selection:text-white overflow-x-hidden" suppressHydrationWarning>
+        <StructuredData data={websiteStructuredData} />
+        <StructuredData data={organizationStructuredData} />
         <RealityProvider>
           {/* ОПТИМИЗАЦИЯ: LazyMotion загружает анимации асинхронно */}
           <LazyMotion features={domAnimation}>

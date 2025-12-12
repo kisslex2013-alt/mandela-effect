@@ -8,9 +8,14 @@ import Loading from '@/components/Loading';
 // УДАЛЕН force-dynamic - он убивал кэширование и увеличивал TTFB до 2.5s
 export const revalidate = 60;
 
+const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://mandela-effect.ru';
+
 export const metadata: Metadata = {
   title: 'Эффект Манделы | Главная',
   description: 'Исследуй коллективные ложные воспоминания. Голосуй и проверяй свою реальность.',
+  alternates: {
+    canonical: baseUrl,
+  },
 };
 
 export default async function Home() {

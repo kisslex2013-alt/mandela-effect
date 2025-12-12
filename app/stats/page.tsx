@@ -3,9 +3,14 @@ import { unstable_cache } from 'next/cache';
 import prisma from '@/lib/prisma';
 import StatsClientWrapper from './StatsClientWrapper';
 
+const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://mandela-effect.ru';
+
 export const metadata: Metadata = {
   title: 'Статистика | Эффект Манделы',
   description: 'Глобальная статистика сбоев реальности.',
+  alternates: {
+    canonical: `${baseUrl}/stats`,
+  },
 };
 
 // ISR: Статическая генерация с ревалидацией

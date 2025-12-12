@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { m } from 'framer-motion';
+import { useReality } from '@/lib/context/RealityContext';
 import { Github, Mail, Send, Database, Server, Cpu } from 'lucide-react';
 
 // Мини-компонент для глитч-статуса
@@ -60,6 +61,7 @@ const GlitchStatus = ({
 };
 
 export default function Footer() {
+  const { isUpsideDown } = useReality();
   const currentYear = new Date().getFullYear();
   
   // ЗАКОММЕНТИРОВАНО ДЛЯ ОПТИМИЗАЦИИ - бегущая строка отключена
@@ -107,7 +109,10 @@ export default function Footer() {
         </m.div>
       </div> */}
 
-      <div className="max-w-7xl mx-auto px-6 py-12 relative z-10">
+      <div 
+        className="max-w-7xl mx-auto px-6 py-12 relative z-10 transition-transform duration-500"
+        style={isUpsideDown ? { transform: 'scaleX(-1)' } : {}}
+      >
         <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
           
           {/* COL 1: INFO */}

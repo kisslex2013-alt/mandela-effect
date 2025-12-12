@@ -8,9 +8,14 @@ import Loading from '@/components/Loading';
 // УДАЛЕН force-dynamic - улучшает TTFB
 export const revalidate = 60;
 
+const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://mandela-effect.ru';
+
 export const metadata: Metadata = {
   title: 'Каталог | Эффект Манделы',
   description: 'Полный архив сбоев реальности. Ищите, голосуйте, проверяйте свою память.',
+  alternates: {
+    canonical: `${baseUrl}/catalog`,
+  },
 };
 
 export default async function CatalogPage() {

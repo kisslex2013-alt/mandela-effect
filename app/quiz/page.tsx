@@ -1,9 +1,14 @@
 import { getQuizEffects, type EffectResult } from '@/app/actions/effects';
 import QuizClient from './QuizClient';
 
+const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://mandela-effect.ru';
+
 export const metadata = {
   title: 'Квиз | Эффект Манделы',
   description: 'Проверь свою память! Пройди квиз и узнай, насколько твои воспоминания совпадают с большинством.',
+  alternates: {
+    canonical: `${baseUrl}/quiz`,
+  },
 };
 
 // Хелпер для парсинга вариантов из content
