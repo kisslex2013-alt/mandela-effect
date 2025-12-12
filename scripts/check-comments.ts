@@ -59,7 +59,7 @@ async function checkComments() {
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       console.log('📋 КОММЕНТАРИИ НА МОДЕРАЦИИ (PENDING):\n');
       
-      pendingComments.forEach((comment, index) => {
+      pendingComments.forEach((comment: CommentWithEffect, index: number) => {
         console.log(`${index + 1}. [${comment.status}] ${comment.type} - "${comment.effect.title}"`);
         console.log(`   Текст: ${comment.text.substring(0, 50)}${comment.text.length > 50 ? '...' : ''}`);
         console.log(`   ID: ${comment.id}`);
@@ -97,7 +97,7 @@ async function checkComments() {
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       console.log('🔗 КОММЕНТАРИИ СО ССЫЛКАМИ:\n');
       
-      commentsWithMedia.slice(0, 5).forEach((comment, index) => {
+      commentsWithMedia.slice(0, 5).forEach((comment: CommentWithEffect, index: number) => {
         console.log(`${index + 1}. [${comment.status}] ${comment.type} - "${comment.effect.title}"`);
         if (comment.imageUrl) console.log(`   📷 imageUrl: ${comment.imageUrl}`);
         if (comment.videoUrl) console.log(`   🎥 videoUrl: ${comment.videoUrl}`);
