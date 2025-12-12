@@ -24,7 +24,6 @@ import toast from 'react-hot-toast';
 import { useReality } from '@/lib/context/RealityContext';
 import RealitySwitch from '@/components/ui/RealitySwitch';
 import CipherReveal from '@/components/ui/CipherReveal';
-import RedactedText from '@/components/ui/RedactedText';
 import RedactedWords from '@/components/ui/RedactedWords';
 
 // --- TYPES ---
@@ -209,14 +208,48 @@ const AddCommentModal = ({ isOpen, onClose, effectId }: any) => {
     try {
       const visitorId = getClientVisitorId();
 
+      // Определяем тип медиа по URL (как в CommentForm)
+      let imageUrl: string | undefined;
+      let videoUrl: string | undefined;
+      let audioUrl: string | undefined;
+
+      if (link) {
+        const url = link.toLowerCase();
+        if (url.includes('youtube.com') || url.includes('youtu.be') || url.includes('rutube.ru') || url.includes('vimeo.com') || url.includes('dailymotion.com')) {
+          videoUrl = link;
+        } else if (url.includes('music.yandex.ru') || url.includes('vk.com') || url.includes('soundcloud.com') || url.includes('spotify.com')) {
+          audioUrl = link;
+        } else if (link.trim()) {
+          imageUrl = link;
+        }
+      }
+
+      // Определяем тип комментария: если есть медиа - ARCHAEOLOGIST, иначе WITNESS
+      const commentType = (imageUrl || videoUrl || audioUrl) ? 'ARCHAEOLOGIST' : 'WITNESS';
+
+      // Логирование для отладки
+      console.log('[AddCommentModal] Отправка комментария:', {
+        effectId,
+        type: commentType,
+        text: text.substring(0, 50),
+        imageUrl,
+        videoUrl,
+        audioUrl,
+        hasLink: !!link,
+        linkValue: link,
+      });
+
       const result = await createComment({
         effectId,
         visitorId,
-        type: 'WITNESS',
+        type: commentType,
         text,
-        imageUrl: link.includes('jpg') || link.includes('png') || link.includes('webp') ? link : undefined,
-        videoUrl: link.includes('youtube') || link.includes('youtu.be') ? link : undefined,
+        imageUrl,
+        videoUrl,
+        audioUrl,
       });
+
+      console.log('[AddCommentModal] Результат:', result);
 
       if (result.success) {
         toast.success('Запись отправлена на модерацию');
@@ -224,7 +257,9 @@ const AddCommentModal = ({ isOpen, onClose, effectId }: any) => {
         setText('');
         setLink('');
       } else {
-        toast.error('Ошибка отправки');
+        // Показываем конкретную ошибку валидации
+        toast.error(result.error || 'Ошибка отправки');
+        console.error('[AddCommentModal] Ошибка создания комментария:', result.error);
       }
     } catch (e) {
       toast.error('Ошибка');
@@ -421,8 +456,18 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [nextUnvotedEffect, setNextUnvotedEffect] = useState<{ id: string; title: string } | null>(null);
   const [prevUnvotedEffect, setPrevUnvotedEffect] = useState<{ id: string; title: string } | null>(null);
-  const [showUnvotedOnly, setShowUnvotedOnly] = useState(true); // Фильтр активен по умолчанию
+  
+  // Сохраняем состояние фильтра в localStorage, чтобы оно не сбрасывалось при переключении эффекта
+  const [showUnvotedOnly, setShowUnvotedOnly] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('showUnvotedOnly');
+      return saved !== null ? saved === 'true' : true; // По умолчанию true
+    }
+    return true;
+  });
+  
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null); // ID эффекта, к которому идет навигация
+  const [hasUnvotedEffects, setHasUnvotedEffects] = useState<boolean>(true); // Есть ли непроголосованные эффекты
   
   // Защита от повторных вызовов голосования
   const isVotingRef = useRef(false);
@@ -536,33 +581,67 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
     }
   }, [effect.id, initialUserVote]);
 
-  // Получаем следующий и предыдущий не проголосованные эффекты (только если фильтр включен)
+  // Сохраняем состояние фильтра в localStorage при изменении
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('showUnvotedOnly', String(showUnvotedOnly));
+    }
+  }, [showUnvotedOnly]);
+
+  // Функция для обновления списка непроголосованных эффектов
+  const updateUnvotedEffects = useCallback(async () => {
     if (showUnvotedOnly) {
-      const fetchUnvotedEffects = async () => {
-        const votes = votesStore.get();
-        const votedIds = Object.keys(votes);
-        const [nextResult, prevResult] = await Promise.all([
-          getNextUnvotedEffect(effect.id, votedIds),
-          getPrevUnvotedEffect(effect.id, votedIds),
-        ]);
-        if (nextResult.success) {
-          setNextUnvotedEffect(nextResult.data ?? null);
-        }
-        if (prevResult.success) {
-          setPrevUnvotedEffect(prevResult.data ?? null);
-        }
-      };
-      fetchUnvotedEffects();
+      const votes = votesStore.get();
+      const votedIds = Object.keys(votes);
+      const [nextResult, prevResult] = await Promise.all([
+        getNextUnvotedEffect(effect.id, votedIds),
+        getPrevUnvotedEffect(effect.id, votedIds),
+      ]);
+      if (nextResult.success) {
+        setNextUnvotedEffect(nextResult.data ?? null);
+      }
+      if (prevResult.success) {
+        setPrevUnvotedEffect(prevResult.data ?? null);
+      }
+      
+      // Проверяем, есть ли вообще непроголосованные эффекты
+      const hasUnvoted = !!(nextResult.data || prevResult.data);
+      setHasUnvotedEffects(hasUnvoted);
     } else {
       setNextUnvotedEffect(null);
       setPrevUnvotedEffect(null);
+      setHasUnvotedEffects(true); // При выключенном фильтре считаем, что есть эффекты
     }
   }, [effect.id, showUnvotedOnly]);
 
-  // Всегда используем стандартные тексты для вариантов ответа
-  const vA = "Как я помню";
-  const vB = "Как в реальности";
+  // Получаем следующий и предыдущий не проголосованные эффекты (только если фильтр включен)
+  useEffect(() => {
+    updateUnvotedEffects();
+  }, [updateUnvotedEffects]);
+
+  // Обновляем список непроголосованных эффектов при изменении голосов
+  useEffect(() => {
+    const handleVotesUpdate = () => {
+      if (showUnvotedOnly) {
+        updateUnvotedEffects();
+      }
+    };
+    window.addEventListener('votes-updated', handleVotesUpdate);
+    return () => window.removeEventListener('votes-updated', handleVotesUpdate);
+  }, [showUnvotedOnly, updateUnvotedEffects]);
+
+  // Парсим варианты из content
+  const parseVariantsFromContent = (content: string): { variantA: string; variantB: string } => {
+    const lines = content.split('\n');
+    const variantALine = lines.find((l) => l.startsWith('Вариант А:'));
+    const variantBLine = lines.find((l) => l.startsWith('Вариант Б:'));
+    return {
+      variantA: variantALine?.replace('Вариант А: ', '').trim() || 'Как я помню',
+      variantB: variantBLine?.replace('Вариант Б: ', '').trim() || 'Как в реальности',
+    };
+  };
+
+  const { variantA: vA, variantB: vB } = parseVariantsFromContent(effect.content || '');
 
   const handleVote = async (variant: 'A' | 'B') => {
     // Защита от повторных вызовов
@@ -606,6 +685,10 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
       } else { 
         toast.success('Голос записан');
         votesStore.set(effect.id, variant);
+        // Обновляем список непроголосованных эффектов после голосования
+        if (showUnvotedOnly) {
+          updateUnvotedEffects();
+        }
       }
     } catch (error) {
       console.error('[EffectPageClient] Ошибка при голосовании:', error);
@@ -668,11 +751,6 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
           </h1>
           <p className="text-xl text-light/80 max-w-2xl leading-relaxed">
             {effect.description}
-            {isUpsideDown && (
-              <span className="ml-2">
-                <RedactedText text="[ДАННЫЕ УДАЛЕНЫ]" />
-              </span>
-            )}
           </p>
         </div>
       </motion.div>
@@ -720,15 +798,34 @@ export default function EffectPageClient({ effect, initialUserVote, prevEffect, 
                   </Link>
                 ) : <div className="w-9 h-9" />}
                 <button
-                  onClick={() => setShowUnvotedOnly(!showUnvotedOnly)}
-                  className={`p-2 rounded-lg transition-colors flex items-center justify-center ${
+                  onClick={() => {
+                    if (!hasUnvotedEffects && showUnvotedOnly) {
+                      // Если непроголосованных эффектов нет, переключаем на все эффекты
+                      setShowUnvotedOnly(false);
+                    } else {
+                      setShowUnvotedOnly(!showUnvotedOnly);
+                    }
+                  }}
+                  disabled={!hasUnvotedEffects && showUnvotedOnly}
+                  className={`p-2 rounded-lg transition-colors flex items-center justify-center relative ${
                     showUnvotedOnly 
-                      ? 'bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30 shadow-[0_0_10px_rgba(6,182,212,0.2)]' 
+                      ? hasUnvotedEffects
+                        ? 'bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30 shadow-[0_0_10px_rgba(6,182,212,0.2)]'
+                        : 'bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.2)] cursor-not-allowed opacity-60'
                       : 'bg-white/5 hover:bg-white/10 text-light/50 hover:text-white'
                   }`}
-                  title={showUnvotedOnly ? 'Показать все эффекты' : 'Показать только не проголосованные'}
+                  title={
+                    !hasUnvotedEffects && showUnvotedOnly
+                      ? 'Все эффекты просмотрены'
+                      : showUnvotedOnly 
+                        ? 'Показать все эффекты' 
+                        : 'Показать только не проголосованные'
+                  }
                 >
                   <Sparkles className="w-5 h-5" />
+                  {!hasUnvotedEffects && showUnvotedOnly && (
+                    <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                  )}
                 </button>
                 {showUnvotedOnly && nextUnvotedEffect ? (
                   <Link 

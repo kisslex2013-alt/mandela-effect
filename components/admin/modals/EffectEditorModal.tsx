@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { flushSync } from 'react-dom';
+import { m, AnimatePresence } from 'framer-motion';
 import { X, Save, Loader2, Wand2, Eye, Search, ScrollText, Brain, MessageSquare, ExternalLink as ExternalLinkIcon, Edit, Trash2, Image as ImageIcon, Video, Music } from 'lucide-react';
 import CustomSelect from '@/components/ui/CustomSelect';
 import { getComments, updateComment, deleteComment } from '@/app/actions/comments';
@@ -37,56 +38,162 @@ export default function EffectEditorModal({ isOpen, onClose, onSave, initialData
   // Состояние для диалога генерации
   const [isGenerationOpen, setIsGenerationOpen] = useState(false);
 
-  useEffect(() => {
-    if (initialData) {
-      const contentLines = initialData.content?.split('\n') || [];
-      const variantA = contentLines.find((l: string) => l.startsWith('Вариант А:'))?.replace('Вариант А: ', '').trim() || '';
-      const variantB = contentLines.find((l: string) => l.startsWith('Вариант Б:'))?.replace('Вариант Б: ', '').trim() || '';
-      const currentState = initialData.currentState || contentLines.find((l: string) => l.includes('Текущее состояние:'))?.replace('Текущее состояние: ', '').trim() || '';
-      const interp = initialData.interpretations || {};
-
-      setForm({
-        title: initialData.title || '',
-        description: initialData.description || '',
-        category: initialData.category || '',
-        variantA, variantB, currentState,
-        sourceLink: interp.sourceLink || '',
-        residue: initialData.residue || '',
-        residueSource: initialData.residueSource || '',
-        history: initialData.history || '',
-        historySource: initialData.historySource || '',
-        scientificInterpretation: interp.scientific || '',
-        scientificSource: interp.scientificSource || '',
-        communityInterpretation: interp.community || '',
-        communitySource: interp.communitySource || '',
-        imageUrl: initialData.imageUrl || '',
-      });
-
-      if (initialData.id) {
-        loadComments(initialData.id);
-      }
-    } else {
-      setForm({
-        title: '', description: '', category: '', variantA: '', variantB: '',
-        currentState: '', sourceLink: '', residue: '', residueSource: '',
-        history: '', historySource: '', scientificInterpretation: '', scientificSource: '',
-        communityInterpretation: '', communitySource: '', imageUrl: '',
-      });
-      setComments([]);
+  // Ref для отслеживания текущего effectId и предотвращения race conditions
+  const currentEffectIdRef = useRef<string | null>(null);
+  // Ref для отслеживания последнего загруженного effectId (чтобы не загружать повторно)
+  const lastLoadedEffectIdRef = useRef<string | null>(null);
+  
+  // Мемоизируем отфильтрованные комментарии для текущего эффекта
+  // Это гарантирует, что мы всегда показываем только комментарии текущего эффекта
+  const filteredCommentsForCurrentEffect = useMemo(() => {
+    const currentEffectId = initialData?.id;
+    if (!currentEffectId || comments.length === 0) {
+      return [];
     }
-  }, [initialData, isOpen]);
+    
+    const filtered = comments.filter(c => {
+      const matches = c.effectId && String(c.effectId).trim() === String(currentEffectId).trim();
+      return matches;
+    });
+    
+    return filtered;
+  }, [comments, initialData?.id]);
+
+  useEffect(() => {
+    // Очищаем комментарии при открытии/закрытии модального окна или смене эффекта
+    if (!isOpen || !initialData) {
+      setComments([]);
+      setEditingCommentId(null);
+      setEditCommentText('');
+      currentEffectIdRef.current = null;
+      lastLoadedEffectIdRef.current = null;
+      if (!initialData) {
+        setForm({
+          title: '', description: '', category: '', variantA: '', variantB: '',
+          currentState: '', sourceLink: '', residue: '', residueSource: '',
+          history: '', historySource: '', scientificInterpretation: '', scientificSource: '',
+          communityInterpretation: '', communitySource: '', imageUrl: '',
+        });
+      }
+      return;
+    }
+
+    const effectId = initialData.id;
+    
+    // Если это тот же эффект и мы уже загрузили комментарии, не перезагружаем
+    if (lastLoadedEffectIdRef.current === effectId && currentEffectIdRef.current === effectId) {
+      return;
+    }
+
+    // Обновляем refs
+    currentEffectIdRef.current = effectId || null;
+
+    // Загружаем данные эффекта
+    const contentLines = initialData.content?.split('\n') || [];
+    const variantA = contentLines.find((l: string) => l.startsWith('Вариант А:'))?.replace('Вариант А: ', '').trim() || '';
+    const variantB = contentLines.find((l: string) => l.startsWith('Вариант Б:'))?.replace('Вариант Б: ', '').trim() || '';
+    const currentState = initialData.currentState || contentLines.find((l: string) => l.includes('Текущее состояние:'))?.replace('Текущее состояние: ', '').trim() || '';
+    const interp = initialData.interpretations || {};
+
+    setForm({
+      title: initialData.title || '',
+      description: initialData.description || '',
+      category: initialData.category || '',
+      variantA, variantB, currentState,
+      sourceLink: interp.sourceLink || '',
+      residue: initialData.residue || '',
+      residueSource: initialData.residueSource || '',
+      history: initialData.history || '',
+      historySource: initialData.historySource || '',
+      scientificInterpretation: interp.scientific || '',
+      scientificSource: interp.scientificSource || '',
+      communityInterpretation: interp.community || '',
+      communitySource: interp.communitySource || '',
+      imageUrl: initialData.imageUrl || '',
+    });
+
+    // КРИТИЧНО: Сбрасываем lastLoadedEffectIdRef чтобы гарантировать загрузку
+    lastLoadedEffectIdRef.current = null;
+    
+    // Принудительно очищаем массив - используем функциональную форму для гарантии
+    setComments(() => []);
+    setEditingCommentId(null);
+    setEditCommentText('');
+
+    // Загружаем комментарии только для текущего эффекта
+    if (effectId) {
+      loadComments(effectId);
+    }
+  }, [initialData?.id, isOpen]); // Зависимость только от ID эффекта и состояния открытия
 
   const loadComments = async (effectId: string) => {
+    // Проверяем, что effectId валидный
+    if (!effectId || typeof effectId !== 'string' || effectId.trim() === '') {
+      setComments([]);
+      return;
+    }
+
+    const trimmedEffectId = effectId.trim();
+    
+    // Проверяем, что мы все еще загружаем комментарии для этого эффекта (защита от race condition)
+    if (currentEffectIdRef.current !== trimmedEffectId) {
+      return;
+    }
+
     setCommentsLoading(true);
     try {
-      const result = await getComments(effectId, undefined, true);
-      if (result.success && result.comments) {
-        setComments(result.comments);
+      // Загружаем комментарии только для указанного эффекта
+      const result = await getComments(trimmedEffectId, undefined, true);
+      
+      // Еще раз проверяем, что effectId не изменился (защита от race condition)
+      if (currentEffectIdRef.current !== trimmedEffectId) {
+        return;
+      }
+      
+      if (result.success && Array.isArray(result.comments)) {
+        // Строгая фильтрация - только комментарии с точно таким же effectId
+        const filteredComments = result.comments.filter(c => {
+          if (!c.effectId) {
+            return false; // Игнорируем комментарии без effectId
+          }
+          return String(c.effectId).trim() === trimmedEffectId;
+        });
+        
+        // Финальная проверка перед установкой состояния - ВСЕГДА устанавливаем, если это текущий эффект
+        if (currentEffectIdRef.current === trimmedEffectId) {
+          // Дополнительная финальная фильтрация перед установкой - только комментарии с нужным effectId
+          const finalComments = filteredComments.filter(c => {
+            return c.effectId && String(c.effectId).trim() === trimmedEffectId;
+          });
+          
+          // КРИТИЧНО: Используем flushSync для синхронного обновления, чтобы гарантировать, что очистка применилась перед установкой новых данных
+          // Это предотвращает визуальное мелькание старых комментариев при переключении между эффектами
+          flushSync(() => {
+            // Принудительно очищаем перед установкой новых комментариев
+            setComments([]);
+          });
+          
+          // Дополнительная проверка - убеждаемся, что мы все еще загружаем комментарии для этого эффекта
+          if (currentEffectIdRef.current === trimmedEffectId) {
+            // КРИТИЧНО: Создаем новый массив через spread для гарантии новой ссылки
+            setComments([...finalComments]);
+            lastLoadedEffectIdRef.current = trimmedEffectId;
+          }
+        }
+      } else {
+        if (currentEffectIdRef.current === trimmedEffectId) {
+          setComments(() => []);
+        }
       }
     } catch (error) {
-      console.error('Ошибка загрузки комментариев:', error);
+      console.error('[loadComments] Ошибка загрузки комментариев:', error);
+      if (currentEffectIdRef.current === trimmedEffectId) {
+        setComments(() => []);
+      }
     } finally {
-      setCommentsLoading(false);
+      if (currentEffectIdRef.current === trimmedEffectId) {
+        setCommentsLoading(false);
+      }
     }
   };
 
@@ -104,7 +211,15 @@ export default function EffectEditorModal({ isOpen, onClose, onSave, initialData
     }
     const result = await updateComment(commentId, { text: editCommentText });
     if (result.success) {
-      setComments(prev => prev.map(c => c.id === commentId ? { ...c, text: editCommentText } : c));
+      // Обновляем только комментарии текущего эффекта
+      const currentEffectId = currentEffectIdRef.current;
+      setComments(prev => prev.map(c => {
+        // Обновляем только если комментарий относится к текущему эффекту
+        if (c.id === commentId && (!currentEffectId || c.effectId === currentEffectId)) {
+          return { ...c, text: editCommentText };
+        }
+        return c;
+      }));
       setEditingCommentId(null);
       toast.success('Комментарий обновлен');
     } else {
@@ -116,7 +231,12 @@ export default function EffectEditorModal({ isOpen, onClose, onSave, initialData
     if (!confirm('Удалить комментарий?')) return;
     const result = await deleteComment(commentId);
     if (result.success) {
-      setComments(prev => prev.filter(c => c.id !== commentId));
+      // Фильтруем только комментарии текущего эффекта
+      const currentEffectId = currentEffectIdRef.current;
+      setComments(prev => prev.filter(c => {
+        // Удаляем комментарий только если он относится к текущему эффекту
+        return c.id !== commentId && (!currentEffectId || c.effectId === currentEffectId);
+      }));
       toast.success('Комментарий удален');
     } else {
       toast.error(result.error || 'Ошибка удаления');
@@ -160,7 +280,7 @@ export default function EffectEditorModal({ isOpen, onClose, onSave, initialData
   return (
     <>
       <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
-        <motion.div 
+        <m.div 
           initial={{ scale: 0.95, opacity: 0 }} 
           animate={{ scale: 1, opacity: 1 }} 
           className="bg-darkCard w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl border border-light/10 shadow-2xl p-6" 
@@ -247,9 +367,9 @@ export default function EffectEditorModal({ isOpen, onClose, onSave, initialData
                   <div className="flex items-center justify-center py-4">
                     <Loader2 className="w-4 h-4 animate-spin text-purple-400" />
                   </div>
-                ) : comments.length > 0 ? (
+                ) : filteredCommentsForCurrentEffect.length > 0 ? (
                   <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {comments.map((comment) => (
+                    {filteredCommentsForCurrentEffect.map((comment) => (
                       <div key={comment.id} className="bg-dark/50 border border-white/5 rounded-lg p-2 text-xs">
                         <div className="flex items-center justify-between mb-1">
                           <div className="flex items-center gap-2">
@@ -318,12 +438,19 @@ export default function EffectEditorModal({ isOpen, onClose, onSave, initialData
                                 <div className="flex items-center gap-1 text-[10px] text-light/50 mb-1">
                                   <ImageIcon className="w-3 h-3" /> Изображение:
                                 </div>
-                                <div className="relative w-full h-24 rounded overflow-hidden border border-white/10">
-                                  <ImageWithSkeleton src={comment.imageUrl} alt="" fill className="object-cover" />
+                                <div className="flex items-start gap-2">
+                                  {/* Миниатюра изображения */}
+                                  <div className="relative w-20 h-20 shrink-0 rounded overflow-hidden border border-white/10 cursor-pointer group" onClick={() => window.open(comment.imageUrl, '_blank')}>
+                                    <ImageWithSkeleton src={comment.imageUrl} alt="" fill className="object-cover group-hover:scale-110 transition-transform" />
+                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                                      <ExternalLinkIcon className="w-4 h-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    </div>
+                                  </div>
+                                  {/* Ссылка на полное изображение */}
+                                  <a href={comment.imageUrl} target="_blank" rel="noopener" className="text-[10px] text-purple-400 hover:underline flex items-center gap-1 self-center">
+                                    <ExternalLinkIcon className="w-2.5 h-2.5" /> Открыть полный размер
+                                  </a>
                                 </div>
-                                <a href={comment.imageUrl} target="_blank" rel="noopener" className="text-[10px] text-purple-400 hover:underline mt-1 flex items-center gap-1">
-                                  <ExternalLinkIcon className="w-2.5 h-2.5" /> Открыть
-                                </a>
                               </div>
                             )}
                             
@@ -371,7 +498,7 @@ export default function EffectEditorModal({ isOpen, onClose, onSave, initialData
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Сохранить
             </button>
           </div>
-        </motion.div>
+        </m.div>
       </div>
 
       {/* Нейро-Синтезатор */}

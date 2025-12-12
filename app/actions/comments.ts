@@ -45,6 +45,16 @@ export interface DeleteCommentResult {
  * Создать комментарий с валидацией безопасности
  */
 export async function createComment(data: CreateCommentData): Promise<CommentResult> {
+  // Логирование входящих данных
+  console.log('[createComment] Начало обработки комментария:', {
+    effectId: data.effectId,
+    type: data.type,
+    textLength: data.text?.length,
+    imageUrl: data.imageUrl || 'null',
+    videoUrl: data.videoUrl || 'null',
+    audioUrl: data.audioUrl || 'null',
+  });
+  
   try {
     // 1. Базовая валидация текста
     if (!data.text?.trim() || data.text.length < 3) {
@@ -87,23 +97,29 @@ export async function createComment(data: CreateCommentData): Promise<CommentRes
         // Проверка домена
         const isAllowed = isDomainAllowed(normalized, 'image');
         if (!isAllowed) {
-          console.log('[createComment] Домен не разрешен:', normalized);
           try {
             const urlObj = new URL(normalized);
-            console.log('[createComment] Hostname:', urlObj.hostname);
+            console.log('[createComment] ❌ Домен не разрешен:', urlObj.hostname, '| URL:', normalized);
           } catch (e) {
-            console.log('[createComment] Ошибка парсинга URL:', e);
+            console.log('[createComment] ❌ Ошибка парсинга URL:', normalized, e);
           }
           return { 
             success: false, 
-            error: 'Разрешены только ссылки с imgur.com, imgbb.com, Яндекс (включая avatars.mds.yandex.net, disk.yandex.ru), Google (включая Google Photos), и других проверенных сервисов' 
+            error: `Домен не разрешен. Разрешены только ссылки с imgur.com, imgbb.com, Яндекс (включая avatars.mds.yandex.net, disk.yandex.ru), Google (включая Google Photos), и других проверенных сервисов. Ваша ссылка: ${normalized}` 
           };
         }
         
         // Проверка типа файла
-        if (!validateFileType(normalized, 'image')) {
-          return { success: false, error: 'Ссылка должна вести на изображение' };
+        const isValidFileType = validateFileType(normalized, 'image');
+        if (!isValidFileType) {
+          console.log('[createComment] ❌ Тип файла не валиден:', normalized);
+          return { 
+            success: false, 
+            error: 'Ссылка должна вести на изображение (jpg, png, gif, webp, svg) или разрешенный сервис хостинга изображений' 
+          };
         }
+        
+        console.log('[createComment] ✅ imageUrl валидирован:', normalized);
         
         data.imageUrl = normalized;
       }
@@ -187,6 +203,13 @@ export async function createComment(data: CreateCommentData): Promise<CommentRes
     // Ревалидируем страницу эффекта
     revalidatePath(`/effect/${data.effectId}`);
     
+    console.log('[createComment] ✅ Комментарий создан успешно:', {
+      commentId: comment.id,
+      imageUrl: comment.imageUrl || 'null',
+      videoUrl: comment.videoUrl || 'null',
+      audioUrl: comment.audioUrl || 'null',
+    });
+    
     return { success: true, commentId: comment.id };
     
   } catch (error) {
@@ -204,9 +227,20 @@ export async function createComment(data: CreateCommentData): Promise<CommentRes
  */
 export async function getComments(effectId: string, visitorId?: string, includePending: boolean = false) {
   try {
+    // Валидация effectId
+    if (!effectId || typeof effectId !== 'string' || effectId.trim() === '') {
+      console.error('[getComments] Некорректный effectId:', effectId);
+      return { success: false, comments: [] };
+    }
+
+    const trimmedEffectId = effectId.trim();
+    
+    // Логирование для отладки
+    console.log('[getComments] Запрос комментариев для effectId:', trimmedEffectId, 'includePending:', includePending);
+    
     const comments = await prisma.comment.findMany({
       where: {
-        effectId,
+        effectId: trimmedEffectId, // Используем обрезанный ID
         ...(includePending ? {} : { status: 'APPROVED' }), // Для админа показываем все, для пользователей только одобренные
       },
       orderBy: {
@@ -214,6 +248,7 @@ export async function getComments(effectId: string, visitorId?: string, includeP
       },
       select: {
         id: true,
+        effectId: true, // Добавляем effectId для проверки
         type: true,
         text: true,
         imageUrl: true,
@@ -249,6 +284,12 @@ export async function getComments(effectId: string, visitorId?: string, includeP
         };
       })
     );
+    
+    // Логирование для отладки
+    console.log('[getComments] Найдено комментариев:', commentsWithLikes.length);
+    commentsWithLikes.forEach((c, idx) => {
+      console.log(`[getComments] Комментарий ${idx + 1}: effectId=${c.effectId}, text=${c.text?.substring(0, 50)}...`);
+    });
     
     return {
       success: true,

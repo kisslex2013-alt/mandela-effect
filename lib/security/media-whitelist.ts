@@ -35,6 +35,12 @@ export const MEDIA_WHITELIST = {
     'freepik.com',
     'img.freepik.com',
     
+    // Canva (дизайн-платформа)
+    'canva.com',
+    'www.canva.com',
+    'static-cse.canva.com',
+    'media.canva.com',
+    
     // Яндекс (все поддомены для изображений)
     'yandex.ru',
     'yandex.com',
@@ -47,6 +53,7 @@ export const MEDIA_WHITELIST = {
     'disk.yandex.com',
     'getfile.dokpub.yandex.ru',
     'getfile.dokpub.yandex.com',
+    'yapic.net', // Яндекс.Картинки CDN
     
     // Google (все поддомены для изображений)
     'google.com',
@@ -77,6 +84,34 @@ export const MEDIA_WHITELIST = {
     'tinypic.com',
     'gyazo.com',
     'i.gyazo.com',
+    'smugmug.com', // Премиум фотохостинг
+    'cdn.smugmug.com',
+    
+    // Cloudflare CDN (безопасный и быстрый)
+    'imagedelivery.net', // Cloudflare Images
+    'cloudflare.com',
+    
+    // GitHub (для открытых репозиториев)
+    'raw.githubusercontent.com',
+    'githubusercontent.com',
+    'github.com',
+    
+    // Облачные хранилища (только для публичных файлов)
+    'dropbox.com',
+    'dl.dropboxusercontent.com',
+    'dropboxusercontent.com',
+    'onedrive.live.com',
+    'onedrive.com',
+    '1drv.ms',
+    'sharepoint.com', // Microsoft SharePoint
+    
+    // Mail.ru Cloud
+    'cloud.mail.ru',
+    'my.mail.ru',
+    
+    // Другие популярные CDN
+    'cdn.discordapp.com', // Discord CDN
+    'media.discordapp.net',
   ],
   
   // Видео
@@ -126,6 +161,23 @@ export const MEDIA_WHITELIST = {
     'bitchute.com',
     'odysee.com',
     'rumble.com',
+    
+    // Cloudflare Stream
+    'cloudflarestream.com',
+    'videodelivery.net', // Cloudflare Stream CDN
+    
+    // Streamable (популярный сервис для быстрой загрузки видео)
+    'streamable.com',
+    'cdn-cf-east.streamable.com',
+    'cdn-cf-west.streamable.com',
+    
+    // OK.ru (Одноклассники)
+    'ok.ru',
+    'odnoklassniki.ru',
+    'okvideo.ru',
+    
+    // VK Video
+    'vk-cdn.net', // VK CDN для видео
   ],
   
   // Аудио
@@ -157,12 +209,15 @@ export const MEDIA_WHITELIST = {
     'music.yandex.net',
     'music.yandex.com.tr',
     
-    // ВКонтакте (музыка)
+    // ВКонтакте (музыка и медиа)
     'vk.com',
     'vkontakte.ru',
     'm.vk.com',
     'vk.me',
     'userapi.com', // VK CDN
+    'vk-cdn.net', // VK CDN для видео/аудио
+    'vkuser.net', // VK User CDN
+    'vkuserlive.net', // VK Live CDN
     
     // Другие музыкальные сервисы
     'deezer.com',
@@ -171,10 +226,29 @@ export const MEDIA_WHITELIST = {
     'itunes.apple.com',
     'audiomack.com',
     'mixcloud.com',
-    'mixcloud.com',
     'jamendo.com',
     'last.fm',
     'tidal.com',
+    
+    // SndUp (быстрая загрузка аудио без регистрации)
+    'sndup.net',
+    
+    // Filepass (для студий звукозаписи)
+    'filepass.io',
+    
+    // Anchor (Spotify для подкастов)
+    'anchor.fm',
+    'anchor.com',
+    'podcasts.apple.com', // Apple Podcasts
+    
+    // Другие платформы для аудио
+    'podbean.com',
+    'audioboom.com',
+    'castbox.fm',
+    
+    // Telegram CDN (для аудио/голосовых сообщений)
+    'cdn4.telegram.org',
+    'cdn5.telegram.org',
   ],
   
   // Документы/файлы
@@ -347,18 +421,28 @@ export function validateFileType(url: string, expectedType: 'image' | 'video' | 
   try {
     const urlObj = new URL(url);
     const pathname = urlObj.pathname.toLowerCase();
-    const extension = pathname.substring(pathname.lastIndexOf('.'));
     
-    // Проверяем расширение
-    const allowedExts = ALLOWED_EXTENSIONS[expectedType] as readonly string[];
-    if (extension && allowedExts.includes(extension)) {
-      return true;
+    // Извлекаем расширение корректно (проверяем наличие точки)
+    const lastDotIndex = pathname.lastIndexOf('.');
+    let extension = '';
+    
+    if (lastDotIndex !== -1 && lastDotIndex < pathname.length - 1) {
+      // Извлекаем расширение только если точка не в конце и не в начале
+      extension = pathname.substring(lastDotIndex);
+      
+      // Проверяем расширение
+      const allowedExts = ALLOWED_EXTENSIONS[expectedType] as readonly string[];
+      if (extension && allowedExts.includes(extension)) {
+        return true;
+      }
     }
     
-    // Для некоторых сервисов расширение может отсутствовать (YouTube, Imgur)
-    // Тогда проверяем только домен
+    // Для некоторых сервисов расширение может отсутствовать (YouTube, Imgur, CDN)
+    // Тогда проверяем только домен - если домен разрешен, считаем URL валидным
+    // Это важно для сервисов вроде avatars.mds.yandex.net, которые не всегда имеют расширение в URL
     return isDomainAllowed(url, expectedType);
-  } catch {
+  } catch (error) {
+    console.log('[validateFileType] Ошибка парсинга URL:', url, error);
     return false;
   }
 }

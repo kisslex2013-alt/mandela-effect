@@ -15,7 +15,6 @@ import { useReality } from '@/lib/context/RealityContext';
 import { Lock, ChevronDown, ChevronUp } from 'lucide-react';
 import RealitySwitch from '@/components/ui/RealitySwitch';
 import CipherReveal from '@/components/ui/CipherReveal';
-import RedactedText from '@/components/ui/RedactedText';
 
 // --- ИКОНКИ ---
 const ArrowLeftIcon = () => (<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>);
@@ -164,9 +163,18 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
     setOpenAccordion(current => current === id ? null : id);
   }, []);
 
-  // Всегда используем стандартные тексты для вариантов ответа
-  const variantA = "Как я помню";
-  const variantB = "Как в реальности";
+  // Парсим варианты из content
+  const parseVariantsFromContent = (content: string): { variantA: string; variantB: string } => {
+    const lines = content.split('\n');
+    const variantALine = lines.find((l) => l.startsWith('Вариант А:'));
+    const variantBLine = lines.find((l) => l.startsWith('Вариант Б:'));
+    return {
+      variantA: variantALine?.replace('Вариант А: ', '').trim() || 'Как я помню',
+      variantB: variantBLine?.replace('Вариант Б: ', '').trim() || 'Как в реальности',
+    };
+  };
+
+  const { variantA, variantB } = parseVariantsFromContent(effect.content || '');
 
   const interp = effect.interpretations || {};
   const scientificText = interp.scientific || "";
@@ -421,10 +429,7 @@ export default function EffectClient({ effect: initialEffect }: EffectClientProp
                 <CipherReveal text={effect.title} reveal={true} />
               </h1>
               <p className="text-lg text-light/80 leading-relaxed">
-                {effect.description} 
-                <span className="ml-2">
-                  <RedactedText text="[ДАННЫЕ УДАЛЕНЫ]" />
-                </span>
+                {effect.description}
               </p>
             </div>
 

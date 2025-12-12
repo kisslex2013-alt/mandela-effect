@@ -107,7 +107,7 @@ export default function HomeClient({
     } catch (error) { setDayVote(null); } finally { setIsDayVoting(false); }
   };
 
-  // Всегда используем стандартные тексты для вариантов ответа
+  // В превью используем стандартные тексты для вариантов ответа
   const vA = "Как я помню";
   const vB = "Как в реальности";
 

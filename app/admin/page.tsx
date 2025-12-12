@@ -57,7 +57,21 @@ export default async function AdminPage() {
   const comments = await prisma.comment.findMany({
     where: { status: 'PENDING' },
     orderBy: { createdAt: 'desc' },
-    include: {
+    select: {
+      id: true,
+      effectId: true,
+      visitorId: true,
+      type: true,
+      text: true,
+      imageUrl: true,
+      videoUrl: true,
+      audioUrl: true,
+      theoryType: true,
+      status: true,
+      likes: true,
+      reports: true,
+      createdAt: true,
+      moderatedAt: true,
       effect: {
         select: {
           id: true,

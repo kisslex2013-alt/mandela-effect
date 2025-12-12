@@ -120,7 +120,7 @@ export default function EffectCard(props: EffectCardProps) {
     return () => window.removeEventListener('votes-updated', handleUpdate);
   }, [effectData.id]);
 
-  // Всегда используем стандартные тексты для вариантов ответа
+  // В превью используем стандартные тексты для вариантов ответа
   const vA = "Как я помню";
   const vB = "Как в реальности";
 

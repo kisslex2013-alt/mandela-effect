@@ -105,6 +105,21 @@ export default function QuizClient() {
   const progress = ((currentIndex + 1) / effects.length) * 100;
   const currentEffect = effects[currentIndex];
 
+  // Парсим варианты из content
+  const parseVariantsFromContent = (content: string): { variantA: string; variantB: string } => {
+    const lines = content.split('\n');
+    const variantALine = lines.find((l) => l.startsWith('Вариант А:'));
+    const variantBLine = lines.find((l) => l.startsWith('Вариант Б:'));
+    return {
+      variantA: variantALine?.replace('Вариант А: ', '').trim() || 'Как я помню',
+      variantB: variantBLine?.replace('Вариант Б: ', '').trim() || 'Как в реальности',
+    };
+  };
+
+  const { variantA, variantB } = currentEffect 
+    ? parseVariantsFromContent(currentEffect.content || '')
+    : { variantA: 'Как я помню', variantB: 'Как в реальности' };
+
   return (
     <div className="min-h-screen bg-dark py-8 px-4 flex flex-col items-center relative overflow-hidden">
       
@@ -182,7 +197,7 @@ export default function QuizClient() {
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${selectedVariant === 'A' ? 'bg-purple-500 text-white' : 'bg-purple-500/10 text-purple-400'}`}>A</div>
                     </div>
                     <div className="text-lg font-bold text-light group-hover:text-purple-300 transition-colors">
-                        Как я помню
+                        {variantA}
                     </div>
                 </button>
 
@@ -200,7 +215,7 @@ export default function QuizClient() {
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${selectedVariant === 'B' ? 'bg-green-500 text-white' : 'bg-green-500/10 text-green-400'}`}>B</div>
                     </div>
                     <div className="text-lg font-bold text-light group-hover:text-green-300 transition-colors">
-                        Как в реальности
+                        {variantB}
                     </div>
                 </button>
             </div>

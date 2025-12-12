@@ -13,11 +13,12 @@ import { createCategory, updateCategory, deleteCategory, type Category } from '@
 import toast from 'react-hot-toast';
 import { 
   LayoutGrid, Inbox, Tags, Plus, LogOut, ArrowLeft, 
-  Zap, ScanSearch, MessageSquare, ListChecks, Trash2, Eye, EyeOff, FileText, ImageIcon, Loader2, Check, X, Cpu, Database
+  Zap, ScanSearch, MessageSquare, ListChecks, Trash2, Eye, EyeOff, FileText, ImageIcon, Loader2, Check, X, Cpu, Database, PlayCircle, Volume2
 } from 'lucide-react';
 
 import dynamic from 'next/dynamic';
 import EffectsTab from '@/components/admin/tabs/EffectsTab';
+import ImagePreviewModal from '@/components/admin/modals/ImagePreviewModal';
 
 // Динамические импорты
 const EffectEditorModal = dynamic(() => import('@/components/admin/modals/EffectEditorModal'), { ssr: false });
@@ -70,6 +71,7 @@ export default function AdminClient({ effects: initialEffects, submissions: init
 
   const [neuralLogs, setNeuralLogs] = useState<string[]>([]);
   const addNeuralLog = (msg: string) => setNeuralLogs(prev => [...prev, msg]);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   // Подсчет количества эффектов по категориям
   const categoryCounts = useMemo(() => {
@@ -462,22 +464,109 @@ export default function AdminClient({ effects: initialEffects, submissions: init
         )}
 
         {activeTab === 'comments' && (
-          <div className="space-y-4">
-            {comments.length === 0 ? <div className="text-center py-20 text-light/40">Нет комментариев</div> : comments.map(comment => (
-              <div key={comment.id} className="bg-darkCard border border-light/10 rounded-xl p-6">
-                <div className="flex justify-between mb-2">
-                  <span className={`px-2 py-1 rounded text-xs font-semibold ${comment.type === 'WITNESS' ? 'bg-blue-500/20 text-blue-400' : comment.type === 'ARCHAEOLOGIST' ? 'bg-purple-500/20 text-purple-400' : 'bg-pink-500/20 text-pink-400'}`}>{comment.type}</span>
-                  <Link href={`/effect/${comment.effectId}`} target="_blank" className="text-sm text-primary hover:underline">{comment.effectTitle}</Link>
+          <>
+            <ImagePreviewModal 
+              isOpen={previewImage !== null}
+              imageUrl={previewImage || ''}
+              onClose={() => setPreviewImage(null)}
+            />
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {comments.length === 0 ? (
+                <div className="col-span-full text-center py-20 text-light/40">Нет комментариев</div>
+              ) : comments.map(comment => {
+                // Функция для создания короткой ссылки
+                const shortenUrl = (url: string) => {
+                  try {
+                    const urlObj = new URL(url);
+                    const hostname = urlObj.hostname.replace('www.', '');
+                    const path = urlObj.pathname;
+                    // Берем первые 20 символов пути или весь путь если короче
+                    const shortPath = path.length > 20 ? path.substring(0, 20) + '...' : path;
+                    return `${hostname}${shortPath}`;
+                  } catch {
+                    return url.length > 30 ? url.substring(0, 30) + '...' : url;
+                  }
+                };
+
+                return (
+                  <div key={comment.id} className="bg-darkCard border border-light/10 rounded-lg p-3 flex flex-col hover:border-primary/30 transition-colors">
+                    {/* Заголовок: Тип + Название эффекта */}
+                    <div className="mb-2">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase ${comment.type === 'WITNESS' ? 'bg-blue-500/20 text-blue-400' : comment.type === 'ARCHAEOLOGIST' ? 'bg-purple-500/20 text-purple-400' : 'bg-pink-500/20 text-pink-400'}`}>
+                          {comment.type}
+                        </span>
+                        <span className="text-[10px] text-light/40">{new Date(comment.createdAt).toLocaleDateString('ru-RU')}</span>
+                      </div>
+                      <Link href={`/effect/${comment.effectId}`} target="_blank" className="text-xs text-primary hover:underline font-medium line-clamp-1">
+                        {comment.effectTitle}
+                      </Link>
+                    </div>
+
+                    {/* Текст комментария */}
+                    <p className="text-xs text-light/70 mb-2 whitespace-pre-wrap line-clamp-3 leading-relaxed flex-1">{comment.text}</p>
+
+                    {/* Медиа: Изображение, Видео, Аудио */}
+                    {(comment.imageUrl || comment.videoUrl || comment.audioUrl || comment.theoryType) && (
+                      <div className="flex flex-wrap gap-1.5 mb-2">
+                        {comment.imageUrl && (
+                          <button
+                            onClick={() => setPreviewImage(comment.imageUrl)}
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 rounded text-[10px] border border-blue-500/20 transition-colors cursor-pointer group"
+                            title={comment.imageUrl}
+                          >
+                            <ImageIcon className="w-2.5 h-2.5" />
+                            <span className="max-w-[120px] truncate">{shortenUrl(comment.imageUrl)}</span>
+                          </button>
+                        )}
+                        {comment.videoUrl && (
+                          <a href={comment.videoUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded text-[10px] border border-red-500/20 transition-colors">
+                            <PlayCircle className="w-2.5 h-2.5" />
+                            <span className="max-w-[120px] truncate">{shortenUrl(comment.videoUrl)}</span>
+                          </a>
+                        )}
+                        {comment.audioUrl && (
+                          <a href={comment.audioUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 rounded text-[10px] border border-purple-500/20 transition-colors">
+                            <Volume2 className="w-2.5 h-2.5" />
+                            <span className="max-w-[120px] truncate">{shortenUrl(comment.audioUrl)}</span>
+                          </a>
+                        )}
+                        {comment.theoryType && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-pink-500/10 text-pink-400 rounded text-[10px] border border-pink-500/20">
+                            Теория: {comment.theoryType}
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                {/* Действия: Одобрить/Отклонить */}
+                <div className="mt-auto pt-2 border-t border-light/5 flex items-center justify-between">
+                  <div className="flex items-center gap-3 text-[10px] text-light/50">
+                    <span>👍 {comment.likes}</span>
+                    {comment.reports > 0 && <span className="text-red-400">⚠ {comment.reports}</span>}
+                  </div>
+                  <div className="flex gap-1.5">
+                    <button 
+                      onClick={() => handleModerateComment(comment.id, 'APPROVED')} 
+                      className="px-2 py-1 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded text-[10px] font-medium transition-colors flex items-center gap-1"
+                    >
+                      <Check className="w-3 h-3" />
+                      <span className="hidden sm:inline">Одобрить</span>
+                    </button>
+                    <button 
+                      onClick={() => handleModerateComment(comment.id, 'REJECTED')} 
+                      className="px-2 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded text-[10px] font-medium transition-colors flex items-center gap-1"
+                    >
+                      <X className="w-3 h-3" />
+                      <span className="hidden sm:inline">Отклонить</span>
+                    </button>
+                  </div>
                 </div>
-                <p className="text-sm text-light/70 mb-4 whitespace-pre-wrap">{comment.text}</p>
-                {comment.imageUrl && <img src={comment.imageUrl} alt="" className="max-w-xs rounded border border-white/10 mb-4" />}
-                <div className="flex gap-3">
-                  <button onClick={() => handleModerateComment(comment.id, 'APPROVED')} className="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg text-sm">Одобрить</button>
-                  <button onClick={() => handleModerateComment(comment.id, 'REJECTED')} className="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg text-sm">Отклонить</button>
-                </div>
-              </div>
-            ))}
-          </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
         )}
 
         {activeTab === 'categories' && (
